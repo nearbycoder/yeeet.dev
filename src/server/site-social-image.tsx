@@ -1,9 +1,17 @@
 import { Resvg } from '@resvg/resvg-js'
+import { createRequire } from 'node:module'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { YeeetlingArtwork, getYeeetlingDesign } from '#/components/yeeetling'
 
 export const SOCIAL_IMAGE_WIDTH = 1200
 export const SOCIAL_IMAGE_HEIGHT = 630
+
+const require = createRequire(import.meta.url)
+const socialFontFiles = [
+  require.resolve('@expo-google-fonts/open-sans/400Regular/OpenSans_400Regular.ttf'),
+  require.resolve('@expo-google-fonts/open-sans/700Bold/OpenSans_700Bold.ttf'),
+  require.resolve('@expo-google-fonts/open-sans/800ExtraBold/OpenSans_800ExtraBold.ttf'),
+]
 
 export function displayNameFromSlug(slug: string) {
   return slug
@@ -73,7 +81,7 @@ export function siteSocialImageSvg(input: { hostname: string; slug: string }) {
           y="39"
           textAnchor="middle"
           fill="#f5f1e8"
-          fontFamily="Arial, sans-serif"
+          fontFamily="Open Sans, sans-serif"
           fontSize="26"
           fontWeight="900"
         >
@@ -83,7 +91,7 @@ export function siteSocialImageSvg(input: { hostname: string; slug: string }) {
           x="76"
           y="39"
           fill="#181815"
-          fontFamily="Arial, sans-serif"
+          fontFamily="Open Sans, sans-serif"
           fontSize="27"
           fontWeight="800"
         >
@@ -97,7 +105,7 @@ export function siteSocialImageSvg(input: { hostname: string; slug: string }) {
           x="27"
           y="-14"
           fill="#181815"
-          fontFamily="monospace"
+          fontFamily="Open Sans, sans-serif"
           fontSize="16"
           fontWeight="700"
           letterSpacing="3"
@@ -108,7 +116,7 @@ export function siteSocialImageSvg(input: { hostname: string; slug: string }) {
           x="0"
           y="70"
           fill="#181815"
-          fontFamily="Arial, sans-serif"
+          fontFamily="Open Sans, sans-serif"
           fontSize={titleFontSize}
           fontWeight="900"
           letterSpacing="-4"
@@ -123,7 +131,7 @@ export function siteSocialImageSvg(input: { hostname: string; slug: string }) {
           x="3"
           y={lines.length === 1 ? 190 : 272}
           fill="#6e6a61"
-          fontFamily="Arial, sans-serif"
+          fontFamily="Open Sans, sans-serif"
           fontSize="25"
         >
           {subtitle}
@@ -178,7 +186,7 @@ export function siteSocialImageSvg(input: { hostname: string; slug: string }) {
           x="58"
           y="40"
           fill="#f5f1e8"
-          fontFamily="monospace"
+          fontFamily="Open Sans, sans-serif"
           fontSize="22"
           fontWeight="700"
         >
@@ -189,7 +197,7 @@ export function siteSocialImageSvg(input: { hostname: string; slug: string }) {
           y="40"
           textAnchor="end"
           fill="#f04d2f"
-          fontFamily="Arial, sans-serif"
+          fontFamily="Open Sans, sans-serif"
           fontSize="20"
           fontWeight="800"
         >
@@ -207,10 +215,11 @@ export function renderSiteSocialImage(input: {
   const renderer = new Resvg(siteSocialImageSvg(input), {
     fitTo: { mode: 'original' },
     font: {
-      loadSystemFonts: true,
-      defaultFontFamily: 'Arial',
-      sansSerifFamily: 'Arial',
-      monospaceFamily: 'monospace',
+      fontFiles: socialFontFiles,
+      loadSystemFonts: false,
+      defaultFontFamily: 'Open Sans',
+      sansSerifFamily: 'Open Sans',
+      monospaceFamily: 'Open Sans',
     },
     shapeRendering: 2,
     textRendering: 1,

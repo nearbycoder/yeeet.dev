@@ -27,6 +27,7 @@ import {
   injectSiteSocialMetadata,
 } from '../src/server/site-social-metadata'
 import {
+  publicSiteOrigin,
   shouldUseSpaFallback,
   siteResponsePolicy,
 } from '../src/server/site-gateway'
@@ -134,6 +135,7 @@ test('generates a deterministic 1200 by 630 social card with the original Yeeetl
   })
   assert.deepEqual(first, second)
   assert.deepEqual([...first.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10])
+  assert.ok(first.byteLength > 75_000)
   assert.equal(first.readUInt32BE(16), 1200)
   assert.equal(first.readUInt32BE(20), 630)
 })
@@ -176,6 +178,23 @@ test('injects an automatic social card only when the site has not supplied one',
       siteName: 'Custom',
     }),
     custom,
+  )
+})
+
+test('uses the public HTTPS origin for generated metadata in production', async () => {
+  await withEnvironment({ NODE_ENV: 'production' }, () => {
+    assert.equal(
+      publicSiteOrigin(new Request('http://test.site.yeeet.dev/about')),
+      'https://test.site.yeeet.dev',
+    )
+  })
+  assert.equal(
+    publicSiteOrigin(
+      new Request('http://test.site.yeeet.dev/about', {
+        headers: { 'x-forwarded-proto': 'https' },
+      }),
+    ),
+    'https://test.site.yeeet.dev',
   )
 })
 

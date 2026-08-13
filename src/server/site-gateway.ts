@@ -114,6 +114,22 @@ export function siteResponsePolicy(
   }
 }
 
+export function publicSiteOrigin(request: Request) {
+  const url = new URL(request.url)
+  if (process.env.NODE_ENV === 'production') return `https://${url.host}`
+
+  const forwardedProtocol = request.headers
+    .get('x-forwarded-proto')
+    ?.split(',')
+    .at(0)
+    ?.trim()
+  const protocol =
+    forwardedProtocol === 'http' || forwardedProtocol === 'https'
+      ? `${forwardedProtocol}:`
+      : url.protocol
+  return `${protocol}//${url.host}`
+}
+
 function escapeHtml(value: string) {
   return value
     .replaceAll('&', '&amp;')
@@ -333,7 +349,7 @@ export async function maybeServeSite(
       target.kind === 'version',
       protectedDeployment,
     )
-    const etag = protectedDeployment ? null : `"yeeet-og-${deployment.id}-v1"`
+    const etag = protectedDeployment ? null : `"yeeet-og-${deployment.id}-v2"`
     const headers = new Headers({
       'content-type': 'image/png',
       'cache-control': responsePolicy.cacheControl,
@@ -420,7 +436,7 @@ export async function maybeServeSite(
   )
   const etag =
     !protectedDeployment && file.etag
-      ? `"${injectSocialImage ? `yeeet-social-v1-${file.etag}` : file.etag}"`
+      ? `"${injectSocialImage ? `yeeet-social-v2-${file.etag}` : file.etag}"`
       : undefined
   const headers = new Headers({
     'content-type': file.contentType,
@@ -454,10 +470,11 @@ export async function maybeServeSite(
     const object = await getStoredObject(file.storageKey, range)
     if (injectSocialImage) {
       const originalHtml = (await object.Body?.transformToString()) ?? ''
-      const pageUrl = `${requestUrl.origin}${requestUrl.pathname}`
+      const publicOrigin = publicSiteOrigin(request)
+      const pageUrl = `${publicOrigin}${requestUrl.pathname}`
       const body = injectSiteSocialMetadata(originalHtml, {
         hostname: target.label,
-        imageUrl: new URL(GENERATED_SOCIAL_IMAGE_PATH, requestUrl.origin).href,
+        imageUrl: new URL(GENERATED_SOCIAL_IMAGE_PATH, publicOrigin).href,
         pageUrl,
         siteName: displayNameFromSlug(siteSlug),
       })
