@@ -193,6 +193,8 @@ test('serves configured human and machine-readable docs', async () => {
       assert.match(home.headers.get('content-type') ?? '', /^text\/html/)
       const html = await home.text()
       assert.match(html, /From folder to <span>HTTPS<\/span>/)
+      assert.match(html, /A Small Deployment Plane for Static Sites/)
+      assert.match(html, /Open source and self-hostable/)
       assert.match(html, /https:\/\/deploy\.example\.com\/dashboard/)
       assert.match(html, /sites\.example\.com/)
 

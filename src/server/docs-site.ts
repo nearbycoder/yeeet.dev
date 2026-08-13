@@ -1113,6 +1113,9 @@ Canonical human docs: https://docs.yeeet.dev/
 Complete plain-text docs: https://docs.yeeet.dev/llms-full.txt
 OpenAPI: https://docs.yeeet.dev/openapi.json
 Dashboard: https://yeeet.dev/dashboard
+Source and self-hosting guide: https://github.com/nearbycoder/yeeet.dev
+
+Yeeet is for developers shipping static builds, teams reviewing immutable previews, agents and CI that need deterministic JSON, and operators who want a compact self-hosted deployment plane. It serves already-built files; it does not execute untrusted builds.
 
 ## Fastest path
 
@@ -1167,6 +1170,9 @@ Yeeet turns a file or build folder into a globally cached HTTPS site. Deploys ar
 
 Human documentation: https://docs.yeeet.dev/
 OpenAPI contract: https://docs.yeeet.dev/openapi.json
+MIT-licensed source and self-hosting guide: https://github.com/nearbycoder/yeeet.dev
+
+Yeeet is designed for developers, review teams, agents, CI pipelines, and self-hosting platform operators. It accepts already-built static files and deliberately does not execute user-supplied builds.
 
 ## Requirements
 
@@ -1401,6 +1407,7 @@ const DOCS_HTML = String.raw`<!doctype html>
       <div class="docs-shell">
         <nav class="toc" aria-label="On this page">
           <p>On This Page</p>
+          <a href="#overview">What Yeeet Is</a>
           <a href="#quick-start">Quick Start</a>
           <a href="#deploy">Deploy</a>
           <a href="#versions">Versions & Rollback</a>
@@ -1413,10 +1420,36 @@ const DOCS_HTML = String.raw`<!doctype html>
         </nav>
 
         <article class="docs-content">
+          <section class="docs-section" id="overview">
+            <span class="section-label">00 / Mission Control</span>
+            <h2>A Small Deployment Plane for Static Sites</h2>
+            <p>Yeeet takes an already-built file or folder and publishes it as an atomic HTTPS release. It combines direct-to-bucket uploads, immutable versions, a movable live alias, SPA refresh support, private review links, custom domains, and edge-aware caching behind one browser workflow and one CLI.</p>
+            <p>It is intentionally focused: Yeeet serves static output and never executes an untrusted build. Run your framework's build locally or in CI, then hand Yeeet the resulting <span class="inline-code" translate="no">dist</span>, <span class="inline-code" translate="no">build</span>, <span class="inline-code" translate="no">out</span>, or <span class="inline-code" translate="no">public</span> directory.</p>
+            <div class="workflow-grid">
+              <article class="workflow-card">
+                <h3>Developers</h3>
+                <p>Ship a portfolio, documentation build, prototype, or client-side app without creating a deployment pipeline.</p>
+              </article>
+              <article class="workflow-card">
+                <h3>Review Teams</h3>
+                <p>Keep immutable previews, roll back instantly, and share protected work through a revocable one-click link.</p>
+              </article>
+              <article class="workflow-card">
+                <h3>Agents & CI</h3>
+                <p>Use API keys, stable JSON, predictable exit codes, LLM-readable guidance, and an OpenAPI contract.</p>
+              </article>
+              <article class="workflow-card">
+                <h3>Platform Operators</h3>
+                <p>Run the complete MIT-licensed control plane on Railway with Postgres and private S3-compatible storage.</p>
+              </article>
+            </div>
+            <div class="callout"><p><strong>Open source and self-hostable.</strong> Read the architecture, configuration, Railway setup, contribution guide, security policy, and MIT license in the <a href="https://github.com/nearbycoder/yeeet.dev">Yeeet GitHub repository</a>.</p></div>
+          </section>
+
           <section class="docs-section" id="quick-start">
             <span class="section-label">01 / First Flight</span>
             <h2>Deploy Your First Site</h2>
-            <p>Bring Node.js 20+, a Yeeet account, and a folder containing static files. The CLI handles the manifest, parallel uploads, atomic activation, and URL.</p>
+            <p>Bring Node.js 20.19+ or 22.12+, a Yeeet account, and a folder containing static files. The CLI handles the manifest, parallel uploads, atomic activation, and URL.</p>
             <ol class="step-list">
               <li>
                 <div>
