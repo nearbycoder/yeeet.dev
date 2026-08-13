@@ -5,10 +5,38 @@ workflows, CI, and coding agents. Give it a file or build directory and it
 publishes an atomic, CDN-cached HTTPS deployment on a generated or chosen
 subdomain.
 
+<p align="center">
+  <a href="https://yeeet.dev">
+    <img src="docs/images/yeeet-home.jpg" alt="Yeeet marketing site showing Build it. Yeeet it. and an animated deployment mascot" width="100%">
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/nearbycoder/yeeet.dev/actions/workflows/ci.yml"><img src="https://github.com/nearbycoder/yeeet.dev/actions/workflows/ci.yml/badge.svg" alt="CI status"></a>
+  <a href="https://www.npmjs.com/package/@yeeet.dev/cli"><img src="https://img.shields.io/npm/v/%40yeeet.dev%2Fcli?label=CLI" alt="npm CLI version"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-111111" alt="MIT license"></a>
+  <a href="https://railway.com/new/template/xVmmCY?utm_medium=integration&utm_source=button&utm_campaign=yeeet"><img src="https://railway.com/button.svg" alt="Deploy on Railway"></a>
+</p>
+
 The hosted instance lives at [yeeet.dev](https://yeeet.dev). This repository is
 the complete platform: the web console, asset gateway, API, database schema,
 Railway deployment configuration, documentation site, and the
 [`@yeeet.dev/cli`](packages/cli) package.
+
+<table>
+  <tr>
+    <td width="50%">
+      <a href="https://docs.yeeet.dev"><img src="docs/images/docs-quick-start.jpg" alt="Yeeet human and LLM-friendly CLI documentation"></a>
+    </td>
+    <td width="50%">
+      <a href="https://yeeet.dev/mascot"><img src="docs/images/yeeetling-lab.png" alt="Yeeetling Lab generating a unique mascot for every deployed site"></a>
+    </td>
+  </tr>
+  <tr>
+    <td align="center"><strong>Human + LLM-friendly CLI docs</strong></td>
+    <td align="center"><strong>A tiny weird coworker for every site</strong></td>
+  </tr>
+</table>
 
 ## Who it is for
 
@@ -96,23 +124,48 @@ YEEET_TOKEN=yeeet_... yeeet deploy ./dist --name comet --json
 The CLI can target any self-hosted instance with `--api https://your-domain` or
 the `YEEET_API` environment variable.
 
+## One-click Railway deploy
+
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/new/template/xVmmCY?utm_medium=integration&utm_source=button&utm_campaign=yeeet)
+
+The template provisions the Yeeet application, PostgreSQL with a persistent
+volume, and a private Railway Bucket. Database and bucket credentials are wired
+with Railway references, while auth and database secrets are generated per
+deployment. The form asks only for:
+
+- the wildcard site suffix you own, such as `site.example.com`;
+- the docs hostname, such as `docs.example.com`;
+- the initial administrator email or comma-separated emails;
+- a private one-time invitation code for the first signup.
+
+Railway gives the control plane a generated HTTPS domain immediately. To make
+site and docs routing live, add the control-plane, wildcard, and docs domains to
+the app service after deployment, then publish the DNS ownership and ACME
+records Railway returns. Apply bucket CORS before browser uploads. The exact
+post-deploy checklist is in the
+[Railway production setup](docs/railway.md#5-add-the-platform-domains).
+
+GitHub OAuth and automatic user custom-domain provisioning are optional. Add
+their variables later if you need them; email/password auth and wildcard site
+deployments work without either integration.
+
 ## Self-host on Railway
 
 Yeeet is designed around one Railway application service plus Railway Postgres
 and an S3-compatible bucket. A Railway Bucket is the simplest production
 choice, but the storage adapter also accepts compatible providers.
 
-1. Fork this repository.
-2. Create an app service, Postgres service, and private bucket in one Railway
-   project.
-3. Copy the variables from [`.env.example`](.env.example) into the app service
-   and replace every development value or blank secret.
-4. Set `BETTER_AUTH_URL` to the control-plane origin and `SITE_DOMAIN` to the
+1. Use the one-click template above, or fork this repository and create an app
+   service, Postgres service, and private bucket in one Railway project.
+2. If you created the services manually, copy the variables from
+   [`.env.example`](.env.example) into the app service and replace every
+   development value or blank secret.
+3. Set `BETTER_AUTH_URL` to the control-plane origin and `SITE_DOMAIN` to the
    wildcard suffix you own.
-5. Add the control-plane domain and `*.SITE_DOMAIN` to the Railway service, then
+4. Add the control-plane domain and `*.SITE_DOMAIN` to the Railway service, then
    publish every DNS record Railway returns—including ownership and ACME
    verification records.
-6. Deploy. [`railway.json`](railway.json) builds the app, applies committed
+5. Deploy. [`railway.json`](railway.json) builds the app, applies committed
    Drizzle migrations, bootstraps the configured administrators, and checks
    `/health`.
 

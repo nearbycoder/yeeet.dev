@@ -11,6 +11,18 @@ The examples use these replaceable domains:
 - Site wildcard: `*.site.example.com`
 - Documentation: `https://docs.example.com`
 
+## One-click option
+
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/new/template/xVmmCY?utm_medium=integration&utm_source=button&utm_campaign=yeeet)
+
+The template creates the application, PostgreSQL volume, and private asset
+bucket; wires their references; and generates fresh database and auth secrets.
+It asks only for `SITE_DOMAIN`, `DOCS_HOST`, `ADMIN_EMAILS`, and the first private
+invitation code. Continue at [Configure bucket CORS](#4-configure-bucket-cors)
+and [Add the platform domains](#5-add-the-platform-domains) after it deploys.
+
+Use the manual steps below when you want different services, storage, or regions.
+
 ## 1. Create the resources
 
 Create these resources in the same Railway project and production environment:
