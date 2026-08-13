@@ -1,0 +1,91 @@
+# Yeeet
+
+Yeeet deploys static files to an operator-configured wildcard domain such as
+`https://<name>.site.example.com`.
+
+This file is served by the current Yeeet control plane. Human, concise LLM, and
+complete plain-text docs are available from its configured documentation host.
+OpenAPI is available at `/openapi.json`. Source and self-hosting documentation:
+https://github.com/nearbycoder/yeeet.dev
+
+## Preferred agent interface
+
+Install the published CLI, then use an API key from the dashboard:
+
+```sh
+npm install --global @yeeet.dev/cli
+export YEEET_TOKEN="yeeet_..."
+yeeet deploy ./dist --json
+```
+
+The published CLI defaults to `https://yeeet.dev`. For another instance, set
+`YEEET_API` to its control-plane origin or pass `--api <url>`.
+
+Successful JSON output:
+
+```json
+{"status":"ready","url":"https://swift-comet-a1b2c3.site.example.com","versionUrl":"https://v-uuidwithoutdashes.site.example.com","deployment":"uuid","site":"swift-comet-a1b2c3","spaFallback":true,"protected":false,"shareUrl":null,"files":42,"bytes":2457600}
+```
+
+The command exits 0 on success, 2 when authentication is required, and 1 for
+validation, upload, or network errors. Human users can run `yeeet login`, which
+uses a secure device authorization flow. Agents and CI should set YEEET_TOKEN.
+
+## Commands
+
+- `yeeet deploy <path> --json`: atomic deployment to a generated readable
+  subdomain. Add `--name <slug>` for a stable name, `--spa` to explicitly enable
+  the default SPA fallback, or `--static` for exact-file routing. Add
+  `--password <password>` or set `YEEET_DEPLOY_PASSWORD` to protect the version
+  and receive a signed one-click share URL.
+- `yeeet sites --json`: list live sites.
+- `yeeet versions <site> --json`: list immutable releases and preview URLs.
+- `yeeet rollback <site> [version] --json`: atomically activate a previous
+  release. Omit the version to choose the previous ready release; IDs may use an
+  unambiguous prefix of at least 8 characters.
+- `yeeet whoami --json`: validate credentials.
+- `yeeet share <site> [version] --json`: return the private share link for the
+  live or selected protected version.
+- `yeeet access protect <site> <version> --password <password> --json`: protect
+  or change the password on an existing version.
+- `yeeet access public <site> <version> --json`: remove password protection.
+- `yeeet access rotate-link <site> <version> --json`: revoke the previous share
+  link and viewer cookies, then return a new link.
+- `yeeet version remove <site> <version> --yes --json`: permanently delete one
+  version and its objects. If it was live, the newest remaining ready version
+  becomes live; otherwise the site is left with no live version.
+- `yeeet remove <site> --yes --json`: permanently delete a site, every version,
+  attached domain mapping, and stored object.
+- `yeeet domain list <site> --json`: list domains and DNS/TLS status.
+- `yeeet domain add <site> <hostname> --json`: attach a hostname and return the
+  required Railway routing and ownership-verification DNS records.
+- `yeeet domain refresh <site> <domain> --json`: refresh DNS/TLS status.
+- `yeeet domain remove <site> <domain> --json`: detach a hostname.
+- `yeeet init [slug]`: create `.yeeet.json`; without a slug, deploys use random
+  names. Set `spaFallback` to `false` for exact-file routing.
+
+`.yeeetignore` uses glob patterns. `.git`, `node_modules`, `.DS_Store`, and the
+ignore file itself are excluded automatically. Never log or commit YEEET_TOKEN.
+
+## HTTP API
+
+OpenAPI: `/openapi.json` on the current control-plane origin.
+
+Authenticate with `Authorization: Bearer <token>` or `X-API-Key: <api-key>`.
+Create a deployment by POSTing a file manifest to `/api/v1/deployments`, PUT
+each file to its returned signed URL using the exact returned headers, then POST
+the returned `completeUrl`. The site only changes after completion succeeds.
+`slug` is optional and `spaFallback` defaults to true. `password` is optional,
+must be 8–128 characters, and is stored only as a memory-hard hash.
+Use `GET /api/v1/sites/{slug}/versions` to inspect history and `POST
+/api/v1/sites/{slug}/versions/{version}/activate` to promote any ready version.
+Use `PATCH /api/v1/sites/{slug}/versions/{version}/access` to change privacy,
+`DELETE` on that version to remove it, or `DELETE /api/v1/sites/{slug}` to
+remove the site. Version preview URLs are immutable. Signed share URLs grant a
+host-only, HTTP-only viewer cookie and redirect immediately to a clean URL.
+Live aliases reflect pointer changes at the edge within about ten seconds.
+Custom domains use `/api/v1/sites/{slug}/domains`; create returns every DNS
+record required for Railway verification and managed TLS.
+
+Registration is invitation-only. Administrators use `/admin` for invitations,
+account roles and suspensions, site deletion, and the moderation audit log.

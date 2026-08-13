@@ -1,0 +1,35 @@
+{
+  "name": "@yeeet.dev/cli",
+  "version": "0.0.1",
+  "description": "Yeeet static sites at terminal velocity.",
+  "type": "module",
+  "license": "MIT",
+  "homepage": "https://github.com/nearbycoder/yeeet.dev/tree/main/packages/cli#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nearbycoder/yeeet.dev.git",
+    "directory": "packages/cli"
+  },
+  "bugs": {
+    "url": "https://github.com/nearbycoder/yeeet.dev/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "bin": {
+    "yeeet": "./bin/yeeet.js"
+  },
+  "files": [
+    "bin",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "commander": "^14.0.0",
+    "fast-glob": "^3.3.3",
+    "mime-types": "^3.0.1",
+    "open": "^10.2.0"
+  }
+}
