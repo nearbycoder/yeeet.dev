@@ -13,7 +13,7 @@ The examples use these replaceable domains:
 
 ## One-click option
 
-[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/new/template/xVmmCY?utm_medium=integration&utm_source=button&utm_campaign=yeeet)
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/new/template/yeeet?utm_medium=integration&utm_source=button&utm_campaign=yeeet)
 
 The template creates the application, PostgreSQL volume, and private asset
 bucket; wires their references; and generates fresh database and auth secrets.

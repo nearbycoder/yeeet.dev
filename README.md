@@ -15,7 +15,7 @@ subdomain.
   <a href="https://github.com/nearbycoder/yeeet.dev/actions/workflows/ci.yml"><img src="https://github.com/nearbycoder/yeeet.dev/actions/workflows/ci.yml/badge.svg" alt="CI status"></a>
   <a href="https://www.npmjs.com/package/@yeeet.dev/cli"><img src="https://img.shields.io/npm/v/%40yeeet.dev%2Fcli?label=CLI" alt="npm CLI version"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-111111" alt="MIT license"></a>
-  <a href="https://railway.com/new/template/xVmmCY?utm_medium=integration&utm_source=button&utm_campaign=yeeet"><img src="https://railway.com/button.svg" alt="Deploy on Railway"></a>
+  <a href="https://railway.com/new/template/yeeet?utm_medium=integration&utm_source=button&utm_campaign=yeeet"><img src="https://railway.com/button.svg" alt="Deploy on Railway"></a>
 </p>
 
 The hosted instance lives at [yeeet.dev](https://yeeet.dev). This repository is
@@ -126,7 +126,7 @@ the `YEEET_API` environment variable.
 
 ## One-click Railway deploy
 
-[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/new/template/xVmmCY?utm_medium=integration&utm_source=button&utm_campaign=yeeet)
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/new/template/yeeet?utm_medium=integration&utm_source=button&utm_campaign=yeeet)
 
 The template provisions the Yeeet application, PostgreSQL with a persistent
 volume, and a private Railway Bucket. Database and bucket credentials are wired
