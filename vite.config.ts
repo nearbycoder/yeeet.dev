@@ -10,7 +10,9 @@ const config = defineConfig({
   resolve: { tsconfigPaths: true },
   plugins: [
     devtools(),
-    nitro({ rollupConfig: { external: [/^@sentry\//] } }),
+    nitro({
+      rollupConfig: { external: [/^@sentry\//, /^@resvg\/resvg-js/] },
+    }),
 
     tanstackStart(),
     viteReact(),

@@ -1158,6 +1158,7 @@ Exit codes are 0 for success, 2 when authentication is required, and 1 for valid
 - Uploads are atomic: the live pointer changes only after every object completes.
 - Version preview URLs are immutable; live aliases update at the edge in about 10 seconds.
 - SPA fallback defaults to true and only handles navigation-like paths, not missing assets.
+- Public sites receive a deterministic 1200x630 Yeeetling social card at /_yeeet/og.png unless their HTML supplies og:image or twitter:image.
 - --json suppresses decorative output. Parse stdout as one JSON object.
 - Version identifiers accept an unambiguous prefix of at least 8 characters where supported.
 - Passwords are 8–128 characters. YEEET_DEPLOY_PASSWORD avoids a password in shell history.
@@ -1338,6 +1339,7 @@ Manage releases through /api/v1/sites/{slug}/versions, privacy through the versi
 
 - Live aliases revalidate at the edge within about 10 seconds.
 - Immutable version URLs use long-lived caching and never change.
+- Public HTML without og:image or twitter:image receives an automatic 1200x630 social card at /_yeeet/og.png containing the site name, hostname, and its original deterministic Yeeetling. Author-provided image metadata always wins.
 - Failed or partial uploads never replace the live release.
 - A generated subdomain is returned when no name or project default is supplied.
 - Registration is invitation-only. Administrators manage invitations and account access from /admin.
@@ -1423,12 +1425,12 @@ const DOCS_HTML = String.raw`<!doctype html>
           <section class="docs-section" id="overview">
             <span class="section-label">00 / Mission Control</span>
             <h2>A Small Deployment Plane for Static Sites</h2>
-            <p>Yeeet takes an already-built file or folder and publishes it as an atomic HTTPS release. It combines direct-to-bucket uploads, immutable versions, a movable live alias, SPA refresh support, private review links, custom domains, and edge-aware caching behind one browser workflow and one CLI.</p>
+            <p>Yeeet takes an already-built file or folder and publishes it as an atomic HTTPS release. It combines direct-to-bucket uploads, immutable versions, a movable live alias, SPA refresh support, private review links, custom domains, automatic social cards, and edge-aware caching behind one browser workflow and one CLI.</p>
             <p>It is intentionally focused: Yeeet serves static output and never executes an untrusted build. Run your framework's build locally or in CI, then hand Yeeet the resulting <span class="inline-code" translate="no">dist</span>, <span class="inline-code" translate="no">build</span>, <span class="inline-code" translate="no">out</span>, or <span class="inline-code" translate="no">public</span> directory.</p>
             <div class="workflow-grid">
               <article class="workflow-card">
                 <h3>Developers</h3>
-                <p>Ship a portfolio, documentation build, prototype, or client-side app without creating a deployment pipeline.</p>
+                <p>Ship a portfolio, documentation build, prototype, or client-side app with a generated Yeeetling preview card when you do not provide one.</p>
               </article>
               <article class="workflow-card">
                 <h3>Review Teams</h3>

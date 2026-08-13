@@ -18,6 +18,15 @@ import { hashInvitationCode } from '../src/server/invitations'
 import { maybeServeDocs } from '../src/server/docs-site'
 import { getYeeetlingDesign } from '../src/components/yeeetling'
 import {
+  displayNameFromSlug,
+  renderSiteSocialImage,
+  siteSocialImageSvg,
+} from '../src/server/site-social-image'
+import {
+  GENERATED_SOCIAL_IMAGE_PATH,
+  injectSiteSocialMetadata,
+} from '../src/server/site-social-metadata'
+import {
   shouldUseSpaFallback,
   siteResponsePolicy,
 } from '../src/server/site-gateway'
@@ -102,6 +111,72 @@ test('generates stable Yeeetlings with thousands of distinct designs', () => {
     ),
   )
   assert.ok(designs.size > 4000)
+})
+
+test('generates a deterministic 1200 by 630 social card with the original Yeeetling', () => {
+  assert.equal(displayNameFromSlug('cosmic-pickle'), 'Cosmic Pickle')
+  const svg = siteSocialImageSvg({
+    hostname: 'cosmic-pickle.site.yeeet.dev',
+    slug: 'cosmic-pickle',
+  })
+  assert.match(svg, /width="1200" height="630"/)
+  assert.match(svg, /Cosmic Pickle/)
+  assert.match(svg, /cosmic-pickle\.site\.yeeet\.dev/)
+  assert.match(svg, /yeeetling-social-card/)
+
+  const first = renderSiteSocialImage({
+    hostname: 'cosmic-pickle.site.yeeet.dev',
+    slug: 'cosmic-pickle',
+  })
+  const second = renderSiteSocialImage({
+    hostname: 'cosmic-pickle.site.yeeet.dev',
+    slug: 'cosmic-pickle',
+  })
+  assert.deepEqual(first, second)
+  assert.deepEqual([...first.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10])
+  assert.equal(first.readUInt32BE(16), 1200)
+  assert.equal(first.readUInt32BE(20), 630)
+})
+
+test('injects an automatic social card only when the site has not supplied one', () => {
+  const html =
+    '<!doctype html><html><head><title>Cosmic Docs</title></head><body>Hi</body></html>'
+  const generated = injectSiteSocialMetadata(html, {
+    hostname: 'cosmic-pickle.site.yeeet.dev',
+    imageUrl: `https://cosmic-pickle.site.yeeet.dev${GENERATED_SOCIAL_IMAGE_PATH}`,
+    pageUrl: 'https://cosmic-pickle.site.yeeet.dev/',
+    siteName: 'Cosmic Pickle',
+  })
+  assert.match(generated, /property="og:image"/)
+  assert.match(generated, /name="twitter:image"/)
+  assert.match(generated, /content="1200"/)
+  assert.match(generated, /content="630"/)
+  assert.match(generated, /content="Cosmic Docs"/)
+  assert.match(generated, /_yeeet\/og\.png/)
+
+  const partial =
+    '<html><head><meta property="og:title" content="Handmade title"></head></html>'
+  const supplemented = injectSiteSocialMetadata(partial, {
+    hostname: 'custom.example.com',
+    imageUrl: 'https://custom.example.com/_yeeet/og.png',
+    pageUrl: 'https://custom.example.com/',
+    siteName: 'Custom',
+  })
+  assert.equal(supplemented.match(/property="og:title"/g)?.length, 1)
+  assert.match(supplemented, /content="Handmade title"/)
+  assert.match(supplemented, /property="og:image"/)
+
+  const custom =
+    '<html><head><META content="/mine.png" PROPERTY="OG:IMAGE"></head></html>'
+  assert.equal(
+    injectSiteSocialMetadata(custom, {
+      hostname: 'custom.example.com',
+      imageUrl: 'https://custom.example.com/_yeeet/og.png',
+      pageUrl: 'https://custom.example.com/',
+      siteName: 'Custom',
+    }),
+    custom,
+  )
 })
 
 test('normalizes custom hostnames and rejects URLs or reserved hosts', () => {

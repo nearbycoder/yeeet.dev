@@ -60,6 +60,7 @@ builds or replace a framework's build command.
 - Password-protected deployments and revocable one-click private share links.
 - Custom domains with Railway-managed DNS verification and TLS.
 - Private S3-compatible object storage behind a cache-aware asset gateway.
+- Automatic 1200×630 social cards with each site's original Yeeetling mascot.
 - Email/password and GitHub login through Better Auth.
 - Invitation-only registration, account bans, role management, and audit history.
 - An OpenAPI contract, LLM-readable docs, API keys, and stable JSON output.
@@ -88,6 +89,12 @@ pointer; they do not copy or mutate files.
 Public live aliases use short edge revalidation. Immutable version hosts can be
 cached for a year. Version previews and protected deployments emit crawler
 blocking headers; protected responses are private and never CDN-cached.
+
+When a site's HTML does not declare `og:image` or `twitter:image`, the gateway
+adds complete Open Graph and X card metadata for a deterministic image at
+`/_yeeet/og.png`. The card includes the site's name, hostname, and original
+Yeeetling. Add either image tag to your uploaded HTML to use your own artwork;
+Yeeet leaves author-provided social metadata untouched.
 
 ## Use the hosted CLI
 

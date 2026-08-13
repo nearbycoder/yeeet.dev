@@ -97,6 +97,8 @@ export function getYeeetlingDesign(seed: string) {
   }
 }
 
+export type YeeetlingDesign = ReturnType<typeof getYeeetlingDesign>
+
 function Eyes({ kind }: { kind: number }) {
   if (kind === 1)
     return (
@@ -345,6 +347,128 @@ function Marking({ kind, accent }: { kind: number; accent: string }) {
   )
 }
 
+export function YeeetlingArtwork({
+  design,
+  clipId,
+}: {
+  design: YeeetlingDesign
+  clipId: string
+}) {
+  const [body, accent] = palettes[design.palette]
+
+  return (
+    <>
+      <defs>
+        <clipPath id={clipId}>
+          <path d={bodyPaths[design.body]} />
+        </clipPath>
+      </defs>
+      <g className="yeeetling-parts">
+        <Antenna kind={design.antenna} accent={accent} />
+        <path
+          className="yeeetling-arm yeeetling-arm-left"
+          d="M43 76Q18 67 13 85"
+          fill="none"
+          stroke="#181815"
+          strokeWidth="7"
+          strokeLinecap="round"
+        />
+        <path
+          className="yeeetling-arm yeeetling-arm-right"
+          d="M119 76Q143 65 148 84"
+          fill="none"
+          stroke="#181815"
+          strokeWidth="7"
+          strokeLinecap="round"
+        />
+        <path
+          d={bodyPaths[design.body]}
+          fill={body}
+          stroke="#181815"
+          strokeWidth="5"
+          strokeLinejoin="round"
+        />
+        <g clipPath={`url(#${clipId})`}>
+          <Marking kind={design.marking} accent={accent} />
+        </g>
+        <path
+          d={bodyPaths[design.body]}
+          fill="none"
+          stroke="#181815"
+          strokeWidth="5"
+          strokeLinejoin="round"
+        />
+        <g className="yeeetling-face">
+          <Eyes kind={design.eyes} />
+          <Mouth kind={design.mouth} />
+        </g>
+        {design.feet === 0 ? (
+          <>
+            <path
+              d="M58 118L55 140"
+              stroke="#181815"
+              strokeWidth="7"
+              strokeLinecap="round"
+            />
+            <path
+              d="M102 118L106 140"
+              stroke="#181815"
+              strokeWidth="7"
+              strokeLinecap="round"
+            />
+          </>
+        ) : design.feet === 1 ? (
+          <>
+            <path
+              d="M57 119Q44 139 59 143"
+              fill="none"
+              stroke="#181815"
+              strokeWidth="7"
+              strokeLinecap="round"
+            />
+            <path
+              d="M104 117Q119 138 104 143"
+              fill="none"
+              stroke="#181815"
+              strokeWidth="7"
+              strokeLinecap="round"
+            />
+          </>
+        ) : design.feet === 2 ? (
+          <path
+            d="M50 126Q80 145 112 125"
+            fill="none"
+            stroke="#181815"
+            strokeWidth="8"
+            strokeLinecap="round"
+          />
+        ) : (
+          <>
+            <ellipse
+              cx="58"
+              cy="139"
+              rx="15"
+              ry="7"
+              fill={accent}
+              stroke="#181815"
+              strokeWidth="4"
+            />
+            <ellipse
+              cx="105"
+              cy="139"
+              rx="15"
+              ry="7"
+              fill={accent}
+              stroke="#181815"
+              strokeWidth="4"
+            />
+          </>
+        )}
+      </g>
+    </>
+  )
+}
+
 export function Yeeetling({
   seed,
   phase = 'idle',
@@ -357,12 +481,11 @@ export function Yeeetling({
   label?: string
 }) {
   const design = getYeeetlingDesign(seed)
-  const [body, accent] = palettes[design.palette]
   const instanceId = useId().replaceAll(':', '')
   const clipId = `yeeetling-${hashSeed(seed).toString(36)}-${design.body}-${instanceId}`
   const style = {
     '--yeeetling-tilt': `${design.tilt}deg`,
-    '--yeeetling-accent': accent,
+    '--yeeetling-accent': palettes[design.palette][1],
   } as CSSProperties
 
   return (
@@ -380,113 +503,7 @@ export function Yeeetling({
       <span className="yeeetling-parcel">⌑</span>
       <div className="yeeetling-motion">
         <svg viewBox="0 0 160 160" focusable="false">
-          <defs>
-            <clipPath id={clipId}>
-              <path d={bodyPaths[design.body]} />
-            </clipPath>
-          </defs>
-          <g className="yeeetling-parts">
-            <Antenna kind={design.antenna} accent={accent} />
-            <path
-              className="yeeetling-arm yeeetling-arm-left"
-              d="M43 76Q18 67 13 85"
-              fill="none"
-              stroke="#181815"
-              strokeWidth="7"
-              strokeLinecap="round"
-            />
-            <path
-              className="yeeetling-arm yeeetling-arm-right"
-              d="M119 76Q143 65 148 84"
-              fill="none"
-              stroke="#181815"
-              strokeWidth="7"
-              strokeLinecap="round"
-            />
-            <path
-              d={bodyPaths[design.body]}
-              fill={body}
-              stroke="#181815"
-              strokeWidth="5"
-              strokeLinejoin="round"
-            />
-            <g clipPath={`url(#${clipId})`}>
-              <Marking kind={design.marking} accent={accent} />
-            </g>
-            <path
-              d={bodyPaths[design.body]}
-              fill="none"
-              stroke="#181815"
-              strokeWidth="5"
-              strokeLinejoin="round"
-            />
-            <g className="yeeetling-face">
-              <Eyes kind={design.eyes} />
-              <Mouth kind={design.mouth} />
-            </g>
-            {design.feet === 0 ? (
-              <>
-                <path
-                  d="M58 118L55 140"
-                  stroke="#181815"
-                  strokeWidth="7"
-                  strokeLinecap="round"
-                />
-                <path
-                  d="M102 118L106 140"
-                  stroke="#181815"
-                  strokeWidth="7"
-                  strokeLinecap="round"
-                />
-              </>
-            ) : design.feet === 1 ? (
-              <>
-                <path
-                  d="M57 119Q44 139 59 143"
-                  fill="none"
-                  stroke="#181815"
-                  strokeWidth="7"
-                  strokeLinecap="round"
-                />
-                <path
-                  d="M104 117Q119 138 104 143"
-                  fill="none"
-                  stroke="#181815"
-                  strokeWidth="7"
-                  strokeLinecap="round"
-                />
-              </>
-            ) : design.feet === 2 ? (
-              <path
-                d="M50 126Q80 145 112 125"
-                fill="none"
-                stroke="#181815"
-                strokeWidth="8"
-                strokeLinecap="round"
-              />
-            ) : (
-              <>
-                <ellipse
-                  cx="58"
-                  cy="139"
-                  rx="15"
-                  ry="7"
-                  fill={accent}
-                  stroke="#181815"
-                  strokeWidth="4"
-                />
-                <ellipse
-                  cx="105"
-                  cy="139"
-                  rx="15"
-                  ry="7"
-                  fill={accent}
-                  stroke="#181815"
-                  strokeWidth="4"
-                />
-              </>
-            )}
-          </g>
+          <YeeetlingArtwork design={design} clipId={clipId} />
         </svg>
       </div>
     </div>

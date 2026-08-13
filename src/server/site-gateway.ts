@@ -8,6 +8,11 @@ import {
   verifyDeploymentShareToken,
 } from './deployment-access'
 import { controlPlaneUrl, siteDomain, siteUrl } from './platform-config'
+import { displayNameFromSlug, renderSiteSocialImage } from './site-social-image'
+import {
+  GENERATED_SOCIAL_IMAGE_PATH,
+  injectSiteSocialMetadata,
+} from './site-social-metadata'
 import { getStoredObject } from './storage'
 
 type SiteTarget =
@@ -238,6 +243,7 @@ export async function maybeServeSite(
   }
 
   let deploymentId: string | null = null
+  let siteSlug: string | null = null
   if (target.kind === 'version') {
     deploymentId = target.deploymentId
   } else if (target.kind === 'live') {
@@ -245,14 +251,19 @@ export async function maybeServeSite(
       where: eq(sites.slug, target.slug),
     })
     deploymentId = site?.activeDeploymentId ?? null
+    siteSlug = site?.slug ?? null
   } else {
     const mappedRows = await db
-      .select({ activeDeploymentId: sites.activeDeploymentId })
+      .select({
+        activeDeploymentId: sites.activeDeploymentId,
+        slug: sites.slug,
+      })
       .from(customDomains)
       .innerJoin(sites, eq(customDomains.siteId, sites.id))
       .where(eq(customDomains.hostname, target.hostname))
       .limit(1)
     deploymentId = mappedRows.at(0)?.activeDeploymentId ?? null
+    siteSlug = mappedRows.at(0)?.slug ?? null
   }
   if (!deploymentId) return notFound(target.label, target.kind === 'version')
 
@@ -263,6 +274,14 @@ export async function maybeServeSite(
     ),
   })
   if (!deployment) return notFound(target.label, target.kind === 'version')
+
+  if (!siteSlug) {
+    const site = await db.query.sites.findFirst({
+      where: eq(sites.id, deployment.siteId),
+    })
+    siteSlug = site?.slug ?? null
+  }
+  if (!siteSlug) return notFound(target.label, target.kind === 'version')
 
   if (deployment.passwordHash) {
     const shareToken = requestUrl.searchParams.get('share')
@@ -307,6 +326,55 @@ export async function maybeServeSite(
     return notFound(target.label, target.kind === 'version')
   }
 
+  const protectedDeployment = Boolean(deployment.passwordHash)
+  if (requestUrl.pathname === GENERATED_SOCIAL_IMAGE_PATH) {
+    const responsePolicy = siteResponsePolicy(
+      'image/png',
+      target.kind === 'version',
+      protectedDeployment,
+    )
+    const etag = protectedDeployment ? null : `"yeeet-og-${deployment.id}-v1"`
+    const headers = new Headers({
+      'content-type': 'image/png',
+      'cache-control': responsePolicy.cacheControl,
+      'content-disposition': `inline; filename="${siteSlug}-social-card.png"`,
+      'x-content-type-options': 'nosniff',
+      'x-yeeet-deployment': deployment.id,
+    })
+    if (responsePolicy.xRobotsTag) {
+      headers.set('x-robots-tag', responsePolicy.xRobotsTag)
+    }
+    if (protectedDeployment) {
+      headers.set('pragma', 'no-cache')
+      headers.set('expires', '0')
+      headers.set('vary', 'cookie')
+    }
+    if (etag) headers.set('etag', etag)
+    if (etag && request.headers.get('if-none-match') === etag) {
+      return new Response(null, { status: 304, headers })
+    }
+
+    try {
+      const image = renderSiteSocialImage({
+        hostname: target.label,
+        slug: siteSlug,
+      })
+      headers.set('content-length', String(image.byteLength))
+      const body = request.method === 'HEAD' ? null : Uint8Array.from(image)
+      return new Response(body, { headers })
+    } catch (error) {
+      console.error('Failed to render site social image', {
+        deploymentId: deployment.id,
+        site: target.label,
+        error,
+      })
+      return new Response('Social image temporarily unavailable', {
+        status: 503,
+        headers: { 'cache-control': 'private, no-store' },
+      })
+    }
+  }
+
   const candidates = candidatePaths(requestUrl.pathname)
   if (!candidates.length)
     return notFound(
@@ -343,13 +411,17 @@ export async function maybeServeSite(
       target.kind === 'version' || Boolean(deployment.passwordHash),
     )
 
-  const protectedDeployment = Boolean(deployment.passwordHash)
+  const injectSocialImage =
+    status === 200 && file.contentType.includes('text/html')
   const responsePolicy = siteResponsePolicy(
     file.contentType,
     target.kind === 'version',
     protectedDeployment,
   )
-  const etag = !protectedDeployment && file.etag ? `"${file.etag}"` : undefined
+  const etag =
+    !protectedDeployment && file.etag
+      ? `"${injectSocialImage ? `yeeet-social-v1-${file.etag}` : file.etag}"`
+      : undefined
   const headers = new Headers({
     'content-type': file.contentType,
     'cache-control': responsePolicy.cacheControl,
@@ -370,15 +442,29 @@ export async function maybeServeSite(
     return new Response(null, { status: 304, headers })
   }
   if (request.method === 'HEAD') {
-    headers.set('content-length', String(file.size))
+    if (injectSocialImage) headers.delete('accept-ranges')
+    else headers.set('content-length', String(file.size))
     return new Response(null, { status, headers })
   }
 
   try {
-    const object = await getStoredObject(
-      file.storageKey,
-      request.headers.get('range') ?? undefined,
-    )
+    const range = injectSocialImage
+      ? undefined
+      : (request.headers.get('range') ?? undefined)
+    const object = await getStoredObject(file.storageKey, range)
+    if (injectSocialImage) {
+      const originalHtml = (await object.Body?.transformToString()) ?? ''
+      const pageUrl = `${requestUrl.origin}${requestUrl.pathname}`
+      const body = injectSiteSocialMetadata(originalHtml, {
+        hostname: target.label,
+        imageUrl: new URL(GENERATED_SOCIAL_IMAGE_PATH, requestUrl.origin).href,
+        pageUrl,
+        siteName: displayNameFromSlug(siteSlug),
+      })
+      headers.delete('accept-ranges')
+      headers.set('content-length', String(Buffer.byteLength(body)))
+      return new Response(body, { status, headers })
+    }
     if (object.ContentLength != null) {
       headers.set('content-length', String(object.ContentLength))
     }
