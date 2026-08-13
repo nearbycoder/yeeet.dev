@@ -216,6 +216,16 @@ test('serves configured human and machine-readable docs', async () => {
       )
 
       assert.equal(maybeServeDocs(new Request('https://docs.yeeet.dev/')), null)
+
+      const controlPlaneLlms = maybeServeDocs(
+        new Request('https://deploy.example.com/llms.txt'),
+      )
+      assert.ok(controlPlaneLlms)
+      assert.equal(controlPlaneLlms.status, 307)
+      assert.equal(
+        controlPlaneLlms.headers.get('location'),
+        'https://docs.example.com/llms.txt',
+      )
     },
   )
 })

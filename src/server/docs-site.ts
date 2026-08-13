@@ -1670,11 +1670,27 @@ function configuredDocument(value: string) {
 export function maybeServeDocs(request: Request): Response | null {
   const url = new URL(request.url)
   const configuredDocsHost = docsHost()
+  const requestHost = url.hostname.toLowerCase()
   if (
-    url.hostname.toLowerCase() !== configuredDocsHost &&
+    requestHost !== configuredDocsHost &&
     process.env.DOCS_PREVIEW !== 'true'
-  )
+  ) {
+    const platformHost = new URL(controlPlaneUrl()).hostname.toLowerCase()
+    if (
+      requestHost === platformHost &&
+      url.pathname === '/llms.txt' &&
+      (request.method === 'GET' || request.method === 'HEAD')
+    ) {
+      return new Response(null, {
+        status: 307,
+        headers: {
+          ...docsHeaders('text/plain; charset=utf-8'),
+          location: `${docsUrl()}/llms.txt`,
+        },
+      })
+    }
     return null
+  }
 
   if (request.method !== 'GET' && request.method !== 'HEAD') {
     return new Response('Method not allowed', {
