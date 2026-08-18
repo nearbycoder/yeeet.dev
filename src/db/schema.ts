@@ -54,6 +54,7 @@ export const deployments = pgTable(
     totalBytes: bigint('total_bytes', { mode: 'number' }).default(0).notNull(),
     error: text('error'),
     spaFallback: boolean('spa_fallback').default(true).notNull(),
+    channel: text('channel'),
     headerRules: text('header_rules').default('[]').notNull(),
     redirectRules: text('redirect_rules').default('[]').notNull(),
     passwordHash: text('password_hash'),
@@ -66,6 +67,32 @@ export const deployments = pgTable(
     index('deployments_site_id_idx').on(table.siteId),
     index('deployments_user_id_idx').on(table.userId),
     index('deployments_created_at_idx').on(table.createdAt),
+  ],
+)
+
+export const siteChannels = pgTable(
+  'site_channels',
+  {
+    id: text('id').primaryKey(),
+    siteId: text('site_id')
+      .notNull()
+      .references(() => sites.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    hostnameLabel: text('hostname_label').notNull(),
+    deploymentId: text('deployment_id')
+      .notNull()
+      .references(() => deployments.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('site_channels_site_name_idx').on(table.siteId, table.name),
+    uniqueIndex('site_channels_hostname_idx').on(table.hostnameLabel),
+    index('site_channels_user_id_idx').on(table.userId),
+    index('site_channels_deployment_id_idx').on(table.deploymentId),
   ],
 )
 
@@ -167,6 +194,7 @@ export const siteRelations = relations(sites, ({ many, one }) => ({
   owner: one(user, { fields: [sites.userId], references: [user.id] }),
   deployments: many(deployments),
   customDomains: many(customDomains),
+  channels: many(siteChannels),
 }))
 
 export const deploymentRelations = relations(deployments, ({ many, one }) => ({
@@ -175,6 +203,22 @@ export const deploymentRelations = relations(deployments, ({ many, one }) => ({
     references: [sites.id],
   }),
   files: many(deploymentFiles),
+  channels: many(siteChannels),
+}))
+
+export const siteChannelRelations = relations(siteChannels, ({ one }) => ({
+  site: one(sites, {
+    fields: [siteChannels.siteId],
+    references: [sites.id],
+  }),
+  deployment: one(deployments, {
+    fields: [siteChannels.deploymentId],
+    references: [deployments.id],
+  }),
+  owner: one(user, {
+    fields: [siteChannels.userId],
+    references: [user.id],
+  }),
 }))
 
 export const deploymentFileRelations = relations(

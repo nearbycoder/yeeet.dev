@@ -268,6 +268,7 @@ async function deploy(target, options) {
     ),
   )
   const slug = options.name || projectConfig.name || undefined
+  const channel = options.channel || projectConfig.channel || undefined
   const spaFallback = options.static
     ? false
     : (options.spa ?? projectConfig.spaFallback ?? true)
@@ -296,6 +297,7 @@ async function deploy(target, options) {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         slug,
+        channel,
         spaFallback,
         password,
         source: 'cli',
@@ -359,6 +361,7 @@ async function deploy(target, options) {
         files: files.length,
         bytes: totalBytes,
         site: completed.site,
+        channel: completed.channel,
         spaFallback: completed.spaFallback,
         protected: completed.protected,
         shareUrl: completed.shareUrl,
@@ -465,6 +468,59 @@ async function removeDomain(site, selector, options) {
     options,
   )
   print(options.json ? removed : `✓ Removed ${removed.hostname}.`, options.json)
+}
+
+async function channels(site, options) {
+  const data = await apiRequest(
+    `/api/v1/sites/${encodeURIComponent(site)}/channels`,
+    {},
+    options,
+  )
+  if (options.json) return print(data, true)
+  if (!data.channels.length) {
+    return console.log(
+      `No channels. Run \`yeeet deploy ./dist --name ${site} --channel staging\`.`,
+    )
+  }
+  console.log(`\n  Channels for ${data.site.url}\n`)
+  for (const channel of data.channels) {
+    console.log(
+      `  ${channel.name.padEnd(18)} ${channel.deploymentId.slice(0, 8)}  ${channel.url}`,
+    )
+  }
+  console.log('')
+}
+
+async function setChannel(site, channel, version, options) {
+  const result = await apiRequest(
+    `/api/v1/sites/${encodeURIComponent(site)}/channels/${encodeURIComponent(channel)}`,
+    {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ version }),
+    },
+    options,
+  )
+  print(
+    options.json
+      ? result
+      : `✓ ${result.site} --${result.channel} now points to ${result.deploymentId.slice(0, 8)} at ${result.url}`,
+    options.json,
+  )
+}
+
+async function removeChannel(site, channel, options) {
+  const result = await apiRequest(
+    `/api/v1/sites/${encodeURIComponent(site)}/channels/${encodeURIComponent(channel)}`,
+    { method: 'DELETE' },
+    options,
+  )
+  print(
+    options.json
+      ? result
+      : `✓ Removed the ${result.channel} channel from ${result.site}.`,
+    options.json,
+  )
 }
 
 async function versions(slug, options) {
@@ -710,6 +766,10 @@ program
   .alias('up')
   .argument('[path]', 'file or directory to deploy', '.')
   .option('-n, --name <slug>', 'subdomain name (or use .yeeet.json)')
+  .option(
+    '--channel <name>',
+    'update a no-index deployment channel instead of production',
+  )
   .option('-c, --concurrency <number>', 'parallel uploads', '8')
   .option('--spa', 'serve index.html for client-side routes')
   .option('--static', 'return 404 for paths without a matching file')
@@ -806,6 +866,34 @@ program
   .argument('[version]', 'version ID or prefix (defaults to live)')
   .description('Print a private one-click share link')
   .action(async (site, version) => shareVersion(site, version, program.opts()))
+
+const channelCommand = program
+  .command('channel')
+  .description('Manage mutable deployment channels such as staging')
+
+channelCommand
+  .command('list')
+  .argument('<site>', 'site name')
+  .description('List deployment channels')
+  .action(async (site) => channels(site, program.opts()))
+
+channelCommand
+  .command('set')
+  .argument('<site>', 'site name')
+  .argument('<channel>', 'channel name')
+  .argument('<version>', 'full version ID or an 8+ character prefix')
+  .description('Point a channel at a ready immutable version')
+  .action(async (site, channel, version) =>
+    setChannel(site, channel, version, program.opts()),
+  )
+
+channelCommand
+  .command('remove')
+  .alias('rm')
+  .argument('<site>', 'site name')
+  .argument('<channel>', 'channel name')
+  .description('Remove a deployment channel without deleting its version')
+  .action(async (site, channel) => removeChannel(site, channel, program.opts()))
 
 const domainCommand = program
   .command('domain')

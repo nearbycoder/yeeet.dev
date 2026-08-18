@@ -1143,6 +1143,10 @@ Exit codes are 0 for success, 2 when authentication is required, and 1 for valid
 - yeeet sites --json: list sites.
 - yeeet versions <site> --json: list immutable releases and preview URLs.
 - yeeet rollback <site> [version] --json: activate a prior ready release. Omit version to choose the previous release.
+- yeeet deploy ./dist --name <site> --channel staging: update a mutable no-index channel without moving production.
+- yeeet channel list <site> --json: list mutable deployment channels.
+- yeeet channel set <site> <channel> <version> --json: point a channel at a ready version.
+- yeeet channel remove <site> <channel> --json: remove an alias without deleting its version.
 - yeeet version remove <site> <version> --yes --json: delete one immutable version.
 - yeeet remove <site> --yes --json: delete a site and every version.
 - yeeet access protect <site> <version> --password <password> --json: protect an existing version.
@@ -1219,6 +1223,12 @@ Choose a stable site name. Later deploys to the same name create new versions an
     yeeet deploy ./dist --name comet
 
 The live URL is https://comet.site.yeeet.dev. Each release also receives an immutable URL in the form https://v-<deployment-id>.site.yeeet.dev.
+
+Deploy to a mutable channel without changing production:
+
+    yeeet deploy ./dist --name comet --channel staging
+
+That updates https://comet--staging.site.yeeet.dev. Channel aliases are no-index and use short edge revalidation. Point a channel at an existing version with yeeet channel set comet staging <version>, or remove only the alias with yeeet channel remove comet staging.
 
 SPA fallback is enabled by default. A refresh at /settings/profile serves index.html when that path has no file, while a missing asset such as /assets/app.js remains a 404. Use strict static routing when appropriate:
 
@@ -1334,9 +1344,12 @@ Yeeet and Railway manage certificate issuance after DNS verification. Remove a m
     yeeet logout
     yeeet whoami [--json]
     yeeet sites [--json]
-    yeeet deploy|up [path] [--name <slug>] [--spa|--static] [--password <password>] [--json]
+    yeeet deploy|up [path] [--name <slug>] [--channel <name>] [--spa|--static] [--password <password>] [--json]
     yeeet versions <site> [--json]
     yeeet rollback <site> [version] [--json]
+    yeeet channel list <site> [--json]
+    yeeet channel set <site> <channel> <version> [--json]
+    yeeet channel remove|rm <site> <channel> [--json]
     yeeet version remove <site> <version> --yes [--json]
     yeeet remove|rm <site> --yes [--json]
     yeeet share <site> [version] [--json]
@@ -1553,6 +1566,12 @@ yeeet rollback comet 52eabb5f
 # Or roll back to the previous ready release
 yeeet rollback comet</code></pre><button class="copy-button" type="button" data-copy="code-versions">Copy</button></div>
             <p>Version commands accept a full deployment ID or an unambiguous prefix of at least 8 characters. Live aliases revalidate at the edge in about 10 seconds; immutable preview URLs never change.</p>
+            <h3>Stage Without Moving Production</h3>
+            <p>Channels are mutable, no-index aliases under the same wildcard certificate. A channel deploy leaves the normal production URL untouched.</p>
+            <div class="code-block"><pre><code id="code-channels">yeeet deploy ./dist --name comet --channel staging
+yeeet channel list comet
+yeeet channel set comet staging 52eabb5f
+yeeet channel remove comet staging</code></pre><button class="copy-button" type="button" data-copy="code-channels">Copy</button></div>
             <h3>Remove What You No Longer Need</h3>
             <div class="code-block"><pre><code id="code-remove">yeeet version remove comet 52eabb5f --yes
 yeeet remove comet --yes</code></pre><button class="copy-button" type="button" data-copy="code-remove">Copy</button></div>

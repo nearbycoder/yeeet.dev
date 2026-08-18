@@ -58,6 +58,8 @@ builds or replace a framework's build command.
 - SHA-256 incremental deploys that reuse unchanged content with storage-side
   copies instead of uploading it again.
 - Immutable version URLs, version history, promotion, rollback, and deletion.
+- Mutable, no-index deployment channels such as
+  `comet--staging.site.example.com` that never move production implicitly.
 - SPA fallback for refreshes on client-side routes, with strict static mode too.
 - Versioned `_headers` and `_redirects` rules for cache policy, security headers,
   redirects, and internal rewrites.
@@ -119,6 +121,8 @@ Useful release operations:
 ```sh
 yeeet versions comet
 yeeet rollback comet
+yeeet deploy ./dist --name comet --channel staging
+yeeet channel set comet staging <version>
 yeeet share comet
 yeeet version remove comet <version> --yes
 yeeet remove comet --yes
@@ -159,6 +163,12 @@ YEEET_TOKEN=yeeet_... yeeet deploy ./dist --name comet --json
 
 The CLI can target any self-hosted instance with `--api https://your-domain` or
 the `YEEET_API` environment variable.
+
+Deployment channels are named mutable pointers to ready versions. Deploy with
+`--channel staging` to update `comet--staging.site.yeeet.dev` while leaving
+`comet.site.yeeet.dev` untouched. Use `yeeet channel list`, `channel set`, and
+`channel remove` to manage aliases directly. Channel responses are no-index by
+default; immutable version URLs remain available for exact build references.
 
 ### GitHub Action and PR previews
 

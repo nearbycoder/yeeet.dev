@@ -10,6 +10,7 @@ type CreateBody = {
   source?: 'web' | 'cli' | 'api'
   spaFallback?: boolean
   password?: string
+  channel?: string
 }
 
 export const Route = createFileRoute('/api/v1/deployments/')({
@@ -50,6 +51,7 @@ export const Route = createFileRoute('/api/v1/deployments/')({
             source,
             spaFallback: body.spaFallback,
             password: body.password,
+            channel: body.channel,
           })
           return json(result, { status: 201 })
         } catch (error) {

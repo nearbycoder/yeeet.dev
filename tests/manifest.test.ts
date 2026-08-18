@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
+  channelHostnameLabel,
   generateRandomSlug,
+  normalizeChannelName,
   normalizeFilePath,
   normalizeSlug,
   validateManifest,
@@ -119,6 +121,19 @@ test('hashes normalized invitation codes without storing plaintext', () => {
 test('generates valid readable random site names', () => {
   const first = generateRandomSlug()
   assert.match(first, /^[a-z]+-[a-z]+-[a-f0-9]{6}$/)
+})
+
+test('builds unambiguous wildcard-safe channel labels', () => {
+  assert.equal(normalizeChannelName('  Staging '), 'staging')
+  assert.equal(
+    channelHostnameLabel('cosmic-docs', 'staging'),
+    'cosmic-docs--staging',
+  )
+  const long = channelHostnameLabel('a'.repeat(63), 'feature-preview')
+  assert.equal(long.length, 63)
+  assert.match(long, /--feature-preview$/)
+  assert.throws(() => normalizeChannelName('production'), /cannot be live/)
+  assert.throws(() => normalizeChannelName('bad--channel'), /single hyphens/)
 })
 
 test('generates stable Yeeetlings with thousands of distinct designs', () => {
@@ -313,6 +328,15 @@ test('keeps immutable versions out of crawler indexes and archives', () => {
     policy.xRobotsTag,
     'noindex, nofollow, noarchive, nosnippet, noimageindex',
   )
+})
+
+test('keeps mutable deployment channels out of crawler indexes', () => {
+  const policy = siteResponsePolicy('text/html', false, false, true)
+  assert.equal(
+    policy.cacheControl,
+    'public, max-age=0, s-maxage=10, stale-while-revalidate=30',
+  )
+  assert.match(policy.xRobotsTag ?? '', /noindex/)
 })
 
 test('prevents private deployments from being stored or crawled', () => {

@@ -202,6 +202,7 @@ export async function run() {
       'deploy',
       input('directory') || '.',
       ...(site ? ['--name', site] : []),
+      ...(input('channel') ? ['--channel', input('channel')] : []),
       input('spa') === 'false' ? '--static' : '--spa',
     ]
     result = parseCliJson(await runCli(deployArguments, environment))

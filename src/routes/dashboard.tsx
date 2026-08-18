@@ -63,6 +63,7 @@ type VersionHistoryData = {
     totalBytes: number
     current: boolean
     previewUrl: string | null
+    channel: string | null
     spaFallback: boolean
     protected: boolean
     shareUrl: string | null
@@ -235,6 +236,7 @@ function VersionHistory(props: {
                     {' · '}
                     {version.spaFallback ? 'SPA' : 'static'} ·{' '}
                     {version.protected ? 'private' : 'public'}
+                    {version.channel ? ` · ${version.channel} channel` : ''}
                   </small>
                 </span>
                 <span className="version-size">
@@ -579,6 +581,7 @@ function Dashboard() {
   const folderInput = useRef<HTMLInputElement>(null)
   const [files, setFiles] = useState<Array<UploadFile>>([])
   const [slug, setSlug] = useState('')
+  const [channel, setChannel] = useState('')
   const [spaFallback, setSpaFallback] = useState(true)
   const [privateDeploy, setPrivateDeploy] = useState(false)
   const [deployPassword, setDeployPassword] = useState('')
@@ -641,6 +644,7 @@ function Dashboard() {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           slug,
+          channel: channel || undefined,
           spaFallback,
           password: privateDeploy ? deployPassword : undefined,
           source: 'web',
@@ -1107,6 +1111,31 @@ function Dashboard() {
                 />
                 <b>.{data.platform.siteDomain}</b>
               </div>
+            </label>
+            <label>
+              <span>Deployment channel (optional)</span>
+              <div className="slug-input">
+                <input
+                  name="deployment-channel"
+                  value={channel}
+                  onChange={(event) =>
+                    setChannel(
+                      event.target.value
+                        .toLowerCase()
+                        .replace(/[^a-z0-9-]/g, '')
+                        .slice(0, 32),
+                    )
+                  }
+                  placeholder="production"
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+                <b>mutable alias</b>
+              </div>
+              <small>
+                Example: staging creates a no-index site channel without moving
+                production.
+              </small>
             </label>
             <label className="routing-toggle">
               <input

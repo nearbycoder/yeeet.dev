@@ -1,7 +1,13 @@
-import { randomBytes, randomUUID } from 'node:crypto'
+import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { and, desc, eq, inArray } from 'drizzle-orm'
 import { db } from '#/db'
-import { customDomains, deploymentFiles, deployments, sites } from '#/db/schema'
+import {
+  customDomains,
+  deploymentFiles,
+  deployments,
+  siteChannels,
+  sites,
+} from '#/db/schema'
 import type { Actor } from './actor'
 import {
   generateShareNonce,
@@ -28,6 +34,8 @@ import {
 const SLUG = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/
 const MAX_FILE_COUNT = 5_000
 const SHA256 = /^[a-f0-9]{64}$/
+const CHANNEL = /^[a-z0-9](?:[a-z0-9-]{0,30}[a-z0-9])?$/
+const RESERVED_CHANNELS = new Set(['live', 'production'])
 const RANDOM_ADJECTIVES = [
   'brisk',
   'cosmic',
@@ -84,6 +92,36 @@ export function generateRandomSlug() {
   const adjective = RANDOM_ADJECTIVES[bytes[0] % RANDOM_ADJECTIVES.length]
   const noun = RANDOM_NOUNS[bytes[1] % RANDOM_NOUNS.length]
   return `${adjective}-${noun}-${bytes.toString('hex').slice(0, 6)}`
+}
+
+export function normalizeChannelName(value: string) {
+  const channel = value.trim().toLowerCase()
+  if (
+    !CHANNEL.test(channel) ||
+    channel.includes('--') ||
+    RESERVED_CHANNELS.has(channel)
+  ) {
+    throw new HttpError(
+      400,
+      'Channel names must be 1–32 lowercase letters, numbers, or single hyphens, and cannot be live or production.',
+      'invalid_channel',
+    )
+  }
+  return channel
+}
+
+export function channelHostnameLabel(slug: string, value: string) {
+  const channel = normalizeChannelName(value)
+  const plain = `${slug}--${channel}`
+  if (plain.length <= 63) return plain
+  const hash = createHash('sha256').update(slug).digest('hex').slice(0, 8)
+  const available = 63 - channel.length - hash.length - 3
+  const prefix = slug.slice(0, available).replace(/-+$/g, '')
+  return `${prefix}-${hash}--${channel}`
+}
+
+export function channelUrl(slug: string, channel: string) {
+  return siteUrl(channelHostnameLabel(slug, channel))
 }
 
 export function normalizeFilePath(value: string) {
@@ -177,8 +215,10 @@ export async function createDeployment(input: {
   source: 'web' | 'cli' | 'api'
   spaFallback?: boolean
   password?: string
+  channel?: string
 }) {
   const manifest = validateManifest(input.files)
+  const channel = input.channel ? normalizeChannelName(input.channel) : null
   const passwordHash = input.password
     ? await hashDeploymentPassword(input.password)
     : null
@@ -275,6 +315,7 @@ export async function createDeployment(input: {
       fileCount: fileRows.length,
       totalBytes: manifest.totalBytes,
       spaFallback: input.spaFallback ?? true,
+      channel,
       passwordHash,
       shareNonce,
     })
@@ -329,6 +370,7 @@ export async function createDeployment(input: {
       status: 'uploading' as const,
       spaFallback: input.spaFallback ?? true,
       protected: Boolean(passwordHash),
+      channel,
       reusedFiles: copiedPaths.size,
       uploadedFiles: uploadFiles.length,
       uploadUrls,
@@ -362,6 +404,7 @@ export async function completeDeployment(actor: Actor, deploymentId: string) {
       deployment.spaFallback,
       deployment.passwordHash,
       deployment.shareNonce,
+      deployment.channel,
     )
   }
   if (deployment.status === 'failed') {
@@ -424,10 +467,39 @@ export async function completeDeployment(actor: Actor, deploymentId: string) {
         redirectRules: JSON.stringify(redirectRules),
       })
       .where(eq(deployments.id, deployment.id))
-    await tx
-      .update(sites)
-      .set({ activeDeploymentId: deployment.id, updatedAt: new Date() })
-      .where(eq(sites.id, deployment.siteId))
+    const activatedAt = new Date()
+    if (deployment.channel) {
+      await tx
+        .insert(siteChannels)
+        .values({
+          id: randomUUID(),
+          siteId: deployment.siteId,
+          userId: deployment.userId,
+          name: deployment.channel,
+          hostnameLabel: channelHostnameLabel(
+            deployment.site.slug,
+            deployment.channel,
+          ),
+          deploymentId: deployment.id,
+          updatedAt: activatedAt,
+        })
+        .onConflictDoUpdate({
+          target: [siteChannels.siteId, siteChannels.name],
+          set: {
+            deploymentId: deployment.id,
+            updatedAt: activatedAt,
+          },
+        })
+      await tx
+        .update(sites)
+        .set({ updatedAt: activatedAt })
+        .where(eq(sites.id, deployment.siteId))
+    } else {
+      await tx
+        .update(sites)
+        .set({ activeDeploymentId: deployment.id, updatedAt: activatedAt })
+        .where(eq(sites.id, deployment.siteId))
+    }
   })
 
   return deploymentResult(
@@ -436,6 +508,7 @@ export async function completeDeployment(actor: Actor, deploymentId: string) {
     deployment.spaFallback,
     deployment.passwordHash,
     deployment.shareNonce,
+    deployment.channel,
   )
 }
 
@@ -445,13 +518,16 @@ function deploymentResult(
   spaFallback: boolean,
   passwordHash: string | null,
   shareNonce: string,
+  channel: string | null,
 ) {
   return {
     id: deploymentId,
     site: slug,
     status: 'ready' as const,
-    url: siteUrl(slug),
+    url: channel ? channelUrl(slug, channel) : siteUrl(slug),
+    productionUrl: siteUrl(slug),
     versionUrl: versionUrl(deploymentId),
+    channel,
     spaFallback,
     protected: Boolean(passwordHash),
     shareUrl: passwordHash ? shareUrl(deploymentId, shareNonce) : null,
@@ -477,6 +553,7 @@ export async function listSiteVersions(userId: string, value: string) {
       activatedAt: deployments.activatedAt,
       error: deployments.error,
       spaFallback: deployments.spaFallback,
+      channel: deployments.channel,
       passwordHash: deployments.passwordHash,
       shareNonce: deployments.shareNonce,
     })
@@ -506,6 +583,111 @@ export async function listSiteVersions(userId: string, value: string) {
       activatedAt: row.activatedAt?.toISOString() ?? null,
     })),
   }
+}
+
+export async function listSiteChannels(userId: string, value: string) {
+  const slug = normalizeSlug(value)
+  const site = await db.query.sites.findFirst({
+    where: and(eq(sites.slug, slug), eq(sites.userId, userId)),
+  })
+  if (!site) throw new HttpError(404, 'Site not found.', 'not_found')
+
+  const rows = await db
+    .select({
+      id: siteChannels.id,
+      name: siteChannels.name,
+      hostnameLabel: siteChannels.hostnameLabel,
+      deploymentId: siteChannels.deploymentId,
+      createdAt: siteChannels.createdAt,
+      updatedAt: siteChannels.updatedAt,
+    })
+    .from(siteChannels)
+    .where(eq(siteChannels.siteId, site.id))
+    .orderBy(desc(siteChannels.updatedAt))
+
+  return {
+    site: { id: site.id, slug, url: siteUrl(slug) },
+    channels: rows.map((row) => ({
+      ...row,
+      url: siteUrl(row.hostnameLabel),
+      versionUrl: versionUrl(row.deploymentId),
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+    })),
+  }
+}
+
+export async function setSiteChannel(
+  userId: string,
+  value: string,
+  channelValue: string,
+  selector: string,
+) {
+  const channel = normalizeChannelName(channelValue)
+  const history = await listSiteVersions(userId, value)
+  const version = resolveSiteVersion(history.versions, selector)
+  if (version.status !== 'ready') {
+    throw new HttpError(
+      409,
+      'Only a ready version can be assigned to a channel.',
+      'version_not_ready',
+    )
+  }
+
+  const updatedAt = new Date()
+  const hostnameLabel = channelHostnameLabel(history.site.slug, channel)
+  const rows = await db
+    .insert(siteChannels)
+    .values({
+      id: randomUUID(),
+      siteId: history.site.id,
+      userId,
+      name: channel,
+      hostnameLabel,
+      deploymentId: version.id,
+      updatedAt,
+    })
+    .onConflictDoUpdate({
+      target: [siteChannels.siteId, siteChannels.name],
+      set: { deploymentId: version.id, updatedAt },
+    })
+    .returning({ id: siteChannels.id })
+
+  return {
+    id: rows[0].id,
+    site: history.site.slug,
+    channel,
+    deploymentId: version.id,
+    url: siteUrl(hostnameLabel),
+    versionUrl: versionUrl(version.id),
+    updatedAt: updatedAt.toISOString(),
+  }
+}
+
+export async function deleteSiteChannel(
+  userId: string,
+  value: string,
+  channelValue: string,
+) {
+  const slug = normalizeSlug(value)
+  const channel = normalizeChannelName(channelValue)
+  const site = await db.query.sites.findFirst({
+    where: and(eq(sites.slug, slug), eq(sites.userId, userId)),
+  })
+  if (!site) throw new HttpError(404, 'Site not found.', 'not_found')
+  const rows = await db
+    .delete(siteChannels)
+    .where(
+      and(
+        eq(siteChannels.userId, userId),
+        eq(siteChannels.name, channel),
+        eq(siteChannels.siteId, site.id),
+      ),
+    )
+    .returning({ id: siteChannels.id, deploymentId: siteChannels.deploymentId })
+  const removed = rows.at(0)
+  if (!removed) throw new HttpError(404, 'Channel not found.', 'not_found')
+  return { ...removed, site: slug, channel, deleted: true as const }
 }
 
 export async function activateSiteVersion(

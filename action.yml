@@ -16,6 +16,9 @@ inputs:
   site:
     description: Stable site name. PR previews append -pr-<number>.
     required: false
+  channel:
+    description: Optional mutable no-index channel to update instead of production.
+    required: false
   api:
     description: Yeeet control-plane URL.
     default: https://yeeet.dev
