@@ -31,6 +31,12 @@ import {
   shouldUseSpaFallback,
   siteResponsePolicy,
 } from '../src/server/site-gateway'
+import {
+  applySiteHeaders,
+  matchingRedirect,
+  parseHeaderRules,
+  parseRedirectRules,
+} from '../src/server/site-rules'
 
 async function withEnvironment<T>(
   values: Record<string, string | undefined>,
@@ -229,6 +235,58 @@ test('uses SPA fallback for navigations but not missing assets or static mode', 
       false,
     ),
     false,
+  )
+})
+
+test('parses and applies deployment _headers rules in declaration order', () => {
+  const rules = parseHeaderRules(`# Cache assets for a week
+/assets/*
+  Cache-Control: public, max-age=604800
+  X-Frame-Options: DENY
+
+/*
+  X-Robots-Tag: noindex
+`)
+  const headers = new Headers({ 'cache-control': 'public, max-age=0' })
+  applySiteHeaders(headers, rules, '/assets/app.js')
+  assert.equal(headers.get('cache-control'), 'public, max-age=604800')
+  assert.equal(headers.get('x-frame-options'), 'DENY')
+  assert.equal(headers.get('x-robots-tag'), 'noindex')
+
+  assert.throws(
+    () => parseHeaderRules('/\n  Set-Cookie: admin=true'),
+    /controlled by Yeeet/,
+  )
+  assert.throws(
+    () => parseHeaderRules('/\n  Content-Type: text/plain'),
+    /controlled by Yeeet/,
+  )
+})
+
+test('matches redirects, named parameters, and internal rewrites', () => {
+  const rules = parseRedirectRules(`# Old documentation
+/docs/:page /guides/:page 308
+/app/* /index.html 200
+/out https://example.com/new 302
+`)
+  assert.deepEqual(matchingRedirect(rules, '/docs/start'), {
+    from: '/docs/:page',
+    to: '/guides/start',
+    status: 308,
+  })
+  assert.deepEqual(matchingRedirect(rules, '/app/settings/profile'), {
+    from: '/app/*',
+    to: '/index.html',
+    status: 200,
+  })
+  assert.equal(matchingRedirect(rules, '/missing'), null)
+  assert.throws(
+    () => parseRedirectRules('/proxy https://example.com 200'),
+    /external proxy rewrites/,
+  )
+  assert.throws(
+    () => parseRedirectRules('/proxy //example.com 200'),
+    /external proxy rewrites/,
   )
 })
 

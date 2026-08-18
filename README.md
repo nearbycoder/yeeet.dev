@@ -57,6 +57,8 @@ builds or replace a framework's build command.
 - Atomic releases: a live pointer moves only after every object is verified.
 - Immutable version URLs, version history, promotion, rollback, and deletion.
 - SPA fallback for refreshes on client-side routes, with strict static mode too.
+- Versioned `_headers` and `_redirects` rules for cache policy, security headers,
+  redirects, and internal rewrites.
 - Password-protected deployments and revocable one-click private share links.
 - Custom domains with Railway-managed DNS verification and TLS.
 - Private S3-compatible object storage behind a cache-aware asset gateway.
@@ -120,6 +122,28 @@ yeeet domain add comet docs.example.com
 
 SPA fallback is enabled by default. Use `--static` when every valid path must
 map to a real file.
+
+### Delivery rules
+
+Put a `_headers` or `_redirects` file at the root of the folder you deploy.
+Yeeet validates and stores the rules with that immutable version, so rollback
+also restores its exact routing and headers.
+
+```text
+# dist/_headers
+/assets/*
+  Cache-Control: public, max-age=604800
+  X-Frame-Options: DENY
+
+# dist/_redirects
+/old-docs/:page /guides/:page 308
+/app/* /index.html 200
+```
+
+Rules support named path parameters and one wildcard. Status `200` performs an
+internal rewrite; `301`, `302`, `303`, `307`, and `308` redirect. Yeeet keeps
+transport, content-type, private-cache, and immutable-version crawler headers
+under platform control. The rule files themselves are never publicly served.
 
 For agents and CI, create an API key in the dashboard and keep it in a secret
 store:

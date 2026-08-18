@@ -13,6 +13,14 @@ import {
   GENERATED_SOCIAL_IMAGE_PATH,
   injectSiteSocialMetadata,
 } from './site-social-metadata'
+import {
+  HEADERS_FILE,
+  REDIRECTS_FILE,
+  applySiteHeaders,
+  deserializeSiteRules,
+  matchingRedirect,
+} from './site-rules'
+import type { SiteHeaderRule, SiteRedirectRule } from './site-rules'
 import { getStoredObject } from './storage'
 
 type SiteTarget =
@@ -391,7 +399,53 @@ export async function maybeServeSite(
     }
   }
 
-  const candidates = candidatePaths(requestUrl.pathname)
+  const headerRules = deserializeSiteRules<SiteHeaderRule>(
+    deployment.headerRules,
+    [],
+  )
+  const redirectRules = deserializeSiteRules<SiteRedirectRule>(
+    deployment.redirectRules,
+    [],
+  )
+  const redirect = matchingRedirect(redirectRules, requestUrl.pathname)
+  if (redirect && redirect.status !== 200) {
+    const responsePolicy = siteResponsePolicy(
+      'text/plain',
+      target.kind === 'version',
+      protectedDeployment,
+    )
+    const headers = new Headers({
+      location: redirect.to,
+      'cache-control': responsePolicy.cacheControl,
+      'x-content-type-options': 'nosniff',
+      'x-yeeet-deployment': deployment.id,
+    })
+    if (responsePolicy.xRobotsTag) {
+      headers.set('x-robots-tag', responsePolicy.xRobotsTag)
+    }
+    if (protectedDeployment) {
+      headers.set('pragma', 'no-cache')
+      headers.set('expires', '0')
+      headers.set('vary', 'cookie')
+    }
+    return new Response(null, { status: redirect.status, headers })
+  }
+
+  const effectivePath =
+    redirect?.status === 200
+      ? new URL(redirect.to, 'https://rewrite.yeeet.invalid').pathname
+      : requestUrl.pathname
+  if (
+    effectivePath === `/${HEADERS_FILE}` ||
+    effectivePath === `/${REDIRECTS_FILE}`
+  ) {
+    return notFound(
+      target.label,
+      target.kind === 'version' || protectedDeployment,
+    )
+  }
+
+  const candidates = candidatePaths(effectivePath)
   if (!candidates.length)
     return notFound(
       target.label,
@@ -445,6 +499,13 @@ export async function maybeServeSite(
     'x-yeeet-deployment': deploymentId,
     'accept-ranges': 'bytes',
   })
+  applySiteHeaders(headers, headerRules, effectivePath)
+  if (target.kind === 'version' || protectedDeployment) {
+    headers.set('cache-control', responsePolicy.cacheControl)
+  }
+  headers.set('content-type', file.contentType)
+  headers.set('x-content-type-options', 'nosniff')
+  headers.set('x-yeeet-deployment', deploymentId)
   if (responsePolicy.xRobotsTag) {
     headers.set('x-robots-tag', responsePolicy.xRobotsTag)
   }

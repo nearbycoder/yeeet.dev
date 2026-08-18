@@ -14,8 +14,15 @@ import { siteUrl } from './platform-config'
 import {
   createUploadUrl,
   deleteStoredPrefix,
+  getStoredObject,
   headStoredObject,
 } from './storage'
+import {
+  HEADERS_FILE,
+  REDIRECTS_FILE,
+  parseHeaderRules,
+  parseRedirectRules,
+} from './site-rules'
 
 const SLUG = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/
 const MAX_FILE_COUNT = 5_000
@@ -307,6 +314,18 @@ export async function completeDeployment(actor: Actor, deploymentId: string) {
     )
   }
 
+  const ruleFiles = new Map(deployment.files.map((file) => [file.path, file]))
+  const readRuleFile = async (path: string) => {
+    const file = ruleFiles.get(path)
+    if (!file) return ''
+    const object = await getStoredObject(file.storageKey)
+    return (await object.Body?.transformToString()) ?? ''
+  }
+  const [headerRules, redirectRules] = await Promise.all([
+    readRuleFile(HEADERS_FILE).then(parseHeaderRules),
+    readRuleFile(REDIRECTS_FILE).then(parseRedirectRules),
+  ])
+
   await db.transaction(async (tx) => {
     for (const check of checks) {
       if (check.etag) {
@@ -323,6 +342,8 @@ export async function completeDeployment(actor: Actor, deploymentId: string) {
         completedAt: new Date(),
         activatedAt: new Date(),
         error: null,
+        headerRules: JSON.stringify(headerRules),
+        redirectRules: JSON.stringify(redirectRules),
       })
       .where(eq(deployments.id, deployment.id))
     await tx

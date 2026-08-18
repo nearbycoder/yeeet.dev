@@ -1158,6 +1158,7 @@ Exit codes are 0 for success, 2 when authentication is required, and 1 for valid
 - Uploads are atomic: the live pointer changes only after every object completes.
 - Version preview URLs are immutable; live aliases update at the edge in about 10 seconds.
 - SPA fallback defaults to true and only handles navigation-like paths, not missing assets.
+- Root _headers and _redirects files are validated and versioned with the deployment. They are never served as site assets.
 - Public sites receive a deterministic 1200x630 Yeeetling social card at /_yeeet/og.png unless their HTML supplies og:image or twitter:image.
 - --json suppresses decorative output. Parse stdout as one JSON object.
 - Version identifiers accept an unambiguous prefix of at least 8 characters where supported.
@@ -1214,6 +1215,21 @@ The live URL is https://comet.site.yeeet.dev. Each release also receives an immu
 SPA fallback is enabled by default. A refresh at /settings/profile serves index.html when that path has no file, while a missing asset such as /assets/app.js remains a 404. Use strict static routing when appropriate:
 
     yeeet deploy ./public --static
+
+## Headers, redirects, and rewrites
+
+Add a _headers file to the root of the deployed folder:
+
+    /assets/*
+      Cache-Control: public, max-age=604800
+      X-Frame-Options: DENY
+
+Add a _redirects file for redirects or internal rewrites:
+
+    /old-docs/:page /guides/:page 308
+    /app/* /index.html 200
+
+Rules support named parameters and one wildcard. Status 200 is an internal rewrite; 301, 302, 303, 307, and 308 are redirects. Rules are immutable deployment metadata, so rollback restores them with the files. Yeeet reserves transport, content-type, privacy, and immutable-version crawler headers.
 
 Use JSON output for scripts:
 
@@ -1508,6 +1524,15 @@ const DOCS_HTML = String.raw`<!doctype html>
             <p>Run <span class="inline-code" translate="no">yeeet init comet</span> to create <span class="inline-code" translate="no">.yeeet.json</span>. From then on, the project name and routing mode travel with the project.</p>
             <div class="code-block"><pre><code id="code-init">yeeet init comet
 yeeet deploy ./dist</code></pre><button class="copy-button" type="button" data-copy="code-init">Copy</button></div>
+            <h3>Ship Headers and Redirects With the Site</h3>
+            <p>Add <span class="inline-code" translate="no">_headers</span> and <span class="inline-code" translate="no">_redirects</span> at the deployed root. Yeeet validates them, keeps them private, and versions them with the files, so rollback restores the complete delivery behavior.</p>
+            <div class="code-block"><pre><code id="code-rules"># _headers
+/assets/*
+  Cache-Control: public, max-age=604800
+
+# _redirects
+/old/:page /new/:page 308
+/app/* /index.html 200</code></pre><button class="copy-button" type="button" data-copy="code-rules">Copy</button></div>
           </section>
 
           <section class="docs-section" id="versions">

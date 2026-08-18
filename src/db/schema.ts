@@ -54,6 +54,8 @@ export const deployments = pgTable(
     totalBytes: bigint('total_bytes', { mode: 'number' }).default(0).notNull(),
     error: text('error'),
     spaFallback: boolean('spa_fallback').default(true).notNull(),
+    headerRules: text('header_rules').default('[]').notNull(),
+    redirectRules: text('redirect_rules').default('[]').notNull(),
     passwordHash: text('password_hash'),
     shareNonce: text('share_nonce').default('').notNull(),
     createdAt: timestamp('created_at').defaultNow().notNull(),
