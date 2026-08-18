@@ -19,7 +19,11 @@
           "path": { "type": "string", "examples": ["index.html"] },
           "size": { "type": "integer", "minimum": 0 },
           "contentType": { "type": "string" },
-          "checksum": { "type": "string" }
+          "checksum": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{64}$",
+            "description": "Optional SHA-256 digest used to reuse unchanged content."
+          }
         }
       },
       "ApiError": {
@@ -90,6 +94,36 @@
         "responses": {
           "200": {
             "description": "Immutable version history and preview URLs"
+          },
+          "404": { "description": "Site not found" }
+        }
+      }
+    },
+    "/api/v1/sites/{slug}/analytics": {
+      "get": {
+        "operationId": "getSiteAnalytics",
+        "description": "Return privacy-preserving aggregate page views. No IP addresses, cookies, user agents, referrers, or visitor identifiers are collected.",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "days",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 90,
+              "default": 30
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Daily page-view totals, status classes, and normalized top paths"
           },
           "404": { "description": "Site not found" }
         }
@@ -244,6 +278,86 @@
         }
       }
     },
+    "/api/v1/webhooks": {
+      "get": {
+        "operationId": "listWebhookEndpoints",
+        "responses": {
+          "200": {
+            "description": "Webhook endpoints and supported event names"
+          }
+        }
+      },
+      "post": {
+        "operationId": "createWebhookEndpoint",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["url"],
+                "properties": {
+                  "url": { "type": "string", "format": "uri" },
+                  "label": { "type": "string", "maxLength": 100 },
+                  "events": {
+                    "type": "array",
+                    "items": {
+                      "enum": [
+                        "*",
+                        "deployment.ready",
+                        "deployment.activated",
+                        "deployment.deleted",
+                        "site.deleted",
+                        "channel.updated",
+                        "channel.deleted"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Webhook created; signing secret shown once"
+          },
+          "400": { "description": "Unsafe URL or unsupported event" }
+        }
+      }
+    },
+    "/api/v1/webhooks/{webhookId}": {
+      "parameters": [
+        {
+          "name": "webhookId",
+          "in": "path",
+          "required": true,
+          "schema": { "type": "string", "format": "uuid" }
+        }
+      ],
+      "patch": {
+        "operationId": "updateWebhookEndpoint",
+        "responses": {
+          "200": {
+            "description": "Webhook updated; a rotated secret is shown once"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteWebhookEndpoint",
+        "responses": {
+          "200": { "description": "Webhook and delivery history deleted" }
+        }
+      }
+    },
+    "/api/v1/webhooks/deliveries": {
+      "get": {
+        "operationId": "listWebhookDeliveries",
+        "responses": {
+          "200": { "description": "Recent durable webhook delivery attempts" }
+        }
+      }
+    },
     "/api/v1/deployments": {
       "get": {
         "operationId": "listDeployments",
@@ -251,6 +365,15 @@
       },
       "post": {
         "operationId": "createDeployment",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": { "type": "string", "maxLength": 128 },
+            "description": "Returns or resumes the same deployment for identical input; conflicting reuse returns 409."
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -275,6 +398,21 @@
                     "maxLength": 128,
                     "description": "Optional password protection. Completion returns a signed one-click share URL."
                   },
+                  "channel": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9][a-z0-9-]{0,31}$",
+                    "description": "Optional mutable, no-index channel to update instead of production."
+                  },
+                  "dryRun": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Return a file and byte diff without creating or uploading."
+                  },
+                  "idempotencyKey": {
+                    "type": "string",
+                    "maxLength": 128,
+                    "description": "Body alternative to the Idempotency-Key header."
+                  },
                   "source": { "enum": ["web", "cli", "api"] },
                   "files": {
                     "type": "array",
@@ -288,9 +426,70 @@
           }
         },
         "responses": {
-          "201": { "description": "Deployment and signed upload URLs created" },
+          "200": { "description": "Dry-run deployment diff" },
+          "201": {
+            "description": "Deployment plan created. uploadUrls contains only content that was not reused inside storage."
+          },
           "400": { "description": "Invalid manifest" },
-          "409": { "description": "Site name is owned by another user" }
+          "409": {
+            "description": "Site name conflict or idempotency key reused with different input"
+          }
+        }
+      }
+    },
+    "/api/v1/sites/{slug}/channels": {
+      "get": {
+        "operationId": "listSiteChannels",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Mutable no-index deployment channels" }
+        }
+      }
+    },
+    "/api/v1/sites/{slug}/channels/{channel}": {
+      "put": {
+        "operationId": "setSiteChannel",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "channel",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["version"],
+                "properties": { "version": { "type": "string" } }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Channel assigned to a ready version" }
+        }
+      },
+      "delete": {
+        "operationId": "deleteSiteChannel",
+        "responses": {
+          "200": { "description": "Channel alias removed; version retained" }
         }
       }
     },

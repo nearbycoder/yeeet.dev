@@ -1,6 +1,10 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { requireActor } from '#/server/actor'
-import { createDeployment, listRecentDeployments } from '#/server/deployments'
+import {
+  createDeployment,
+  listRecentDeployments,
+  planDeployment,
+} from '#/server/deployments'
 import type { ManifestFile } from '#/server/deployments'
 import { errorResponse, HttpError, json } from '#/server/http'
 
@@ -10,6 +14,9 @@ type CreateBody = {
   source?: 'web' | 'cli' | 'api'
   spaFallback?: boolean
   password?: string
+  channel?: string
+  dryRun?: boolean
+  idempotencyKey?: string
 }
 
 export const Route = createFileRoute('/api/v1/deployments/')({
@@ -43,6 +50,16 @@ export const Route = createFileRoute('/api/v1/deployments/')({
             : body.source === 'api'
               ? 'api'
               : 'web'
+          if (body.dryRun) {
+            return json(
+              await planDeployment({
+                actor,
+                slug: body.slug,
+                files: body.files,
+                channel: body.channel,
+              }),
+            )
+          }
           const result = await createDeployment({
             actor,
             slug: body.slug,
@@ -50,6 +67,9 @@ export const Route = createFileRoute('/api/v1/deployments/')({
             source,
             spaFallback: body.spaFallback,
             password: body.password,
+            channel: body.channel,
+            idempotencyKey:
+              request.headers.get('idempotency-key') ?? body.idempotencyKey,
           })
           return json(result, { status: 201 })
         } catch (error) {

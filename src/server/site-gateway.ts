@@ -1,6 +1,12 @@
 import { and, eq, inArray } from 'drizzle-orm'
 import { db } from '#/db'
-import { customDomains, deploymentFiles, deployments, sites } from '#/db/schema'
+import {
+  customDomains,
+  deploymentFiles,
+  deployments,
+  siteChannels,
+  sites,
+} from '#/db/schema'
 import {
   deploymentShareCookieName,
   shareTokenForDeployment,
@@ -13,10 +19,19 @@ import {
   GENERATED_SOCIAL_IMAGE_PATH,
   injectSiteSocialMetadata,
 } from './site-social-metadata'
+import {
+  HEADERS_FILE,
+  REDIRECTS_FILE,
+  applySiteHeaders,
+  deserializeSiteRules,
+  matchingRedirect,
+} from './site-rules'
+import type { SiteHeaderRule, SiteRedirectRule } from './site-rules'
 import { getStoredObject } from './storage'
 
 type SiteTarget =
   | { kind: 'live'; label: string; slug: string }
+  | { kind: 'channel'; hostnameLabel: string; label: string }
   | { kind: 'version'; deploymentId: string; label: string }
   | { kind: 'custom'; hostname: string; label: string }
 
@@ -36,11 +51,13 @@ function siteTarget(request: Request): SiteTarget | null {
       const deploymentId = uuidFromVersionLabel(label)
       return deploymentId
         ? { kind: 'version', deploymentId, label }
-        : {
-            kind: 'live',
-            slug: label,
-            label: new URL(siteUrl(label)).hostname,
-          }
+        : label.includes('--')
+          ? { kind: 'channel', hostnameLabel: label, label }
+          : {
+              kind: 'live',
+              slug: label,
+              label: new URL(siteUrl(label)).hostname,
+            }
     }
   }
 
@@ -52,7 +69,9 @@ function siteTarget(request: Request): SiteTarget | null {
     const deploymentId = uuidFromVersionLabel(label)
     return deploymentId
       ? { kind: 'version', deploymentId, label: hostname }
-      : { kind: 'live', slug: label, label: hostname }
+      : label.includes('--')
+        ? { kind: 'channel', hostnameLabel: label, label: hostname }
+        : { kind: 'live', slug: label, label: hostname }
   }
 
   const platformHost = new URL(controlPlaneUrl()).hostname
@@ -97,6 +116,7 @@ export function siteResponsePolicy(
   contentType: string,
   immutableVersion: boolean,
   protectedDeployment: boolean,
+  noCrawl = immutableVersion,
 ) {
   const cacheControl = protectedDeployment
     ? 'private, no-store, max-age=0'
@@ -105,10 +125,10 @@ export function siteResponsePolicy(
       : contentType.includes('text/html')
         ? 'public, max-age=0, s-maxage=10, stale-while-revalidate=30'
         : 'public, max-age=0, s-maxage=10, stale-while-revalidate=30'
-  const noCrawl = immutableVersion || protectedDeployment
+  const blockCrawlers = noCrawl || protectedDeployment
   return {
     cacheControl,
-    xRobotsTag: noCrawl
+    xRobotsTag: blockCrawlers
       ? 'noindex, nofollow, noarchive, nosnippet, noimageindex'
       : null,
   }
@@ -251,6 +271,7 @@ export async function maybeServeSite(
   if (new URL(request.url).pathname === '/health') return null
   const target = siteTarget(request)
   if (!target) return null
+  const noCrawlTarget = target.kind === 'version' || target.kind === 'channel'
   const requestUrl = new URL(request.url)
   const isUnlock =
     request.method === 'POST' && requestUrl.pathname === '/_yeeet/unlock'
@@ -268,6 +289,18 @@ export async function maybeServeSite(
     })
     deploymentId = site?.activeDeploymentId ?? null
     siteSlug = site?.slug ?? null
+  } else if (target.kind === 'channel') {
+    const mappedRows = await db
+      .select({
+        deploymentId: siteChannels.deploymentId,
+        slug: sites.slug,
+      })
+      .from(siteChannels)
+      .innerJoin(sites, eq(siteChannels.siteId, sites.id))
+      .where(eq(siteChannels.hostnameLabel, target.hostnameLabel))
+      .limit(1)
+    deploymentId = mappedRows.at(0)?.deploymentId ?? null
+    siteSlug = mappedRows.at(0)?.slug ?? null
   } else {
     const mappedRows = await db
       .select({
@@ -281,7 +314,7 @@ export async function maybeServeSite(
     deploymentId = mappedRows.at(0)?.activeDeploymentId ?? null
     siteSlug = mappedRows.at(0)?.slug ?? null
   }
-  if (!deploymentId) return notFound(target.label, target.kind === 'version')
+  if (!deploymentId) return notFound(target.label, noCrawlTarget)
 
   const deployment = await db.query.deployments.findFirst({
     where: and(
@@ -289,7 +322,7 @@ export async function maybeServeSite(
       eq(deployments.status, 'ready'),
     ),
   })
-  if (!deployment) return notFound(target.label, target.kind === 'version')
+  if (!deployment) return notFound(target.label, noCrawlTarget)
 
   if (!siteSlug) {
     const site = await db.query.sites.findFirst({
@@ -297,7 +330,7 @@ export async function maybeServeSite(
     })
     siteSlug = site?.slug ?? null
   }
-  if (!siteSlug) return notFound(target.label, target.kind === 'version')
+  if (!siteSlug) return notFound(target.label, noCrawlTarget)
 
   if (deployment.passwordHash) {
     const shareToken = requestUrl.searchParams.get('share')
@@ -339,7 +372,7 @@ export async function maybeServeSite(
       return unlockPage(request, target.label)
     }
   } else if (isUnlock) {
-    return notFound(target.label, target.kind === 'version')
+    return notFound(target.label, noCrawlTarget)
   }
 
   const protectedDeployment = Boolean(deployment.passwordHash)
@@ -348,6 +381,7 @@ export async function maybeServeSite(
       'image/png',
       target.kind === 'version',
       protectedDeployment,
+      noCrawlTarget,
     )
     const etag = protectedDeployment ? null : `"yeeet-og-${deployment.id}-v2"`
     const headers = new Headers({
@@ -391,11 +425,55 @@ export async function maybeServeSite(
     }
   }
 
-  const candidates = candidatePaths(requestUrl.pathname)
+  const headerRules = deserializeSiteRules<SiteHeaderRule>(
+    deployment.headerRules,
+    [],
+  )
+  const redirectRules = deserializeSiteRules<SiteRedirectRule>(
+    deployment.redirectRules,
+    [],
+  )
+  const redirect = matchingRedirect(redirectRules, requestUrl.pathname)
+  if (redirect && redirect.status !== 200) {
+    const responsePolicy = siteResponsePolicy(
+      'text/plain',
+      target.kind === 'version',
+      protectedDeployment,
+      noCrawlTarget,
+    )
+    const headers = new Headers({
+      location: redirect.to,
+      'cache-control': responsePolicy.cacheControl,
+      'x-content-type-options': 'nosniff',
+      'x-yeeet-deployment': deployment.id,
+    })
+    if (responsePolicy.xRobotsTag) {
+      headers.set('x-robots-tag', responsePolicy.xRobotsTag)
+    }
+    if (protectedDeployment) {
+      headers.set('pragma', 'no-cache')
+      headers.set('expires', '0')
+      headers.set('vary', 'cookie')
+    }
+    return new Response(null, { status: redirect.status, headers })
+  }
+
+  const effectivePath =
+    redirect?.status === 200
+      ? new URL(redirect.to, 'https://rewrite.yeeet.invalid').pathname
+      : requestUrl.pathname
+  if (
+    effectivePath === `/${HEADERS_FILE}` ||
+    effectivePath === `/${REDIRECTS_FILE}`
+  ) {
+    return notFound(target.label, noCrawlTarget || protectedDeployment)
+  }
+
+  const candidates = candidatePaths(effectivePath)
   if (!candidates.length)
     return notFound(
       target.label,
-      target.kind === 'version' || Boolean(deployment.passwordHash),
+      noCrawlTarget || Boolean(deployment.passwordHash),
     )
 
   const rows = await db
@@ -424,7 +502,7 @@ export async function maybeServeSite(
   if (!file)
     return notFound(
       target.label,
-      target.kind === 'version' || Boolean(deployment.passwordHash),
+      noCrawlTarget || Boolean(deployment.passwordHash),
     )
 
   const injectSocialImage =
@@ -433,6 +511,7 @@ export async function maybeServeSite(
     file.contentType,
     target.kind === 'version',
     protectedDeployment,
+    noCrawlTarget,
   )
   const etag =
     !protectedDeployment && file.etag
@@ -445,6 +524,13 @@ export async function maybeServeSite(
     'x-yeeet-deployment': deploymentId,
     'accept-ranges': 'bytes',
   })
+  applySiteHeaders(headers, headerRules, effectivePath)
+  if (target.kind === 'version' || protectedDeployment) {
+    headers.set('cache-control', responsePolicy.cacheControl)
+  }
+  headers.set('content-type', file.contentType)
+  headers.set('x-content-type-options', 'nosniff')
+  headers.set('x-yeeet-deployment', deploymentId)
   if (responsePolicy.xRobotsTag) {
     headers.set('x-robots-tag', responsePolicy.xRobotsTag)
   }
@@ -499,7 +585,7 @@ export async function maybeServeSite(
       error,
     })
     const errorHeaders = new Headers()
-    if (target.kind === 'version' || protectedDeployment) {
+    if (noCrawlTarget || protectedDeployment) {
       errorHeaders.set('cache-control', 'private, no-store, max-age=0')
       errorHeaders.set(
         'x-robots-tag',

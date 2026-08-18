@@ -25,6 +25,13 @@ export const Route = createFileRoute('/dashboard')({
 
 type UploadFile = { file: File; path: string }
 
+async function sha256File(file: File) {
+  const digest = await crypto.subtle.digest('SHA-256', await file.arrayBuffer())
+  return Array.from(new Uint8Array(digest), (byte) =>
+    byte.toString(16).padStart(2, '0'),
+  ).join('')
+}
+
 type CustomDomainData = {
   id: string
   hostname: string
@@ -56,11 +63,26 @@ type VersionHistoryData = {
     totalBytes: number
     current: boolean
     previewUrl: string | null
+    channel: string | null
     spaFallback: boolean
     protected: boolean
     shareUrl: string | null
     createdAt: string
   }>
+}
+
+type AnalyticsData = {
+  site: { id: string; slug: string; url: string }
+  period: { days: number; from: string; to: string }
+  totalViews: number
+  statuses: { successful: number; redirects: number; errors: number }
+  daily: Array<{ date: string; views: number }>
+  topPaths: Array<{ path: string; views: number }>
+  privacy: {
+    uniqueVisitors: false
+    stored: Array<string>
+    notStored: Array<string>
+  }
 }
 
 type DashboardDeleteTarget =
@@ -228,6 +250,7 @@ function VersionHistory(props: {
                     {' · '}
                     {version.spaFallback ? 'SPA' : 'static'} ·{' '}
                     {version.protected ? 'private' : 'public'}
+                    {version.channel ? ` · ${version.channel} channel` : ''}
                   </small>
                 </span>
                 <span className="version-size">
@@ -376,6 +399,114 @@ function VersionHistory(props: {
         <p className="version-note">
           Live aliases revalidate at the edge within about 10 seconds. Version
           preview URLs never change.
+        </p>
+      </section>
+    </div>
+  )
+}
+
+function SiteAnalytics(props: { data: AnalyticsData; onClose: () => void }) {
+  useEffect(() => {
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === 'Escape') props.onClose()
+    }
+    window.addEventListener('keydown', closeOnEscape)
+    return () => window.removeEventListener('keydown', closeOnEscape)
+  }, [props.onClose])
+
+  const headingId = `site-analytics-${props.data.site.slug}`
+  const maxViews = Math.max(...props.data.daily.map((day) => day.views), 1)
+
+  return (
+    <div className="version-drawer-shell">
+      <button
+        type="button"
+        className="version-drawer-backdrop"
+        aria-label="Close analytics"
+        onClick={props.onClose}
+      />
+      <section
+        className="version-drawer analytics-drawer"
+        aria-labelledby={headingId}
+        tabIndex={-1}
+      >
+        <div className="version-heading">
+          <div>
+            <span>PRIVACY-FIRST ANALYTICS</span>
+            <h3 id={headingId}>{props.data.site.slug}</h3>
+          </div>
+          <button type="button" onClick={props.onClose}>
+            Close
+          </button>
+        </div>
+        <div className="analytics-summary">
+          <div className="analytics-stat">
+            <strong>{props.data.totalViews.toLocaleString()}</strong>
+            <span>page views</span>
+          </div>
+          <div className="analytics-stat">
+            <strong>{props.data.statuses.successful.toLocaleString()}</strong>
+            <span>successful</span>
+          </div>
+          <div className="analytics-stat">
+            <strong>{props.data.statuses.errors.toLocaleString()}</strong>
+            <span>errors</span>
+          </div>
+        </div>
+        <div className="analytics-grid">
+          <section aria-labelledby={`${headingId}-daily`}>
+            <div className="analytics-section-heading">
+              <h4 id={`${headingId}-daily`}>
+                Last {props.data.period.days} days
+              </h4>
+              <span>UTC</span>
+            </div>
+            <div className="analytics-list analytics-daily-list">
+              {props.data.daily.map((day) => (
+                <div className="analytics-row" key={day.date}>
+                  <time dateTime={day.date}>
+                    {new Date(`${day.date}T00:00:00Z`).toLocaleDateString(
+                      undefined,
+                      { month: 'short', day: 'numeric', timeZone: 'UTC' },
+                    )}
+                  </time>
+                  <span className="analytics-bar-track" aria-hidden="true">
+                    <i
+                      style={{
+                        width: `${Math.max((day.views / maxViews) * 100, day.views ? 3 : 0)}%`,
+                      }}
+                    />
+                  </span>
+                  <b>{day.views.toLocaleString()}</b>
+                </div>
+              ))}
+            </div>
+          </section>
+          <section aria-labelledby={`${headingId}-paths`}>
+            <div className="analytics-section-heading">
+              <h4 id={`${headingId}-paths`}>Top paths</h4>
+              <span>normalized</span>
+            </div>
+            <div className="analytics-list">
+              {props.data.topPaths.length ? (
+                props.data.topPaths.map((item) => (
+                  <div className="analytics-row analytics-path" key={item.path}>
+                    <code>{item.path}</code>
+                    <b>{item.views.toLocaleString()}</b>
+                  </div>
+                ))
+              ) : (
+                <p className="analytics-empty">
+                  No page views yet. Open the live site to start the chart.
+                </p>
+              )}
+            </div>
+          </section>
+        </div>
+        <p className="analytics-privacy">
+          No cookies or visitor profiles. Yeeet stores only daily aggregate
+          counts, normalized paths, and response status classes—not IPs, user
+          agents, referrers, or visitor IDs.
         </p>
       </section>
     </div>
@@ -570,8 +701,12 @@ function Dashboard() {
   const router = useRouter()
   const fileInput = useRef<HTMLInputElement>(null)
   const folderInput = useRef<HTMLInputElement>(null)
+  const deploymentKey = useRef<{ fingerprint: string; key: string } | null>(
+    null,
+  )
   const [files, setFiles] = useState<Array<UploadFile>>([])
   const [slug, setSlug] = useState('')
+  const [channel, setChannel] = useState('')
   const [spaFallback, setSpaFallback] = useState(true)
   const [privateDeploy, setPrivateDeploy] = useState(false)
   const [deployPassword, setDeployPassword] = useState('')
@@ -580,6 +715,8 @@ function Dashboard() {
     'idle' | 'preparing' | 'uploading' | 'finalizing' | 'done'
   >('idle')
   const [uploaded, setUploaded] = useState(0)
+  const [uploadTotal, setUploadTotal] = useState(0)
+  const [reused, setReused] = useState(0)
   const [error, setError] = useState('')
   const [resultUrl, setResultUrl] = useState('')
   const [resultShareUrl, setResultShareUrl] = useState('')
@@ -587,6 +724,8 @@ function Dashboard() {
   const [keyBusy, setKeyBusy] = useState(false)
   const [history, setHistory] = useState<VersionHistoryData | null>(null)
   const [historyLoading, setHistoryLoading] = useState('')
+  const [analytics, setAnalytics] = useState<AnalyticsData | null>(null)
+  const [analyticsLoading, setAnalyticsLoading] = useState('')
   const [versionBusy, setVersionBusy] = useState('')
   const [domainSiteSlug, setDomainSiteSlug] = useState('')
   const [domainBusy, setDomainBusy] = useState('')
@@ -604,10 +743,13 @@ function Dashboard() {
       })),
     )
     setFiles(next)
+    deploymentKey.current = null
     setError('')
     setResultUrl('')
     setResultShareUrl('')
     setUploaded(0)
+    setUploadTotal(0)
+    setReused(0)
     setPhase('idle')
   }
 
@@ -617,22 +759,38 @@ function Dashboard() {
     setResultUrl('')
     setResultShareUrl('')
     setUploaded(0)
+    setUploadTotal(0)
+    setReused(0)
     setPhase('preparing')
     try {
+      const checksums = new Map<string, string>()
+      await uploadInBatches(files, 2, async (item) => {
+        checksums.set(item.path, await sha256File(item.file))
+      })
+      const deploymentInput = {
+        slug,
+        channel: channel || undefined,
+        spaFallback,
+        password: privateDeploy ? deployPassword : undefined,
+        source: 'web',
+        files: files.map((item) => ({
+          path: item.path,
+          size: item.file.size,
+          contentType: item.file.type || 'application/octet-stream',
+          checksum: checksums.get(item.path),
+        })),
+      }
+      const fingerprint = JSON.stringify(deploymentInput)
+      if (deploymentKey.current?.fingerprint !== fingerprint) {
+        deploymentKey.current = { fingerprint, key: crypto.randomUUID() }
+      }
       const response = await fetch('/api/v1/deployments', {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          slug,
-          spaFallback,
-          password: privateDeploy ? deployPassword : undefined,
-          source: 'web',
-          files: files.map((item) => ({
-            path: item.path,
-            size: item.file.size,
-            contentType: item.file.type || 'application/octet-stream',
-          })),
-        }),
+        headers: {
+          'content-type': 'application/json',
+          'idempotency-key': deploymentKey.current.key,
+        },
+        body: fingerprint,
       })
       const deployment = await response.json()
       if (!response.ok)
@@ -641,6 +799,8 @@ function Dashboard() {
         )
 
       const localFiles = new Map(files.map((item) => [item.path, item.file]))
+      setUploadTotal(deployment.uploadUrls.length)
+      setReused(deployment.reusedFiles ?? 0)
       setPhase('uploading')
       await uploadInBatches(
         deployment.uploadUrls,
@@ -675,6 +835,7 @@ function Dashboard() {
       setSlug(completed.site)
       setDeployPassword('')
       setPrivateDeploy(false)
+      deploymentKey.current = null
       setPhase('done')
       await router.invalidate()
     } catch (uploadError) {
@@ -707,6 +868,8 @@ function Dashboard() {
   }
 
   async function showVersions(siteSlug: string) {
+    setAnalytics(null)
+    setDomainSiteSlug('')
     setHistoryLoading(siteSlug)
     setError('')
     try {
@@ -725,6 +888,30 @@ function Dashboard() {
       )
     } finally {
       setHistoryLoading('')
+    }
+  }
+
+  async function showAnalytics(siteSlug: string) {
+    setAnalyticsLoading(siteSlug)
+    setError('')
+    setHistory(null)
+    setDomainSiteSlug('')
+    try {
+      const response = await fetch(
+        `/api/v1/sites/${encodeURIComponent(siteSlug)}/analytics?days=30`,
+      )
+      const body = await response.json()
+      if (!response.ok)
+        throw new Error(body.error?.message || 'Could not load analytics.')
+      setAnalytics(body)
+    } catch (analyticsError) {
+      setError(
+        analyticsError instanceof Error
+          ? analyticsError.message
+          : 'Could not load analytics.',
+      )
+    } finally {
+      setAnalyticsLoading('')
     }
   }
 
@@ -909,7 +1096,7 @@ function Dashboard() {
     : phase === 'preparing'
       ? 'Calculating maximum yeeet…'
       : phase === 'uploading'
-        ? `Munching file ${Math.min(uploaded + 1, files.length)} of ${files.length}…`
+        ? `Munching file ${Math.min(uploaded + 1, uploadTotal || files.length)} of ${uploadTotal || files.length}…`
         : phase === 'finalizing'
           ? 'YEETING to the edge!'
           : phase === 'done'
@@ -1088,6 +1275,31 @@ function Dashboard() {
                 <b>.{data.platform.siteDomain}</b>
               </div>
             </label>
+            <label>
+              <span>Deployment channel (optional)</span>
+              <div className="slug-input">
+                <input
+                  name="deployment-channel"
+                  value={channel}
+                  onChange={(event) =>
+                    setChannel(
+                      event.target.value
+                        .toLowerCase()
+                        .replace(/[^a-z0-9-]/g, '')
+                        .slice(0, 32),
+                    )
+                  }
+                  placeholder="production"
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+                <b>mutable alias</b>
+              </div>
+              <small>
+                Example: staging creates a no-index site channel without moving
+                production.
+              </small>
+            </label>
             <label className="routing-toggle">
               <input
                 name="spa-fallback"
@@ -1130,7 +1342,7 @@ function Dashboard() {
                 : phase === 'preparing'
                   ? 'Plotting course…'
                   : phase === 'uploading'
-                    ? `Uploading ${uploaded}/${files.length}`
+                    ? `Uploading ${uploaded}/${uploadTotal || files.length}`
                     : phase === 'done'
                       ? 'Landed ✓'
                       : 'Going live…'}
@@ -1159,7 +1371,7 @@ function Dashboard() {
             <div className="upload-progress">
               <span
                 style={{
-                  width: `${phase === 'finalizing' ? 100 : (uploaded / files.length) * 100}%`,
+                  width: `${phase === 'finalizing' ? 100 : (uploaded / (uploadTotal || files.length)) * 100}%`,
                 }}
               />
             </div>
@@ -1179,6 +1391,12 @@ function Dashboard() {
                 </a>
                 {resultShareUrl ? (
                   <small>Private deployment · share link is ready</small>
+                ) : null}
+                {reused ? (
+                  <small>
+                    {reused} unchanged {reused === 1 ? 'file' : 'files'} reused
+                    without upload
+                  </small>
                 ) : null}
               </div>
               <button
@@ -1233,7 +1451,17 @@ function Dashboard() {
                     <span className="site-row-actions">
                       <button
                         type="button"
-                        onClick={() => setDomainSiteSlug(site.slug)}
+                        onClick={() => showAnalytics(site.slug)}
+                      >
+                        {analyticsLoading === site.slug ? '…' : 'Analytics'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAnalytics(null)
+                          setHistory(null)
+                          setDomainSiteSlug(site.slug)
+                        }}
                       >
                         Domains
                         {site.customDomains.length
@@ -1302,6 +1530,12 @@ function Dashboard() {
                 }}
                 onAccess={updateVersionAccess}
                 onClose={() => setHistory(null)}
+              />
+            ) : null}
+            {analytics ? (
+              <SiteAnalytics
+                data={analytics}
+                onClose={() => setAnalytics(null)}
               />
             ) : null}
             {domainSite ? (

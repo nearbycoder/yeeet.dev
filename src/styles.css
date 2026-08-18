@@ -2171,6 +2171,110 @@ html[data-theme='dark'] .theme-icon-sun {
     12px/1.55 'DM Mono',
     monospace;
 }
+.analytics-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 18px;
+}
+.analytics-stat {
+  display: grid;
+  gap: 3px;
+  border: 1px solid #46443e;
+  border-radius: 4px;
+  padding: 14px;
+  background: #252521;
+}
+.analytics-stat strong {
+  color: var(--night-ink);
+  font-size: 24px;
+}
+.analytics-stat span,
+.analytics-section-heading span {
+  color: #9e9a91;
+  font:
+    11px 'DM Mono',
+    monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.analytics-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(240px, 1fr);
+  gap: 18px;
+}
+.analytics-grid > section {
+  min-width: 0;
+}
+.analytics-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid #3e3d38;
+  padding-bottom: 9px;
+}
+.analytics-section-heading h4 {
+  margin: 0;
+  font-size: 13px;
+}
+.analytics-list {
+  max-height: 390px;
+  overflow-y: auto;
+}
+.analytics-row {
+  display: grid;
+  grid-template-columns: 56px minmax(40px, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+  border-bottom: 1px solid #31312d;
+  font-size: 12px;
+}
+.analytics-row time,
+.analytics-row code {
+  color: #aaa79e;
+  font-family: 'DM Mono', monospace;
+}
+.analytics-row b {
+  font-variant-numeric: tabular-nums;
+}
+.analytics-bar-track {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: #34342f;
+}
+.analytics-bar-track i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--lime);
+}
+.analytics-path {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+.analytics-path code {
+  overflow: hidden;
+  color: var(--night-ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.analytics-empty {
+  margin: 0;
+  padding: 20px 0;
+  color: #aaa79e;
+  font-size: 12px;
+}
+.analytics-privacy {
+  margin: 18px 0 0;
+  border-top: 1px solid #3e3d38;
+  padding-top: 14px;
+  color: #8e8b82;
+  font:
+    12px/1.55 'DM Mono',
+    monospace;
+}
 .version-access-editor {
   display: grid;
   grid-template-columns: minmax(180px, 1fr) minmax(180px, 0.8fr) auto auto auto;
@@ -3039,6 +3143,31 @@ h3 {
     margin: 16px 2px 0;
     font-size: 12px;
     line-height: 1.6;
+  }
+  .analytics-summary {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin-top: 12px;
+  }
+  .analytics-stat {
+    padding: 11px;
+  }
+  .analytics-stat strong {
+    font-size: 19px;
+  }
+  .analytics-stat span {
+    font-size: 9px;
+  }
+  .analytics-grid {
+    grid-template-columns: 1fr;
+  }
+  .analytics-list {
+    max-height: none;
+  }
+  .analytics-daily-list {
+    max-height: 300px;
+  }
+  .analytics-privacy {
+    padding-bottom: 4px;
   }
   .version-access-editor {
     grid-template-columns: 1fr;

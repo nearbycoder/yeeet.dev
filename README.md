@@ -55,8 +55,14 @@ builds or replace a framework's build command.
 - Random readable subdomains or stable names such as
   `comet.site.example.com`.
 - Atomic releases: a live pointer moves only after every object is verified.
+- SHA-256 incremental deploys that reuse unchanged content with storage-side
+  copies instead of uploading it again.
 - Immutable version URLs, version history, promotion, rollback, and deletion.
+- Mutable, no-index deployment channels such as
+  `comet--staging.site.example.com` that never move production implicitly.
 - SPA fallback for refreshes on client-side routes, with strict static mode too.
+- Versioned `_headers` and `_redirects` rules for cache policy, security headers,
+  redirects, and internal rewrites.
 - Password-protected deployments and revocable one-click private share links.
 - Custom domains with Railway-managed DNS verification and TLS.
 - Private S3-compatible object storage behind a cache-aware asset gateway.
@@ -64,6 +70,12 @@ builds or replace a framework's build command.
 - Email/password and GitHub login through Better Auth.
 - Invitation-only registration, account bans, role management, and audit history.
 - An OpenAPI contract, LLM-readable docs, API keys, and stable JSON output.
+- A first-party stdio MCP server with typed deploy, release, channel, domain,
+  sharing, and confirmed cleanup tools.
+- Signed event webhooks with a durable Postgres outbox, SSRF-safe public
+  endpoints, atomic delivery claims, and exponential retries.
+- Cookie-free aggregate page-view analytics with normalized paths and no IP,
+  user-agent, referrer, or visitor-identity collection.
 - A responsive control plane and a deterministic animated mascot for each site.
 
 ## How it works
@@ -84,7 +96,10 @@ Wildcard asset gateway ──► edge cache ──► <site>.<SITE_DOMAIN>
 Every deployment writes to a unique storage prefix. Finalization verifies the
 manifest and changes the active deployment in one database transaction, so an
 interrupted upload never replaces a working site. Rollbacks only move that
-pointer; they do not copy or mutate files.
+pointer; they do not copy or mutate files. CLI and browser clients include a
+SHA-256 digest for each file. When a ready deployment owned by the same account
+already contains that content, Yeeet copies it inside private storage into the
+new immutable prefix and returns upload URLs only for changed content.
 
 Public live aliases use short edge revalidation. Immutable version hosts can be
 cached for a year. Version previews and protected deployments emit crawler
@@ -112,6 +127,9 @@ Useful release operations:
 ```sh
 yeeet versions comet
 yeeet rollback comet
+yeeet deploy ./dist --name comet --channel staging
+yeeet deploy ./dist --name comet --dry-run
+yeeet channel set comet staging <version>
 yeeet share comet
 yeeet version remove comet <version> --yes
 yeeet remove comet --yes
@@ -120,6 +138,28 @@ yeeet domain add comet docs.example.com
 
 SPA fallback is enabled by default. Use `--static` when every valid path must
 map to a real file.
+
+### Delivery rules
+
+Put a `_headers` or `_redirects` file at the root of the folder you deploy.
+Yeeet validates and stores the rules with that immutable version, so rollback
+also restores its exact routing and headers.
+
+```text
+# dist/_headers
+/assets/*
+  Cache-Control: public, max-age=604800
+  X-Frame-Options: DENY
+
+# dist/_redirects
+/old-docs/:page /guides/:page 308
+/app/* /index.html 200
+```
+
+Rules support named path parameters and one wildcard. Status `200` performs an
+internal rewrite; `301`, `302`, `303`, `307`, and `308` redirect. Yeeet keeps
+transport, content-type, private-cache, and immutable-version crawler headers
+under platform control. The rule files themselves are never publicly served.
 
 For agents and CI, create an API key in the dashboard and keep it in a secret
 store:
@@ -130,6 +170,110 @@ YEEET_TOKEN=yeeet_... yeeet deploy ./dist --name comet --json
 
 The CLI can target any self-hosted instance with `--api https://your-domain` or
 the `YEEET_API` environment variable.
+
+Deployment channels are named mutable pointers to ready versions. Deploy with
+`--channel staging` to update `comet--staging.site.yeeet.dev` while leaving
+`comet.site.yeeet.dev` untouched. Use `yeeet channel list`, `channel set`, and
+`channel remove` to manage aliases directly. Channel responses are no-index by
+default; immutable version URLs remain available for exact build references.
+
+Use `--dry-run` to hash the folder and receive added, changed, removed, and
+unchanged paths plus byte totals without creating a deployment or touching
+storage. Every CLI create also sends a random idempotency key and retries
+transient failures safely. Automation can supply a stable key explicitly with
+`--idempotency-key <key>` or the `Idempotency-Key` API header; reusing a key with
+different input is rejected.
+
+### GitHub Action and PR previews
+
+The repository is also a dependency-free JavaScript action. It deploys a normal
+site from any workflow, or manages a stable `<site>-pr-<number>` preview and an
+idempotently updated pull-request comment. Closing the pull request can remove
+the temporary site automatically.
+
+```yaml
+- uses: nearbycoder/yeeet.dev@main
+  with:
+    token: ${{ secrets.YEEET_TOKEN }}
+    github-token: ${{ github.token }}
+    site: docs
+    directory: dist
+```
+
+Copy the complete deploy-and-cleanup workflow from
+[`docs/examples/yeeet-preview.yml`](docs/examples/yeeet-preview.yml). It runs
+only for branches in the same repository because GitHub correctly withholds
+secrets from untrusted forks. Pin the action to a commit SHA when your security
+policy requires immutable third-party actions.
+
+### MCP server for coding agents
+
+The `@yeeet.dev/mcp` workspace is the official Model Context Protocol server.
+It supports current and legacy MCP clients over stdio and deploys directly
+through the Yeeet API. Configure `YEEET_TOKEN` in the host's secret store:
+
+```json
+{
+  "mcpServers": {
+    "yeeet": {
+      "command": "npx",
+      "args": ["-y", "@yeeet.dev/mcp"],
+      "env": { "YEEET_TOKEN": "yeeet_..." }
+    }
+  }
+}
+```
+
+While developing this repository, run it without publishing:
+
+```sh
+YEEET_TOKEN=yeeet_... node packages/mcp/bin/yeeet-mcp.js
+```
+
+Agents can plan a content diff before deployment, deploy a local path, inspect
+and roll back releases, move channels, manage domains, and retrieve private
+share links. Permanent site and version deletion each require a literal
+`confirm: true` tool argument. See [`packages/mcp`](packages/mcp).
+
+### Deployment event webhooks
+
+Register a public HTTPS endpoint and subscribe to every event or a selected
+set. The signing secret is derived from platform key material and shown only on
+creation or rotation.
+
+```sh
+yeeet webhook add https://example.com/yeeet \
+  --events deployment.ready,deployment.activated \
+  --label production-bot
+yeeet webhook list
+yeeet webhook deliveries
+```
+
+Each JSON request includes `id`, `event`, `createdAt`, and `data`. Verify
+`X-Yeeet-Signature`, formatted as `t=<unix>,v1=<hex>`, by computing HMAC-SHA256
+with the webhook secret over `<unix>.<raw request body>`. Also reject stale
+timestamps and deduplicate the stable `X-Yeeet-Delivery` ID. Yeeet never follows
+redirects, blocks private/loopback DNS targets, times out slow receivers, and
+retries failed delivery from a durable Postgres outbox.
+
+Supported events are `deployment.ready`, `deployment.activated`,
+`deployment.deleted`, `site.deleted`, `channel.updated`, and
+`channel.deleted`. Use `yeeet webhook rotate-secret <id>` to revoke a signing
+secret and receive its replacement once.
+
+### Privacy-first analytics
+
+Every HTML page response contributes to an aggregate UTC daily counter. View a
+site's last 30 days in the responsive dashboard or use the CLI/API:
+
+```sh
+yeeet analytics comet --days 30 --json
+```
+
+Yeeet stores the site, UTC day, normalized path, response status, and count. It
+does not store IP addresses, cookies, user agents, referrers, or visitor IDs,
+and deliberately does not claim unique-visitor metrics. Dynamic path segments
+are collapsed and path cardinality is capped before data reaches Postgres.
 
 ## One-click Railway deploy
 
@@ -248,6 +392,7 @@ src/server/          deployment, storage, domains, docs, and gateway logic
 src/db/              Drizzle schemas
 drizzle/             committed SQL migrations and migration metadata
 packages/cli/        publishable Node.js CLI
+packages/mcp/        first-party stdio MCP server for coding agents
 public/              OpenAPI and agent-readable entry points
 docs/                operator documentation
 scripts/             migrations, admin bootstrap, and bucket CORS helpers

@@ -1,0 +1,1 @@
+CREATE INDEX "deployment_files_checksum_idx" ON "deployment_files" USING btree ("checksum");

@@ -1,0 +1,35 @@
+{
+  "name": "@yeeet.dev/mcp",
+  "version": "0.0.1",
+  "description": "Official MCP server for deploying and managing Yeeet static sites.",
+  "type": "module",
+  "license": "MIT",
+  "homepage": "https://github.com/nearbycoder/yeeet.dev/tree/main/packages/mcp#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nearbycoder/yeeet.dev.git",
+    "directory": "packages/mcp"
+  },
+  "bugs": {
+    "url": "https://github.com/nearbycoder/yeeet.dev/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "bin": {
+    "yeeet-mcp": "./bin/yeeet-mcp.js"
+  },
+  "files": [
+    "bin",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/server": "^2.0.0",
+    "fast-glob": "^3.3.3",
+    "mime-types": "^3.0.2",
+    "zod": "^4.3.6"
+  }
+}

@@ -1,4 +1,5 @@
 import {
+  CopyObjectCommand,
   DeleteObjectsCommand,
   GetObjectCommand,
   HeadObjectCommand,
@@ -82,6 +83,29 @@ export async function getStoredObject(key: string, range?: string) {
   const { bucket, client } = getStorage()
   return client.send(
     new GetObjectCommand({ Bucket: bucket, Key: key, Range: range }),
+  )
+}
+
+export async function copyStoredObject(input: {
+  sourceKey: string
+  targetKey: string
+  contentType: string
+  deploymentId: string
+}) {
+  const { bucket, client } = getStorage()
+  const copySource = `${encodeURIComponent(bucket)}/${input.sourceKey
+    .split('/')
+    .map(encodeURIComponent)
+    .join('/')}`
+  return client.send(
+    new CopyObjectCommand({
+      Bucket: bucket,
+      Key: input.targetKey,
+      CopySource: copySource,
+      ContentType: input.contentType,
+      MetadataDirective: 'REPLACE',
+      Metadata: { deployment: input.deploymentId },
+    }),
   )
 }
 

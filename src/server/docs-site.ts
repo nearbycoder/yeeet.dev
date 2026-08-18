@@ -1139,10 +1139,16 @@ Exit codes are 0 for success, 2 when authentication is required, and 1 for valid
 - yeeet login: authenticate through the browser with a one-time device code.
 - yeeet whoami --json: verify the current credential.
 - yeeet deploy [path] --json: atomically publish a file or folder. Path defaults to the current directory.
+- yeeet deploy [path] --dry-run --json: return an exact file and byte diff without creating a deployment.
 - yeeet deploy ./dist --name <slug>: update a stable named site.
 - yeeet sites --json: list sites.
 - yeeet versions <site> --json: list immutable releases and preview URLs.
 - yeeet rollback <site> [version] --json: activate a prior ready release. Omit version to choose the previous release.
+- yeeet deploy ./dist --name <site> --channel staging: update a mutable no-index channel without moving production.
+- yeeet channel list <site> --json: list mutable deployment channels.
+- yeeet channel set <site> <channel> <version> --json: point a channel at a ready version.
+- yeeet channel remove <site> <channel> --json: remove an alias without deleting its version.
+- yeeet analytics <site> --days 30 --json: return daily page views, normalized top paths, and status totals without visitor tracking.
 - yeeet version remove <site> <version> --yes --json: delete one immutable version.
 - yeeet remove <site> --yes --json: delete a site and every version.
 - yeeet access protect <site> <version> --password <password> --json: protect an existing version.
@@ -1152,22 +1158,32 @@ Exit codes are 0 for success, 2 when authentication is required, and 1 for valid
 - yeeet domain add <site> <hostname> --json: attach a custom hostname and return required DNS records.
 - yeeet domain list <site> --json: inspect DNS and TLS status.
 - yeeet init [name]: create .yeeet.json for repeatable deploy defaults.
+- GitHub Action: use nearbycoder/yeeet.dev@main to deploy a directory or maintain a per-PR preview and comment. Use cleanup mode when the PR closes.
+- MCP server: @yeeet.dev/mcp exposes typed planning, deploy, release, channel, domain, sharing, and confirmed deletion tools over stdio. Configure YEEET_TOKEN in the MCP host.
+- Webhooks: yeeet webhook add <https-url> [--events <comma-list>] creates a signed endpoint and shows its secret once; list, deliveries, rotate-secret, and remove manage it.
 
 ## Invariants useful to agents
 
 - Uploads are atomic: the live pointer changes only after every object completes.
+- Clients send SHA-256 file digests. Unchanged content owned by the same account is copied within storage and omitted from uploadUrls.
 - Version preview URLs are immutable; live aliases update at the edge in about 10 seconds.
 - SPA fallback defaults to true and only handles navigation-like paths, not missing assets.
+- Root _headers and _redirects files are validated and versioned with the deployment. They are never served as site assets.
 - Public sites receive a deterministic 1200x630 Yeeetling social card at /_yeeet/og.png unless their HTML supplies og:image or twitter:image.
 - --json suppresses decorative output. Parse stdout as one JSON object.
+- CLI creates use a random idempotency key and retry transient failures. Agents may set --idempotency-key explicitly; the API also accepts Idempotency-Key.
 - Version identifiers accept an unambiguous prefix of at least 8 characters where supported.
 - Passwords are 8–128 characters. YEEET_DEPLOY_PASSWORD avoids a password in shell history.
 - Never log or commit YEEET_TOKEN.
+- Webhook requests use X-Yeeet-Signature: t=<unix>,v1=<HMAC-SHA256> over <unix>.<raw body>. Reject stale timestamps and deduplicate X-Yeeet-Delivery.
+- Analytics store only aggregate UTC day, normalized path, response status, and count. They never store IPs, cookies, user agents, referrers, or visitor IDs, and do not report unique visitors.
 `
 
 const LLMS_FULL_TXT = String.raw`# Yeeet CLI Guide
 
 Yeeet turns a file or build folder into a globally cached HTTPS site. Deploys are atomic, every ready release has an immutable preview URL, and a named site can move between releases without uploading the files again.
+
+CLI and browser deploys hash files with SHA-256. When a ready release owned by the same account already contains identical bytes, the server copies that object into the new immutable release inside storage and asks the client to upload only changed files.
 
 Human documentation: https://docs.yeeet.dev/
 OpenAPI contract: https://docs.yeeet.dev/openapi.json
@@ -1195,6 +1211,22 @@ For CI or agents, create an API key in the Yeeet dashboard and pass it through t
 
 Never put YEEET_TOKEN in source control, command output, screenshots, or prompts.
 
+## GitHub Actions and pull request previews
+
+Yeeet ships a JavaScript action at nearbycoder/yeeet.dev@main. Give it a Yeeet API key, a build directory, and a stable site base name. On pull_request events it deploys to <site>-pr-<number>, updates one PR comment with the live and immutable URLs, and removes the preview when called with mode cleanup. GitHub does not expose repository secrets to untrusted fork pull requests; keep that protection in place.
+
+## MCP server
+
+The first-party @yeeet.dev/mcp package speaks stdio MCP and supports modern and legacy clients. Set YEEET_TOKEN in the host environment, and optionally YEEET_API for a self-hosted instance. Its typed tools cover list_sites, list_versions, plan_deploy, deploy_path, rollback_site, channels, domains, private share-link lookup, and deletion. delete_site and delete_version require confirm=true. The server never writes logs to stdout because that stream is reserved for MCP protocol messages.
+
+## Signed event webhooks
+
+Create an endpoint with yeeet webhook add https://example.com/hook --events deployment.ready,deployment.activated. The secret is shown once. Each request body has id, event, createdAt, and data. X-Yeeet-Signature is t=<unix>,v1=<hex HMAC-SHA256> over <unix>.<raw body>; X-Yeeet-Delivery is stable for deduplication. Reject stale timestamps. Yeeet persists an outbox row before delivery, atomically claims work across replicas, blocks callbacks to private networks, does not follow redirects, times out slow endpoints, and retries with backoff. Supported events: deployment.ready, deployment.activated, deployment.deleted, site.deleted, channel.updated, channel.deleted.
+
+## Privacy-first analytics
+
+Use yeeet analytics <site> --days 30 --json or the dashboard to inspect aggregate page views. The gateway counts HTML page responses by UTC day, normalized path, and response status. Dynamic identifiers and error paths are collapsed and per-site path cardinality is capped. Yeeet does not store IP addresses, cookies, user agents, referrers, or visitor IDs, and does not estimate unique visitors. The API accepts a 1–90 day window.
+
 ## Deploy
 
 Deploy the current directory and let Yeeet create a readable random name:
@@ -1211,13 +1243,40 @@ Choose a stable site name. Later deploys to the same name create new versions an
 
 The live URL is https://comet.site.yeeet.dev. Each release also receives an immutable URL in the form https://v-<deployment-id>.site.yeeet.dev.
 
+Deploy to a mutable channel without changing production:
+
+    yeeet deploy ./dist --name comet --channel staging
+
+That updates https://comet--staging.site.yeeet.dev. Channel aliases are no-index and use short edge revalidation. Point a channel at an existing version with yeeet channel set comet staging <version>, or remove only the alias with yeeet channel remove comet staging.
+
 SPA fallback is enabled by default. A refresh at /settings/profile serves index.html when that path has no file, while a missing asset such as /assets/app.js remains a 404. Use strict static routing when appropriate:
 
     yeeet deploy ./public --static
 
+## Headers, redirects, and rewrites
+
+Add a _headers file to the root of the deployed folder:
+
+    /assets/*
+      Cache-Control: public, max-age=604800
+      X-Frame-Options: DENY
+
+Add a _redirects file for redirects or internal rewrites:
+
+    /old-docs/:page /guides/:page 308
+    /app/* /index.html 200
+
+Rules support named parameters and one wildcard. Status 200 is an internal rewrite; 301, 302, 303, 307, and 308 are redirects. Rules are immutable deployment metadata, so rollback restores them with the files. Yeeet reserves transport, content-type, privacy, and immutable-version crawler headers.
+
 Use JSON output for scripts:
 
     yeeet deploy ./dist --name comet --json
+
+Preview the exact operation without creating a database row, changing an alias, or touching storage:
+
+    yeeet deploy ./dist --name comet --dry-run --json
+
+The response separates added, changed, removed, and unchanged paths and includes uploadBytes. Real CLI creates automatically retry with one idempotency key. Supply --idempotency-key <key> when an external workflow needs to resume the same exact request; using that key with different input returns a conflict.
 
 A successful response resembles:
 
@@ -1310,9 +1369,13 @@ Yeeet and Railway manage certificate issuance after DNS verification. Remove a m
     yeeet logout
     yeeet whoami [--json]
     yeeet sites [--json]
-    yeeet deploy|up [path] [--name <slug>] [--spa|--static] [--password <password>] [--json]
+    yeeet deploy|up [path] [--name <slug>] [--channel <name>] [--dry-run] [--idempotency-key <key>] [--spa|--static] [--password <password>] [--json]
     yeeet versions <site> [--json]
     yeeet rollback <site> [version] [--json]
+    yeeet channel list <site> [--json]
+    yeeet channel set <site> <channel> <version> [--json]
+    yeeet channel remove|rm <site> <channel> [--json]
+    yeeet analytics <site> [--days <1-90>] [--json]
     yeeet version remove <site> <version> --yes [--json]
     yeeet remove|rm <site> --yes [--json]
     yeeet share <site> [version] [--json]
@@ -1508,6 +1571,15 @@ const DOCS_HTML = String.raw`<!doctype html>
             <p>Run <span class="inline-code" translate="no">yeeet init comet</span> to create <span class="inline-code" translate="no">.yeeet.json</span>. From then on, the project name and routing mode travel with the project.</p>
             <div class="code-block"><pre><code id="code-init">yeeet init comet
 yeeet deploy ./dist</code></pre><button class="copy-button" type="button" data-copy="code-init">Copy</button></div>
+            <h3>Ship Headers and Redirects With the Site</h3>
+            <p>Add <span class="inline-code" translate="no">_headers</span> and <span class="inline-code" translate="no">_redirects</span> at the deployed root. Yeeet validates them, keeps them private, and versions them with the files, so rollback restores the complete delivery behavior.</p>
+            <div class="code-block"><pre><code id="code-rules"># _headers
+/assets/*
+  Cache-Control: public, max-age=604800
+
+# _redirects
+/old/:page /new/:page 308
+/app/* /index.html 200</code></pre><button class="copy-button" type="button" data-copy="code-rules">Copy</button></div>
           </section>
 
           <section class="docs-section" id="versions">
@@ -1520,6 +1592,20 @@ yeeet rollback comet 52eabb5f
 # Or roll back to the previous ready release
 yeeet rollback comet</code></pre><button class="copy-button" type="button" data-copy="code-versions">Copy</button></div>
             <p>Version commands accept a full deployment ID or an unambiguous prefix of at least 8 characters. Live aliases revalidate at the edge in about 10 seconds; immutable preview URLs never change.</p>
+            <h3>See the Diff Before Takeoff</h3>
+            <p>A dry run hashes the local folder and reports added, changed, removed, and unchanged paths without creating a deployment or touching storage.</p>
+            <div class="code-block"><pre><code id="code-dry-run">yeeet deploy ./dist --name comet --dry-run
+yeeet deploy ./dist --name comet --dry-run --json</code></pre><button class="copy-button" type="button" data-copy="code-dry-run">Copy</button></div>
+            <h3>Stage Without Moving Production</h3>
+            <p>Channels are mutable, no-index aliases under the same wildcard certificate. A channel deploy leaves the normal production URL untouched.</p>
+            <div class="code-block"><pre><code id="code-channels">yeeet deploy ./dist --name comet --channel staging
+yeeet channel list comet
+yeeet channel set comet staging 52eabb5f
+yeeet channel remove comet staging</code></pre><button class="copy-button" type="button" data-copy="code-channels">Copy</button></div>
+            <h3>See Traffic, Not Visitors</h3>
+            <p>Cookie-free analytics count HTML page responses by UTC day, normalized path, and status. Yeeet never stores IP addresses, user agents, referrers, cookies, or visitor IDs, and does not pretend page views are unique people.</p>
+            <div class="code-block"><pre><code id="code-analytics">yeeet analytics comet --days 30
+yeeet analytics comet --days 7 --json</code></pre><button class="copy-button" type="button" data-copy="code-analytics">Copy</button></div>
             <h3>Remove What You No Longer Need</h3>
             <div class="code-block"><pre><code id="code-remove">yeeet version remove comet 52eabb5f --yes
 yeeet remove comet --yes</code></pre><button class="copy-button" type="button" data-copy="code-remove">Copy</button></div>
@@ -1559,6 +1645,31 @@ yeeet domain list comet --json</code></pre><button class="copy-button" type="but
 yeeet whoami --json
 yeeet deploy ./dist --json</code></pre><button class="copy-button" type="button" data-copy="code-agent">Copy</button></div>
             <div class="callout"><p><strong>Secret handling:</strong> never print, commit, or place <span class="inline-code" translate="no">YEEET_TOKEN</span> in a prompt. Inject it from your CI secret store or agent environment.</p></div>
+            <h3>Pull Request Previews</h3>
+            <p>Use <span class="inline-code" translate="no">nearbycoder/yeeet.dev@main</span> in GitHub Actions. Each trusted pull request gets a stable <span class="inline-code" translate="no">&lt;site&gt;-pr-&lt;number&gt;</span> URL, an updated PR comment, and cleanup when the PR closes.</p>
+            <div class="code-block"><pre><code id="code-github-action">- uses: nearbycoder/yeeet.dev@main
+  with:
+    token: \${{ secrets.YEEET_TOKEN }}
+    github-token: \${{ github.token }}
+    site: docs
+    directory: dist</code></pre><button class="copy-button" type="button" data-copy="code-github-action">Copy</button></div>
+            <h3>Give an Agent Native Yeeet Tools</h3>
+            <p>The first-party <span class="inline-code" translate="no">@yeeet.dev/mcp</span> server exposes typed planning, deploy, rollback, channel, domain, sharing, and confirmed cleanup tools over stdio. Keep the API key in the MCP host environment.</p>
+            <div class="code-block"><pre><code id="code-mcp">{
+  "mcpServers": {
+    "yeeet": {
+      "command": "npx",
+      "args": ["-y", "@yeeet.dev/mcp"],
+      "env": { "YEEET_TOKEN": "yeeet_..." }
+    }
+  }
+}</code></pre><button class="copy-button" type="button" data-copy="code-mcp">Copy</button></div>
+            <h3>Signed Deployment Events</h3>
+            <p>Webhooks use a durable outbox and retry failed public HTTPS endpoints. The secret appears once. Verify HMAC-SHA256 over the timestamp and raw body, reject stale requests, and deduplicate the delivery ID.</p>
+            <div class="code-block"><pre><code id="code-webhooks">yeeet webhook add https://example.com/yeeet \\
+  --events deployment.ready,deployment.activated
+yeeet webhook deliveries
+yeeet webhook rotate-secret &lt;id&gt;</code></pre><button class="copy-button" type="button" data-copy="code-webhooks">Copy</button></div>
             <div class="agent-panel">
               <div class="agent-panel-content">
                 <h3>Start with One Plain-Text URL</h3>
@@ -1591,6 +1702,7 @@ yeeet deploy ./dist --json</code></pre><button class="copy-button" type="button"
                   <tr><td>sites</td><td>List live sites owned by the current account.</td></tr>
                   <tr><td>versions &lt;site&gt;</td><td>List immutable releases, preview URLs, status, routing mode, and privacy.</td></tr>
                   <tr><td>rollback &lt;site&gt; [version]</td><td>Promote an older ready release, or the previous release when omitted.</td></tr>
+                  <tr><td>analytics &lt;site&gt;</td><td>Inspect aggregate daily views, normalized paths, and response statuses without visitor tracking.</td></tr>
                   <tr><td>version remove …</td><td>Permanently remove one release and its stored objects.</td></tr>
                   <tr><td>remove &lt;site&gt;</td><td>Permanently remove a site, its releases, domains, and stored objects.</td></tr>
                   <tr><td>share &lt;site&gt; [version]</td><td>Print the signed one-click URL for a protected release.</td></tr>
