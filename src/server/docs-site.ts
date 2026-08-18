@@ -1157,6 +1157,7 @@ Exit codes are 0 for success, 2 when authentication is required, and 1 for valid
 ## Invariants useful to agents
 
 - Uploads are atomic: the live pointer changes only after every object completes.
+- Clients send SHA-256 file digests. Unchanged content owned by the same account is copied within storage and omitted from uploadUrls.
 - Version preview URLs are immutable; live aliases update at the edge in about 10 seconds.
 - SPA fallback defaults to true and only handles navigation-like paths, not missing assets.
 - Root _headers and _redirects files are validated and versioned with the deployment. They are never served as site assets.
@@ -1170,6 +1171,8 @@ Exit codes are 0 for success, 2 when authentication is required, and 1 for valid
 const LLMS_FULL_TXT = String.raw`# Yeeet CLI Guide
 
 Yeeet turns a file or build folder into a globally cached HTTPS site. Deploys are atomic, every ready release has an immutable preview URL, and a named site can move between releases without uploading the files again.
+
+CLI and browser deploys hash files with SHA-256. When a ready release owned by the same account already contains identical bytes, the server copies that object into the new immutable release inside storage and asks the client to upload only changed files.
 
 Human documentation: https://docs.yeeet.dev/
 OpenAPI contract: https://docs.yeeet.dev/openapi.json

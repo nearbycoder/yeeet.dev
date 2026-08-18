@@ -159,6 +159,7 @@ export const deploymentFiles = pgTable(
   (table) => [
     uniqueIndex('deployment_files_path_idx').on(table.deploymentId, table.path),
     index('deployment_files_deployment_id_idx').on(table.deploymentId),
+    index('deployment_files_checksum_idx').on(table.checksum),
   ],
 )
 

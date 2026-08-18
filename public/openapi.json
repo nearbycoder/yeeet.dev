@@ -19,7 +19,11 @@
           "path": { "type": "string", "examples": ["index.html"] },
           "size": { "type": "integer", "minimum": 0 },
           "contentType": { "type": "string" },
-          "checksum": { "type": "string" }
+          "checksum": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{64}$",
+            "description": "Optional SHA-256 digest used to reuse unchanged content."
+          }
         }
       },
       "ApiError": {
@@ -288,7 +292,9 @@
           }
         },
         "responses": {
-          "201": { "description": "Deployment and signed upload URLs created" },
+          "201": {
+            "description": "Deployment plan created. uploadUrls contains only content that was not reused inside storage."
+          },
           "400": { "description": "Invalid manifest" },
           "409": { "description": "Site name is owned by another user" }
         }

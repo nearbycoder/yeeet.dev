@@ -4,6 +4,7 @@ import {
   generateRandomSlug,
   normalizeFilePath,
   normalizeSlug,
+  validateManifest,
   versionUrl,
 } from '../src/server/deployments'
 import { normalizeCustomDomain } from '../src/server/custom-domains'
@@ -78,6 +79,21 @@ test('normalizes platform-independent file paths', () => {
 test('rejects traversal and empty file paths', () => {
   assert.throws(() => normalizeFilePath('../secret'))
   assert.throws(() => normalizeFilePath('/'))
+})
+
+test('validates and normalizes content-addressed manifests', () => {
+  const checksum = 'A'.repeat(64)
+  const manifest = validateManifest([
+    { path: 'index.html', size: 12, checksum },
+  ])
+  assert.equal(manifest.files[0].checksum, checksum.toLowerCase())
+  assert.throws(
+    () =>
+      validateManifest([
+        { path: 'index.html', size: 12, checksum: 'not-a-sha256' },
+      ]),
+    /Invalid SHA-256 checksum/,
+  )
 })
 
 test('builds immutable version URLs from the configured site domain', async () => {

@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+import { createHash } from 'node:crypto'
+import { createReadStream } from 'node:fs'
 import { chmod, mkdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
@@ -243,6 +245,12 @@ async function runConcurrent(values, limit, worker) {
   )
 }
 
+async function sha256File(path) {
+  const hash = createHash('sha256')
+  for await (const chunk of createReadStream(path)) hash.update(chunk)
+  return hash.digest('hex')
+}
+
 function safeName(value) {
   return value
     .toLowerCase()
@@ -272,6 +280,9 @@ async function deploy(target, options) {
   const files = await findFiles(targetPath)
   if (!files.length) throw new Error('No files found to deploy.')
   const totalBytes = files.reduce((sum, file) => sum + file.size, 0)
+  await runConcurrent(files, 4, async (file) => {
+    file.checksum = await sha256File(file.absolutePath)
+  })
 
   if (!options.json) {
     console.log(
@@ -292,6 +303,7 @@ async function deploy(target, options) {
           path: file.path,
           size: file.size,
           contentType: mime.lookup(file.path) || 'application/octet-stream',
+          checksum: file.checksum,
         })),
       }),
     },
@@ -314,7 +326,9 @@ async function deploy(target, options) {
         )
       uploaded += 1
       if (!options.json && process.stderr.isTTY) {
-        process.stderr.write(`\r  → uploaded ${uploaded}/${files.length}`)
+        process.stderr.write(
+          `\r  → uploaded ${uploaded}/${deployment.uploadUrls.length}`,
+        )
       }
     },
   )
@@ -348,6 +362,8 @@ async function deploy(target, options) {
         spaFallback: completed.spaFallback,
         protected: completed.protected,
         shareUrl: completed.shareUrl,
+        uploadedFiles: deployment.uploadedFiles,
+        reusedFiles: deployment.reusedFiles,
       },
       true,
     )

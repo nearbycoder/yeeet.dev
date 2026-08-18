@@ -1,5 +1,5 @@
 import { randomBytes, randomUUID } from 'node:crypto'
-import { and, desc, eq } from 'drizzle-orm'
+import { and, desc, eq, inArray } from 'drizzle-orm'
 import { db } from '#/db'
 import { customDomains, deploymentFiles, deployments, sites } from '#/db/schema'
 import type { Actor } from './actor'
@@ -12,6 +12,7 @@ import { removeRailwayCustomDomain } from './custom-domains'
 import { HttpError } from './http'
 import { siteUrl } from './platform-config'
 import {
+  copyStoredObject,
   createUploadUrl,
   deleteStoredPrefix,
   getStoredObject,
@@ -26,6 +27,7 @@ import {
 
 const SLUG = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/
 const MAX_FILE_COUNT = 5_000
+const SHA256 = /^[a-f0-9]{64}$/
 const RANDOM_ADJECTIVES = [
   'brisk',
   'cosmic',
@@ -97,7 +99,7 @@ export function normalizeFilePath(value: string) {
   return parts.join('/')
 }
 
-function validateManifest(files: Array<ManifestFile>) {
+export function validateManifest(files: Array<ManifestFile>) {
   if (!Array.isArray(files) || !files.length) {
     throw new HttpError(
       400,
@@ -123,6 +125,14 @@ function validateManifest(files: Array<ManifestFile>) {
     if (!Number.isSafeInteger(file.size) || file.size < 0) {
       throw new HttpError(400, `Invalid size for ${path}.`, 'invalid_size')
     }
+    const checksum = file.checksum?.trim().toLowerCase()
+    if (checksum && !SHA256.test(checksum)) {
+      throw new HttpError(
+        400,
+        `Invalid SHA-256 checksum for ${path}.`,
+        'invalid_checksum',
+      )
+    }
     return {
       path,
       size: file.size,
@@ -130,7 +140,7 @@ function validateManifest(files: Array<ManifestFile>) {
         0,
         255,
       ),
-      checksum: file.checksum?.slice(0, 128),
+      checksum,
     }
   })
 
@@ -200,15 +210,55 @@ export async function createDeployment(input: {
   const siteId = existing?.id ?? randomUUID()
   const deploymentId = randomUUID()
   const shareNonce = generateShareNonce()
-  const fileRows = manifest.files.map((file) => ({
-    id: randomUUID(),
-    deploymentId,
-    path: file.path,
-    storageKey: `sites/${siteId}/deployments/${deploymentId}/${file.path}`,
-    contentType: file.contentType,
-    size: file.size,
-    checksum: file.checksum,
+  const checksums = [
+    ...new Set(
+      manifest.files.flatMap((file) => (file.checksum ? [file.checksum] : [])),
+    ),
+  ]
+  const reusableRows = checksums.length
+    ? await db
+        .select({
+          checksum: deploymentFiles.checksum,
+          size: deploymentFiles.size,
+          storageKey: deploymentFiles.storageKey,
+        })
+        .from(deploymentFiles)
+        .innerJoin(
+          deployments,
+          eq(deploymentFiles.deploymentId, deployments.id),
+        )
+        .where(
+          and(
+            eq(deployments.userId, input.actor.userId),
+            eq(deployments.status, 'ready'),
+            inArray(deploymentFiles.checksum, checksums),
+          ),
+        )
+        .orderBy(desc(deployments.createdAt))
+    : []
+  const reusableByContent = new Map<string, string>()
+  for (const row of reusableRows) {
+    if (!row.checksum) continue
+    const key = `${row.checksum}:${row.size}`
+    if (!reusableByContent.has(key)) {
+      reusableByContent.set(key, row.storageKey)
+    }
+  }
+  const filePlans = manifest.files.map((file) => ({
+    row: {
+      id: randomUUID(),
+      deploymentId,
+      path: file.path,
+      storageKey: `sites/${siteId}/deployments/${deploymentId}/${file.path}`,
+      contentType: file.contentType,
+      size: file.size,
+      checksum: file.checksum,
+    },
+    reuseSource: file.checksum
+      ? reusableByContent.get(`${file.checksum}:${file.size}`)
+      : undefined,
   }))
+  const fileRows = filePlans.map((plan) => plan.row)
 
   await db.transaction(async (tx) => {
     if (!existing) {
@@ -236,7 +286,33 @@ export async function createDeployment(input: {
   })
 
   try {
-    const uploadUrls = await inBatches(fileRows, 25, async (file) => ({
+    const copiedPaths = new Set<string>()
+    await inBatches(
+      filePlans.filter((plan) => plan.reuseSource),
+      20,
+      async (plan) => {
+        try {
+          await copyStoredObject({
+            sourceKey: plan.reuseSource!,
+            targetKey: plan.row.storageKey,
+            contentType: plan.row.contentType,
+            deploymentId,
+          })
+          copiedPaths.add(plan.row.path)
+        } catch (error) {
+          console.warn(
+            'Could not reuse deployment object; requesting upload.',
+            {
+              deploymentId,
+              path: plan.row.path,
+              error,
+            },
+          )
+        }
+      },
+    )
+    const uploadFiles = fileRows.filter((file) => !copiedPaths.has(file.path))
+    const uploadUrls = await inBatches(uploadFiles, 25, async (file) => ({
       path: file.path,
       method: 'PUT' as const,
       headers: { 'content-type': file.contentType },
@@ -253,6 +329,8 @@ export async function createDeployment(input: {
       status: 'uploading' as const,
       spaFallback: input.spaFallback ?? true,
       protected: Boolean(passwordHash),
+      reusedFiles: copiedPaths.size,
+      uploadedFiles: uploadFiles.length,
       uploadUrls,
       completeUrl: `/api/v1/deployments/${deploymentId}/complete`,
     }

@@ -55,6 +55,8 @@ builds or replace a framework's build command.
 - Random readable subdomains or stable names such as
   `comet.site.example.com`.
 - Atomic releases: a live pointer moves only after every object is verified.
+- SHA-256 incremental deploys that reuse unchanged content with storage-side
+  copies instead of uploading it again.
 - Immutable version URLs, version history, promotion, rollback, and deletion.
 - SPA fallback for refreshes on client-side routes, with strict static mode too.
 - Versioned `_headers` and `_redirects` rules for cache policy, security headers,
@@ -86,7 +88,10 @@ Wildcard asset gateway ──► edge cache ──► <site>.<SITE_DOMAIN>
 Every deployment writes to a unique storage prefix. Finalization verifies the
 manifest and changes the active deployment in one database transaction, so an
 interrupted upload never replaces a working site. Rollbacks only move that
-pointer; they do not copy or mutate files.
+pointer; they do not copy or mutate files. CLI and browser clients include a
+SHA-256 digest for each file. When a ready deployment owned by the same account
+already contains that content, Yeeet copies it inside private storage into the
+new immutable prefix and returns upload URLs only for changed content.
 
 Public live aliases use short edge revalidation. Immutable version hosts can be
 cached for a year. Version previews and protected deployments emit crawler

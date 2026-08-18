@@ -25,6 +25,13 @@ export const Route = createFileRoute('/dashboard')({
 
 type UploadFile = { file: File; path: string }
 
+async function sha256File(file: File) {
+  const digest = await crypto.subtle.digest('SHA-256', await file.arrayBuffer())
+  return Array.from(new Uint8Array(digest), (byte) =>
+    byte.toString(16).padStart(2, '0'),
+  ).join('')
+}
+
 type CustomDomainData = {
   id: string
   hostname: string
@@ -580,6 +587,8 @@ function Dashboard() {
     'idle' | 'preparing' | 'uploading' | 'finalizing' | 'done'
   >('idle')
   const [uploaded, setUploaded] = useState(0)
+  const [uploadTotal, setUploadTotal] = useState(0)
+  const [reused, setReused] = useState(0)
   const [error, setError] = useState('')
   const [resultUrl, setResultUrl] = useState('')
   const [resultShareUrl, setResultShareUrl] = useState('')
@@ -608,6 +617,8 @@ function Dashboard() {
     setResultUrl('')
     setResultShareUrl('')
     setUploaded(0)
+    setUploadTotal(0)
+    setReused(0)
     setPhase('idle')
   }
 
@@ -617,8 +628,14 @@ function Dashboard() {
     setResultUrl('')
     setResultShareUrl('')
     setUploaded(0)
+    setUploadTotal(0)
+    setReused(0)
     setPhase('preparing')
     try {
+      const checksums = new Map<string, string>()
+      await uploadInBatches(files, 2, async (item) => {
+        checksums.set(item.path, await sha256File(item.file))
+      })
       const response = await fetch('/api/v1/deployments', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -631,6 +648,7 @@ function Dashboard() {
             path: item.path,
             size: item.file.size,
             contentType: item.file.type || 'application/octet-stream',
+            checksum: checksums.get(item.path),
           })),
         }),
       })
@@ -641,6 +659,8 @@ function Dashboard() {
         )
 
       const localFiles = new Map(files.map((item) => [item.path, item.file]))
+      setUploadTotal(deployment.uploadUrls.length)
+      setReused(deployment.reusedFiles ?? 0)
       setPhase('uploading')
       await uploadInBatches(
         deployment.uploadUrls,
@@ -909,7 +929,7 @@ function Dashboard() {
     : phase === 'preparing'
       ? 'Calculating maximum yeeet…'
       : phase === 'uploading'
-        ? `Munching file ${Math.min(uploaded + 1, files.length)} of ${files.length}…`
+        ? `Munching file ${Math.min(uploaded + 1, uploadTotal || files.length)} of ${uploadTotal || files.length}…`
         : phase === 'finalizing'
           ? 'YEETING to the edge!'
           : phase === 'done'
@@ -1130,7 +1150,7 @@ function Dashboard() {
                 : phase === 'preparing'
                   ? 'Plotting course…'
                   : phase === 'uploading'
-                    ? `Uploading ${uploaded}/${files.length}`
+                    ? `Uploading ${uploaded}/${uploadTotal || files.length}`
                     : phase === 'done'
                       ? 'Landed ✓'
                       : 'Going live…'}
@@ -1159,7 +1179,7 @@ function Dashboard() {
             <div className="upload-progress">
               <span
                 style={{
-                  width: `${phase === 'finalizing' ? 100 : (uploaded / files.length) * 100}%`,
+                  width: `${phase === 'finalizing' ? 100 : (uploaded / (uploadTotal || files.length)) * 100}%`,
                 }}
               />
             </div>
@@ -1179,6 +1199,12 @@ function Dashboard() {
                 </a>
                 {resultShareUrl ? (
                   <small>Private deployment · share link is ready</small>
+                ) : null}
+                {reused ? (
+                  <small>
+                    {reused} unchanged {reused === 1 ? 'file' : 'files'} reused
+                    without upload
+                  </small>
                 ) : null}
               </div>
               <button
