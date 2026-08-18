@@ -122,6 +122,7 @@ Useful release operations:
 yeeet versions comet
 yeeet rollback comet
 yeeet deploy ./dist --name comet --channel staging
+yeeet deploy ./dist --name comet --dry-run
 yeeet channel set comet staging <version>
 yeeet share comet
 yeeet version remove comet <version> --yes
@@ -169,6 +170,13 @@ Deployment channels are named mutable pointers to ready versions. Deploy with
 `comet.site.yeeet.dev` untouched. Use `yeeet channel list`, `channel set`, and
 `channel remove` to manage aliases directly. Channel responses are no-index by
 default; immutable version URLs remain available for exact build references.
+
+Use `--dry-run` to hash the folder and receive added, changed, removed, and
+unchanged paths plus byte totals without creating a deployment or touching
+storage. Every CLI create also sends a random idempotency key and retries
+transient failures safely. Automation can supply a stable key explicitly with
+`--idempotency-key <key>` or the `Idempotency-Key` API header; reusing a key with
+different input is rejected.
 
 ### GitHub Action and PR previews
 

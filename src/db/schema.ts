@@ -55,6 +55,8 @@ export const deployments = pgTable(
     error: text('error'),
     spaFallback: boolean('spa_fallback').default(true).notNull(),
     channel: text('channel'),
+    idempotencyKey: text('idempotency_key'),
+    requestFingerprint: text('request_fingerprint'),
     headerRules: text('header_rules').default('[]').notNull(),
     redirectRules: text('redirect_rules').default('[]').notNull(),
     passwordHash: text('password_hash'),
@@ -67,6 +69,10 @@ export const deployments = pgTable(
     index('deployments_site_id_idx').on(table.siteId),
     index('deployments_user_id_idx').on(table.userId),
     index('deployments_created_at_idx').on(table.createdAt),
+    uniqueIndex('deployments_user_idempotency_idx').on(
+      table.userId,
+      table.idempotencyKey,
+    ),
   ],
 )
 

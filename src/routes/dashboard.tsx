@@ -579,6 +579,9 @@ function Dashboard() {
   const router = useRouter()
   const fileInput = useRef<HTMLInputElement>(null)
   const folderInput = useRef<HTMLInputElement>(null)
+  const deploymentKey = useRef<{ fingerprint: string; key: string } | null>(
+    null,
+  )
   const [files, setFiles] = useState<Array<UploadFile>>([])
   const [slug, setSlug] = useState('')
   const [channel, setChannel] = useState('')
@@ -616,6 +619,7 @@ function Dashboard() {
       })),
     )
     setFiles(next)
+    deploymentKey.current = null
     setError('')
     setResultUrl('')
     setResultShareUrl('')
@@ -639,22 +643,30 @@ function Dashboard() {
       await uploadInBatches(files, 2, async (item) => {
         checksums.set(item.path, await sha256File(item.file))
       })
+      const deploymentInput = {
+        slug,
+        channel: channel || undefined,
+        spaFallback,
+        password: privateDeploy ? deployPassword : undefined,
+        source: 'web',
+        files: files.map((item) => ({
+          path: item.path,
+          size: item.file.size,
+          contentType: item.file.type || 'application/octet-stream',
+          checksum: checksums.get(item.path),
+        })),
+      }
+      const fingerprint = JSON.stringify(deploymentInput)
+      if (deploymentKey.current?.fingerprint !== fingerprint) {
+        deploymentKey.current = { fingerprint, key: crypto.randomUUID() }
+      }
       const response = await fetch('/api/v1/deployments', {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          slug,
-          channel: channel || undefined,
-          spaFallback,
-          password: privateDeploy ? deployPassword : undefined,
-          source: 'web',
-          files: files.map((item) => ({
-            path: item.path,
-            size: item.file.size,
-            contentType: item.file.type || 'application/octet-stream',
-            checksum: checksums.get(item.path),
-          })),
-        }),
+        headers: {
+          'content-type': 'application/json',
+          'idempotency-key': deploymentKey.current.key,
+        },
+        body: fingerprint,
       })
       const deployment = await response.json()
       if (!response.ok)
@@ -699,6 +711,7 @@ function Dashboard() {
       setSlug(completed.site)
       setDeployPassword('')
       setPrivateDeploy(false)
+      deploymentKey.current = null
       setPhase('done')
       await router.invalidate()
     } catch (uploadError) {

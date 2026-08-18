@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   channelHostnameLabel,
+  diffManifests,
   generateRandomSlug,
   normalizeChannelName,
   normalizeFilePath,
@@ -96,6 +97,66 @@ test('validates and normalizes content-addressed manifests', () => {
       ]),
     /Invalid SHA-256 checksum/,
   )
+})
+
+test('calculates deterministic deployment diffs and byte totals', () => {
+  const hashA = 'a'.repeat(64)
+  const hashB = 'b'.repeat(64)
+  const diff = diffManifests(
+    [
+      {
+        path: 'added.js',
+        size: 5,
+        contentType: 'text/javascript',
+        checksum: hashA,
+      },
+      {
+        path: 'changed.css',
+        size: 7,
+        contentType: 'text/css',
+        checksum: hashB,
+      },
+      {
+        path: 'same.html',
+        size: 11,
+        contentType: 'text/html',
+        checksum: hashA,
+      },
+    ],
+    [
+      {
+        path: 'changed.css',
+        size: 6,
+        contentType: 'text/css',
+        checksum: hashA,
+      },
+      {
+        path: 'removed.png',
+        size: 13,
+        contentType: 'image/png',
+        checksum: hashB,
+      },
+      {
+        path: 'same.html',
+        size: 11,
+        contentType: 'text/html',
+        checksum: hashA,
+      },
+    ],
+  )
+  assert.deepEqual(diff.added, ['added.js'])
+  assert.deepEqual(diff.changed, ['changed.css'])
+  assert.deepEqual(diff.removed, ['removed.png'])
+  assert.deepEqual(diff.unchanged, ['same.html'])
+  assert.deepEqual(diff.summary, {
+    added: 1,
+    changed: 1,
+    removed: 1,
+    unchanged: 1,
+    uploadBytes: 12,
+    unchangedBytes: 11,
+    removedBytes: 13,
+  })
 })
 
 test('builds immutable version URLs from the configured site domain', async () => {

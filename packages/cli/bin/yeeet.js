@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { createHash } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { createReadStream } from 'node:fs'
 import { chmod, mkdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
@@ -259,6 +259,24 @@ function safeName(value) {
     .slice(0, 63)
 }
 
+function printDeploymentDiff(plan) {
+  console.log(
+    `\n  Deployment diff${plan.targetUrl ? ` for ${plan.targetUrl}` : ''}\n`,
+  )
+  console.log(
+    `  + ${plan.summary.added} added  ~ ${plan.summary.changed} changed  - ${plan.summary.removed} removed  = ${plan.summary.unchanged} unchanged`,
+  )
+  console.log(`  ${formatBytes(plan.summary.uploadBytes)} would upload\n`)
+  for (const [marker, key] of [
+    ['+', 'added'],
+    ['~', 'changed'],
+    ['-', 'removed'],
+  ]) {
+    for (const path of plan[key]) console.log(`  ${marker} ${path}`)
+  }
+  console.log('')
+}
+
 async function deploy(target, options) {
   const targetPath = resolve(target)
   const projectConfig = await readJson(
@@ -285,32 +303,65 @@ async function deploy(target, options) {
     file.checksum = await sha256File(file.absolutePath)
   })
 
-  if (!options.json) {
+  if (!options.json && !options.dryRun) {
     console.log(
       `\n  ↑ Yeeeting ${files.length.toLocaleString()} files (${formatBytes(totalBytes)}) to ${slug ? `the named site “${slug}”` : 'a fresh random subdomain'}`,
     )
   }
-  const deployment = await apiRequest(
-    '/api/v1/deployments',
-    {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        slug,
-        channel,
-        spaFallback,
-        password,
-        source: 'cli',
-        files: files.map((file) => ({
-          path: file.path,
-          size: file.size,
-          contentType: mime.lookup(file.path) || 'application/octet-stream',
-          checksum: file.checksum,
-        })),
-      }),
+  const manifest = files.map((file) => ({
+    path: file.path,
+    size: file.size,
+    contentType: mime.lookup(file.path) || 'application/octet-stream',
+    checksum: file.checksum,
+  }))
+  if (options.dryRun) {
+    const plan = await apiRequest(
+      '/api/v1/deployments',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ slug, channel, files: manifest, dryRun: true }),
+      },
+      options,
+    )
+    if (options.json) print(plan, true)
+    else printDeploymentDiff(plan)
+    return
+  }
+
+  const idempotencyKey = options.idempotencyKey || randomUUID()
+  const createRequest = {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'idempotency-key': idempotencyKey,
     },
-    options,
-  )
+    body: JSON.stringify({
+      slug,
+      channel,
+      spaFallback,
+      password,
+      source: 'cli',
+      files: manifest,
+    }),
+  }
+  let deployment
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      deployment = await apiRequest(
+        '/api/v1/deployments',
+        createRequest,
+        options,
+      )
+      break
+    } catch (error) {
+      if ((error.status == null || error.status >= 500) && attempt < 2) {
+        await sleep(500 * (attempt + 1))
+        continue
+      }
+      throw error
+    }
+  }
   const paths = new Map(files.map((file) => [file.path, file.absolutePath]))
   let uploaded = 0
   await runConcurrent(
@@ -367,6 +418,8 @@ async function deploy(target, options) {
         shareUrl: completed.shareUrl,
         uploadedFiles: deployment.uploadedFiles,
         reusedFiles: deployment.reusedFiles,
+        diff: deployment.diff,
+        idempotent: deployment.idempotent,
       },
       true,
     )
@@ -769,6 +822,11 @@ program
   .option(
     '--channel <name>',
     'update a no-index deployment channel instead of production',
+  )
+  .option('--dry-run', 'show the deployment diff without creating or uploading')
+  .option(
+    '--idempotency-key <key>',
+    'resume this exact deployment safely on retry',
   )
   .option('-c, --concurrency <number>', 'parallel uploads', '8')
   .option('--spa', 'serve index.html for client-side routes')

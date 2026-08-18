@@ -13,6 +13,7 @@ import {
   generateShareNonce,
   hashDeploymentPassword,
   shareTokenForDeployment,
+  validateDeploymentPassword,
 } from './deployment-access'
 import { removeRailwayCustomDomain } from './custom-domains'
 import { HttpError } from './http'
@@ -36,6 +37,7 @@ const MAX_FILE_COUNT = 5_000
 const SHA256 = /^[a-f0-9]{64}$/
 const CHANNEL = /^[a-z0-9](?:[a-z0-9-]{0,30}[a-z0-9])?$/
 const RESERVED_CHANNELS = new Set(['live', 'production'])
+const IDEMPOTENCY_KEY = /^[A-Za-z0-9._:-]{1,128}$/
 const RANDOM_ADJECTIVES = [
   'brisk',
   'cosmic',
@@ -194,6 +196,160 @@ export function validateManifest(files: Array<ManifestFile>) {
   return { files: normalized, totalBytes }
 }
 
+type ComparableFile = {
+  path: string
+  size: number
+  contentType: string
+  checksum?: string | null
+}
+
+export function diffManifests(
+  nextFiles: Array<ComparableFile>,
+  currentFiles: Array<ComparableFile>,
+) {
+  const current = new Map(currentFiles.map((file) => [file.path, file]))
+  const added: Array<string> = []
+  const changed: Array<string> = []
+  const unchanged: Array<string> = []
+  let uploadBytes = 0
+  let unchangedBytes = 0
+  for (const file of nextFiles) {
+    const previous = current.get(file.path)
+    current.delete(file.path)
+    if (!previous) {
+      added.push(file.path)
+      uploadBytes += file.size
+      continue
+    }
+    const same =
+      file.checksum && previous.checksum
+        ? file.checksum === previous.checksum
+        : file.size === previous.size &&
+          file.contentType === previous.contentType
+    if (same) {
+      unchanged.push(file.path)
+      unchangedBytes += file.size
+    } else {
+      changed.push(file.path)
+      uploadBytes += file.size
+    }
+  }
+  const removed = [...current.values()].map((file) => file.path)
+  const removedBytes = [...current.values()].reduce(
+    (total, file) => total + file.size,
+    0,
+  )
+  for (const paths of [added, changed, unchanged, removed]) paths.sort()
+  return {
+    added,
+    changed,
+    removed,
+    unchanged,
+    summary: {
+      added: added.length,
+      changed: changed.length,
+      removed: removed.length,
+      unchanged: unchanged.length,
+      uploadBytes,
+      unchangedBytes,
+      removedBytes,
+    },
+  }
+}
+
+function normalizeIdempotencyKey(value?: string) {
+  if (!value) return null
+  const key = value.trim()
+  if (!IDEMPOTENCY_KEY.test(key)) {
+    throw new HttpError(
+      400,
+      'Idempotency keys must be 1–128 letters, numbers, dots, underscores, colons, or hyphens.',
+      'invalid_idempotency_key',
+    )
+  }
+  return key
+}
+
+function requestFingerprint(input: {
+  slug: string | null
+  channel: string | null
+  source: string
+  spaFallback: boolean
+  password: string | null
+  files: Array<ComparableFile>
+}) {
+  return createHash('sha256')
+    .update(
+      JSON.stringify({
+        ...input,
+        files: [...input.files].sort((left, right) =>
+          left.path.localeCompare(right.path),
+        ),
+      }),
+    )
+    .digest('hex')
+}
+
+async function diffForTarget(
+  site: typeof sites.$inferSelect | undefined,
+  channel: string | null,
+  manifest: ReturnType<typeof validateManifest>,
+) {
+  let baseDeploymentId = site?.activeDeploymentId ?? null
+  if (site && channel) {
+    const alias = await db.query.siteChannels.findFirst({
+      where: and(
+        eq(siteChannels.siteId, site.id),
+        eq(siteChannels.name, channel),
+      ),
+    })
+    baseDeploymentId = alias?.deploymentId ?? null
+  }
+  const currentFiles = baseDeploymentId
+    ? await db
+        .select({
+          path: deploymentFiles.path,
+          size: deploymentFiles.size,
+          contentType: deploymentFiles.contentType,
+          checksum: deploymentFiles.checksum,
+        })
+        .from(deploymentFiles)
+        .where(eq(deploymentFiles.deploymentId, baseDeploymentId))
+    : []
+  return {
+    baseDeploymentId,
+    ...diffManifests(manifest.files, currentFiles),
+  }
+}
+
+export async function planDeployment(input: {
+  actor: Actor
+  slug?: string
+  files: Array<ManifestFile>
+  channel?: string
+}) {
+  const manifest = validateManifest(input.files)
+  const channel = input.channel ? normalizeChannelName(input.channel) : null
+  const slug = input.slug?.trim() ? normalizeSlug(input.slug) : null
+  const site = slug
+    ? await db.query.sites.findFirst({ where: eq(sites.slug, slug) })
+    : undefined
+  if (site && site.userId !== input.actor.userId) {
+    throw new HttpError(409, 'That site name is already flying.', 'slug_taken')
+  }
+  return {
+    dryRun: true as const,
+    site: slug,
+    channel,
+    targetUrl: slug
+      ? channel
+        ? channelUrl(slug, channel)
+        : siteUrl(slug)
+      : null,
+    ...(await diffForTarget(site, channel, manifest)),
+  }
+}
+
 async function inBatches<T, TResult>(
   values: Array<T>,
   size: number,
@@ -208,6 +364,72 @@ async function inBatches<T, TResult>(
   return results
 }
 
+async function resumeIdempotentDeployment(
+  userId: string,
+  key: string,
+  fingerprint: string,
+) {
+  const deployment = await db.query.deployments.findFirst({
+    where: and(
+      eq(deployments.userId, userId),
+      eq(deployments.idempotencyKey, key),
+    ),
+    with: { files: true, site: true },
+  })
+  if (!deployment) return null
+  if (deployment.requestFingerprint !== fingerprint) {
+    throw new HttpError(
+      409,
+      'That idempotency key was already used with different deployment input.',
+      'idempotency_conflict',
+    )
+  }
+  if (deployment.status === 'failed') {
+    throw new HttpError(
+      409,
+      'The deployment created by that idempotency key has failed. Use a new key.',
+      'deployment_failed',
+    )
+  }
+
+  const missingFiles =
+    deployment.status === 'ready'
+      ? []
+      : (
+          await inBatches(deployment.files, 20, async (file) => {
+            try {
+              const object = await headStoredObject(file.storageKey)
+              return Number(object.ContentLength) === file.size ? null : file
+            } catch {
+              return file
+            }
+          })
+        ).filter((file) => file !== null)
+  const uploadUrls = await inBatches(missingFiles, 25, async (file) => ({
+    path: file.path,
+    method: 'PUT' as const,
+    headers: { 'content-type': file.contentType },
+    url: await createUploadUrl({
+      key: file.storageKey,
+      contentType: file.contentType,
+      deploymentId: deployment.id,
+    }),
+  }))
+  return {
+    id: deployment.id,
+    site: deployment.site.slug,
+    status: deployment.status,
+    spaFallback: deployment.spaFallback,
+    protected: Boolean(deployment.passwordHash),
+    channel: deployment.channel,
+    reusedFiles: deployment.files.length - missingFiles.length,
+    uploadedFiles: missingFiles.length,
+    uploadUrls,
+    completeUrl: `/api/v1/deployments/${deployment.id}/complete`,
+    idempotent: true as const,
+  }
+}
+
 export async function createDeployment(input: {
   actor: Actor
   slug?: string
@@ -216,13 +438,34 @@ export async function createDeployment(input: {
   spaFallback?: boolean
   password?: string
   channel?: string
+  idempotencyKey?: string
 }) {
   const manifest = validateManifest(input.files)
   const channel = input.channel ? normalizeChannelName(input.channel) : null
-  const passwordHash = input.password
-    ? await hashDeploymentPassword(input.password)
-    : null
   const requestedSlug = input.slug?.trim()
+    ? normalizeSlug(input.slug.trim())
+    : null
+  const password = input.password
+    ? validateDeploymentPassword(input.password)
+    : null
+  const idempotencyKey = normalizeIdempotencyKey(input.idempotencyKey)
+  const fingerprint = requestFingerprint({
+    slug: requestedSlug,
+    channel,
+    source: input.source,
+    spaFallback: input.spaFallback ?? true,
+    password,
+    files: manifest.files,
+  })
+  if (idempotencyKey) {
+    const resumed = await resumeIdempotentDeployment(
+      input.actor.userId,
+      idempotencyKey,
+      fingerprint,
+    )
+    if (resumed) return resumed
+  }
+  const passwordHash = password ? await hashDeploymentPassword(password) : null
   let slug = requestedSlug ? normalizeSlug(requestedSlug) : generateRandomSlug()
   let existing = await db.query.sites.findFirst({
     where: eq(sites.slug, slug),
@@ -246,6 +489,8 @@ export async function createDeployment(input: {
   if (existing && existing.userId !== input.actor.userId) {
     throw new HttpError(409, 'That site name is already flying.', 'slug_taken')
   }
+
+  const diff = await diffForTarget(existing, channel, manifest)
 
   const siteId = existing?.id ?? randomUUID()
   const deploymentId = randomUUID()
@@ -300,31 +545,51 @@ export async function createDeployment(input: {
   }))
   const fileRows = filePlans.map((plan) => plan.row)
 
-  await db.transaction(async (tx) => {
-    if (!existing) {
-      await tx
-        .insert(sites)
-        .values({ id: siteId, slug, userId: input.actor.userId })
-    }
-    await tx.insert(deployments).values({
-      id: deploymentId,
-      siteId,
-      userId: input.actor.userId,
-      status: 'uploading',
-      source: input.source,
-      fileCount: fileRows.length,
-      totalBytes: manifest.totalBytes,
-      spaFallback: input.spaFallback ?? true,
-      channel,
-      passwordHash,
-      shareNonce,
+  try {
+    await db.transaction(async (tx) => {
+      if (!existing) {
+        await tx
+          .insert(sites)
+          .values({ id: siteId, slug, userId: input.actor.userId })
+      }
+      await tx.insert(deployments).values({
+        id: deploymentId,
+        siteId,
+        userId: input.actor.userId,
+        status: 'uploading',
+        source: input.source,
+        fileCount: fileRows.length,
+        totalBytes: manifest.totalBytes,
+        spaFallback: input.spaFallback ?? true,
+        channel,
+        idempotencyKey,
+        requestFingerprint: fingerprint,
+        passwordHash,
+        shareNonce,
+      })
+      for (let index = 0; index < fileRows.length; index += 500) {
+        await tx
+          .insert(deploymentFiles)
+          .values(fileRows.slice(index, index + 500))
+      }
     })
-    for (let index = 0; index < fileRows.length; index += 500) {
-      await tx
-        .insert(deploymentFiles)
-        .values(fileRows.slice(index, index + 500))
+  } catch (error) {
+    if (
+      idempotencyKey &&
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      error.code === '23505'
+    ) {
+      const resumed = await resumeIdempotentDeployment(
+        input.actor.userId,
+        idempotencyKey,
+        fingerprint,
+      )
+      if (resumed) return resumed
     }
-  })
+    throw error
+  }
 
   try {
     const copiedPaths = new Set<string>()
@@ -373,6 +638,8 @@ export async function createDeployment(input: {
       channel,
       reusedFiles: copiedPaths.size,
       uploadedFiles: uploadFiles.length,
+      diff,
+      idempotent: false as const,
       uploadUrls,
       completeUrl: `/api/v1/deployments/${deploymentId}/complete`,
     }

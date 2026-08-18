@@ -1139,6 +1139,7 @@ Exit codes are 0 for success, 2 when authentication is required, and 1 for valid
 - yeeet login: authenticate through the browser with a one-time device code.
 - yeeet whoami --json: verify the current credential.
 - yeeet deploy [path] --json: atomically publish a file or folder. Path defaults to the current directory.
+- yeeet deploy [path] --dry-run --json: return an exact file and byte diff without creating a deployment.
 - yeeet deploy ./dist --name <slug>: update a stable named site.
 - yeeet sites --json: list sites.
 - yeeet versions <site> --json: list immutable releases and preview URLs.
@@ -1167,6 +1168,7 @@ Exit codes are 0 for success, 2 when authentication is required, and 1 for valid
 - Root _headers and _redirects files are validated and versioned with the deployment. They are never served as site assets.
 - Public sites receive a deterministic 1200x630 Yeeetling social card at /_yeeet/og.png unless their HTML supplies og:image or twitter:image.
 - --json suppresses decorative output. Parse stdout as one JSON object.
+- CLI creates use a random idempotency key and retry transient failures. Agents may set --idempotency-key explicitly; the API also accepts Idempotency-Key.
 - Version identifiers accept an unambiguous prefix of at least 8 characters where supported.
 - Passwords are 8–128 characters. YEEET_DEPLOY_PASSWORD avoids a password in shell history.
 - Never log or commit YEEET_TOKEN.
@@ -1252,6 +1254,12 @@ Rules support named parameters and one wildcard. Status 200 is an internal rewri
 Use JSON output for scripts:
 
     yeeet deploy ./dist --name comet --json
+
+Preview the exact operation without creating a database row, changing an alias, or touching storage:
+
+    yeeet deploy ./dist --name comet --dry-run --json
+
+The response separates added, changed, removed, and unchanged paths and includes uploadBytes. Real CLI creates automatically retry with one idempotency key. Supply --idempotency-key <key> when an external workflow needs to resume the same exact request; using that key with different input returns a conflict.
 
 A successful response resembles:
 
@@ -1344,7 +1352,7 @@ Yeeet and Railway manage certificate issuance after DNS verification. Remove a m
     yeeet logout
     yeeet whoami [--json]
     yeeet sites [--json]
-    yeeet deploy|up [path] [--name <slug>] [--channel <name>] [--spa|--static] [--password <password>] [--json]
+    yeeet deploy|up [path] [--name <slug>] [--channel <name>] [--dry-run] [--idempotency-key <key>] [--spa|--static] [--password <password>] [--json]
     yeeet versions <site> [--json]
     yeeet rollback <site> [version] [--json]
     yeeet channel list <site> [--json]
@@ -1566,6 +1574,10 @@ yeeet rollback comet 52eabb5f
 # Or roll back to the previous ready release
 yeeet rollback comet</code></pre><button class="copy-button" type="button" data-copy="code-versions">Copy</button></div>
             <p>Version commands accept a full deployment ID or an unambiguous prefix of at least 8 characters. Live aliases revalidate at the edge in about 10 seconds; immutable preview URLs never change.</p>
+            <h3>See the Diff Before Takeoff</h3>
+            <p>A dry run hashes the local folder and reports added, changed, removed, and unchanged paths without creating a deployment or touching storage.</p>
+            <div class="code-block"><pre><code id="code-dry-run">yeeet deploy ./dist --name comet --dry-run
+yeeet deploy ./dist --name comet --dry-run --json</code></pre><button class="copy-button" type="button" data-copy="code-dry-run">Copy</button></div>
             <h3>Stage Without Moving Production</h3>
             <p>Channels are mutable, no-index aliases under the same wildcard certificate. A channel deploy leaves the normal production URL untouched.</p>
             <div class="code-block"><pre><code id="code-channels">yeeet deploy ./dist --name comet --channel staging
