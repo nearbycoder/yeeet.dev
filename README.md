@@ -70,6 +70,8 @@ builds or replace a framework's build command.
 - Email/password and GitHub login through Better Auth.
 - Invitation-only registration, account bans, role management, and audit history.
 - An OpenAPI contract, LLM-readable docs, API keys, and stable JSON output.
+- A first-party stdio MCP server with typed deploy, release, channel, domain,
+  sharing, and confirmed cleanup tools.
 - A responsive control plane and a deterministic animated mascot for each site.
 
 ## How it works
@@ -200,6 +202,35 @@ only for branches in the same repository because GitHub correctly withholds
 secrets from untrusted forks. Pin the action to a commit SHA when your security
 policy requires immutable third-party actions.
 
+### MCP server for coding agents
+
+The `@yeeet.dev/mcp` workspace is the official Model Context Protocol server.
+It supports current and legacy MCP clients over stdio and deploys directly
+through the Yeeet API. Configure `YEEET_TOKEN` in the host's secret store:
+
+```json
+{
+  "mcpServers": {
+    "yeeet": {
+      "command": "npx",
+      "args": ["-y", "@yeeet.dev/mcp"],
+      "env": { "YEEET_TOKEN": "yeeet_..." }
+    }
+  }
+}
+```
+
+While developing this repository, run it without publishing:
+
+```sh
+YEEET_TOKEN=yeeet_... node packages/mcp/bin/yeeet-mcp.js
+```
+
+Agents can plan a content diff before deployment, deploy a local path, inspect
+and roll back releases, move channels, manage domains, and retrieve private
+share links. Permanent site and version deletion each require a literal
+`confirm: true` tool argument. See [`packages/mcp`](packages/mcp).
+
 ## One-click Railway deploy
 
 [![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/new/template/yeeet?utm_medium=integration&utm_source=button&utm_campaign=yeeet)
@@ -317,6 +348,7 @@ src/server/          deployment, storage, domains, docs, and gateway logic
 src/db/              Drizzle schemas
 drizzle/             committed SQL migrations and migration metadata
 packages/cli/        publishable Node.js CLI
+packages/mcp/        first-party stdio MCP server for coding agents
 public/              OpenAPI and agent-readable entry points
 docs/                operator documentation
 scripts/             migrations, admin bootstrap, and bucket CORS helpers

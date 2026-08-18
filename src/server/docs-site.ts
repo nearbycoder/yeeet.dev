@@ -1158,6 +1158,7 @@ Exit codes are 0 for success, 2 when authentication is required, and 1 for valid
 - yeeet domain list <site> --json: inspect DNS and TLS status.
 - yeeet init [name]: create .yeeet.json for repeatable deploy defaults.
 - GitHub Action: use nearbycoder/yeeet.dev@main to deploy a directory or maintain a per-PR preview and comment. Use cleanup mode when the PR closes.
+- MCP server: @yeeet.dev/mcp exposes typed planning, deploy, release, channel, domain, sharing, and confirmed deletion tools over stdio. Configure YEEET_TOKEN in the MCP host.
 
 ## Invariants useful to agents
 
@@ -1209,6 +1210,10 @@ Never put YEEET_TOKEN in source control, command output, screenshots, or prompts
 ## GitHub Actions and pull request previews
 
 Yeeet ships a JavaScript action at nearbycoder/yeeet.dev@main. Give it a Yeeet API key, a build directory, and a stable site base name. On pull_request events it deploys to <site>-pr-<number>, updates one PR comment with the live and immutable URLs, and removes the preview when called with mode cleanup. GitHub does not expose repository secrets to untrusted fork pull requests; keep that protection in place.
+
+## MCP server
+
+The first-party @yeeet.dev/mcp package speaks stdio MCP and supports modern and legacy clients. Set YEEET_TOKEN in the host environment, and optionally YEEET_API for a self-hosted instance. Its typed tools cover list_sites, list_versions, plan_deploy, deploy_path, rollback_site, channels, domains, private share-link lookup, and deletion. delete_site and delete_version require confirm=true. The server never writes logs to stdout because that stream is reserved for MCP protocol messages.
 
 ## Deploy
 
@@ -1631,6 +1636,17 @@ yeeet deploy ./dist --json</code></pre><button class="copy-button" type="button"
     github-token: \${{ github.token }}
     site: docs
     directory: dist</code></pre><button class="copy-button" type="button" data-copy="code-github-action">Copy</button></div>
+            <h3>Give an Agent Native Yeeet Tools</h3>
+            <p>The first-party <span class="inline-code" translate="no">@yeeet.dev/mcp</span> server exposes typed planning, deploy, rollback, channel, domain, sharing, and confirmed cleanup tools over stdio. Keep the API key in the MCP host environment.</p>
+            <div class="code-block"><pre><code id="code-mcp">{
+  "mcpServers": {
+    "yeeet": {
+      "command": "npx",
+      "args": ["-y", "@yeeet.dev/mcp"],
+      "env": { "YEEET_TOKEN": "yeeet_..." }
+    }
+  }
+}</code></pre><button class="copy-button" type="button" data-copy="code-mcp">Copy</button></div>
             <div class="agent-panel">
               <div class="agent-panel-content">
                 <h3>Start with One Plain-Text URL</h3>
