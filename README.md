@@ -74,6 +74,8 @@ builds or replace a framework's build command.
   sharing, and confirmed cleanup tools.
 - Signed event webhooks with a durable Postgres outbox, SSRF-safe public
   endpoints, atomic delivery claims, and exponential retries.
+- Cookie-free aggregate page-view analytics with normalized paths and no IP,
+  user-agent, referrer, or visitor-identity collection.
 - A responsive control plane and a deterministic animated mascot for each site.
 
 ## How it works
@@ -258,6 +260,20 @@ Supported events are `deployment.ready`, `deployment.activated`,
 `deployment.deleted`, `site.deleted`, `channel.updated`, and
 `channel.deleted`. Use `yeeet webhook rotate-secret <id>` to revoke a signing
 secret and receive its replacement once.
+
+### Privacy-first analytics
+
+Every HTML page response contributes to an aggregate UTC daily counter. View a
+site's last 30 days in the responsive dashboard or use the CLI/API:
+
+```sh
+yeeet analytics comet --days 30 --json
+```
+
+Yeeet stores the site, UTC day, normalized path, response status, and count. It
+does not store IP addresses, cookies, user agents, referrers, or visitor IDs,
+and deliberately does not claim unique-visitor metrics. Dynamic path segments
+are collapsed and path cardinality is capped before data reaches Postgres.
 
 ## One-click Railway deploy
 

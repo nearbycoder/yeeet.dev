@@ -71,6 +71,20 @@ type VersionHistoryData = {
   }>
 }
 
+type AnalyticsData = {
+  site: { id: string; slug: string; url: string }
+  period: { days: number; from: string; to: string }
+  totalViews: number
+  statuses: { successful: number; redirects: number; errors: number }
+  daily: Array<{ date: string; views: number }>
+  topPaths: Array<{ path: string; views: number }>
+  privacy: {
+    uniqueVisitors: false
+    stored: Array<string>
+    notStored: Array<string>
+  }
+}
+
 type DashboardDeleteTarget =
   | {
       kind: 'version'
@@ -391,6 +405,114 @@ function VersionHistory(props: {
   )
 }
 
+function SiteAnalytics(props: { data: AnalyticsData; onClose: () => void }) {
+  useEffect(() => {
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === 'Escape') props.onClose()
+    }
+    window.addEventListener('keydown', closeOnEscape)
+    return () => window.removeEventListener('keydown', closeOnEscape)
+  }, [props.onClose])
+
+  const headingId = `site-analytics-${props.data.site.slug}`
+  const maxViews = Math.max(...props.data.daily.map((day) => day.views), 1)
+
+  return (
+    <div className="version-drawer-shell">
+      <button
+        type="button"
+        className="version-drawer-backdrop"
+        aria-label="Close analytics"
+        onClick={props.onClose}
+      />
+      <section
+        className="version-drawer analytics-drawer"
+        aria-labelledby={headingId}
+        tabIndex={-1}
+      >
+        <div className="version-heading">
+          <div>
+            <span>PRIVACY-FIRST ANALYTICS</span>
+            <h3 id={headingId}>{props.data.site.slug}</h3>
+          </div>
+          <button type="button" onClick={props.onClose}>
+            Close
+          </button>
+        </div>
+        <div className="analytics-summary">
+          <div className="analytics-stat">
+            <strong>{props.data.totalViews.toLocaleString()}</strong>
+            <span>page views</span>
+          </div>
+          <div className="analytics-stat">
+            <strong>{props.data.statuses.successful.toLocaleString()}</strong>
+            <span>successful</span>
+          </div>
+          <div className="analytics-stat">
+            <strong>{props.data.statuses.errors.toLocaleString()}</strong>
+            <span>errors</span>
+          </div>
+        </div>
+        <div className="analytics-grid">
+          <section aria-labelledby={`${headingId}-daily`}>
+            <div className="analytics-section-heading">
+              <h4 id={`${headingId}-daily`}>
+                Last {props.data.period.days} days
+              </h4>
+              <span>UTC</span>
+            </div>
+            <div className="analytics-list analytics-daily-list">
+              {props.data.daily.map((day) => (
+                <div className="analytics-row" key={day.date}>
+                  <time dateTime={day.date}>
+                    {new Date(`${day.date}T00:00:00Z`).toLocaleDateString(
+                      undefined,
+                      { month: 'short', day: 'numeric', timeZone: 'UTC' },
+                    )}
+                  </time>
+                  <span className="analytics-bar-track" aria-hidden="true">
+                    <i
+                      style={{
+                        width: `${Math.max((day.views / maxViews) * 100, day.views ? 3 : 0)}%`,
+                      }}
+                    />
+                  </span>
+                  <b>{day.views.toLocaleString()}</b>
+                </div>
+              ))}
+            </div>
+          </section>
+          <section aria-labelledby={`${headingId}-paths`}>
+            <div className="analytics-section-heading">
+              <h4 id={`${headingId}-paths`}>Top paths</h4>
+              <span>normalized</span>
+            </div>
+            <div className="analytics-list">
+              {props.data.topPaths.length ? (
+                props.data.topPaths.map((item) => (
+                  <div className="analytics-row analytics-path" key={item.path}>
+                    <code>{item.path}</code>
+                    <b>{item.views.toLocaleString()}</b>
+                  </div>
+                ))
+              ) : (
+                <p className="analytics-empty">
+                  No page views yet. Open the live site to start the chart.
+                </p>
+              )}
+            </div>
+          </section>
+        </div>
+        <p className="analytics-privacy">
+          No cookies or visitor profiles. Yeeet stores only daily aggregate
+          counts, normalized paths, and response status classes—not IPs, user
+          agents, referrers, or visitor IDs.
+        </p>
+      </section>
+    </div>
+  )
+}
+
 function DomainManager(props: {
   site: { slug: string; customDomains: Array<CustomDomainData> }
   busy: string
@@ -602,6 +724,8 @@ function Dashboard() {
   const [keyBusy, setKeyBusy] = useState(false)
   const [history, setHistory] = useState<VersionHistoryData | null>(null)
   const [historyLoading, setHistoryLoading] = useState('')
+  const [analytics, setAnalytics] = useState<AnalyticsData | null>(null)
+  const [analyticsLoading, setAnalyticsLoading] = useState('')
   const [versionBusy, setVersionBusy] = useState('')
   const [domainSiteSlug, setDomainSiteSlug] = useState('')
   const [domainBusy, setDomainBusy] = useState('')
@@ -744,6 +868,8 @@ function Dashboard() {
   }
 
   async function showVersions(siteSlug: string) {
+    setAnalytics(null)
+    setDomainSiteSlug('')
     setHistoryLoading(siteSlug)
     setError('')
     try {
@@ -762,6 +888,30 @@ function Dashboard() {
       )
     } finally {
       setHistoryLoading('')
+    }
+  }
+
+  async function showAnalytics(siteSlug: string) {
+    setAnalyticsLoading(siteSlug)
+    setError('')
+    setHistory(null)
+    setDomainSiteSlug('')
+    try {
+      const response = await fetch(
+        `/api/v1/sites/${encodeURIComponent(siteSlug)}/analytics?days=30`,
+      )
+      const body = await response.json()
+      if (!response.ok)
+        throw new Error(body.error?.message || 'Could not load analytics.')
+      setAnalytics(body)
+    } catch (analyticsError) {
+      setError(
+        analyticsError instanceof Error
+          ? analyticsError.message
+          : 'Could not load analytics.',
+      )
+    } finally {
+      setAnalyticsLoading('')
     }
   }
 
@@ -1301,7 +1451,17 @@ function Dashboard() {
                     <span className="site-row-actions">
                       <button
                         type="button"
-                        onClick={() => setDomainSiteSlug(site.slug)}
+                        onClick={() => showAnalytics(site.slug)}
+                      >
+                        {analyticsLoading === site.slug ? '…' : 'Analytics'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAnalytics(null)
+                          setHistory(null)
+                          setDomainSiteSlug(site.slug)
+                        }}
                       >
                         Domains
                         {site.customDomains.length
@@ -1370,6 +1530,12 @@ function Dashboard() {
                 }}
                 onAccess={updateVersionAccess}
                 onClose={() => setHistory(null)}
+              />
+            ) : null}
+            {analytics ? (
+              <SiteAnalytics
+                data={analytics}
+                onClose={() => setAnalytics(null)}
               />
             ) : null}
             {domainSite ? (

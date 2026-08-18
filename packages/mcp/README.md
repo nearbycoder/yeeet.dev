@@ -3,7 +3,8 @@
 Official Model Context Protocol server for Yeeet. It gives coding agents typed
 tools to plan and deploy local static builds, inspect sites and immutable
 versions, roll back production, manage channels and domains, retrieve private
-share links, and perform explicitly confirmed cleanup.
+share links, inspect privacy-preserving aggregate analytics, and perform
+explicitly confirmed cleanup.
 
 ```json
 {

@@ -467,6 +467,23 @@ export function createYeeetMcpServer() {
   )
   register(
     server,
+    'get_analytics',
+    {
+      description:
+        'Return privacy-preserving daily aggregate pageviews and top normalized paths.',
+      inputSchema: z.object({
+        site: z.string().min(1),
+        days: z.number().int().min(1).max(90).optional(),
+      }),
+      annotations: { readOnlyHint: true },
+    },
+    ({ site, days }) =>
+      apiRequest(
+        `/api/v1/sites/${encodeURIComponent(site)}/analytics?days=${days ?? 30}`,
+      ),
+  )
+  register(
+    server,
     'delete_version',
     {
       description:

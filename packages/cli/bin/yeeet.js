@@ -671,6 +671,24 @@ async function webhookDeliveries(options) {
   console.log('')
 }
 
+async function analytics(site, options) {
+  const days = Number(options.days || 30)
+  const data = await apiRequest(
+    `/api/v1/sites/${encodeURIComponent(site)}/analytics?days=${encodeURIComponent(days)}`,
+    {},
+    options,
+  )
+  if (options.json) return print(data, true)
+  console.log(
+    `\n  ${data.totalViews.toLocaleString()} pageviews for ${data.site.url}`,
+  )
+  console.log(`  ${data.period.from} through ${data.period.to}\n`)
+  for (const path of data.topPaths.slice(0, 10)) {
+    console.log(`  ${String(path.views).padStart(7)}  ${path.path}`)
+  }
+  console.log('\n  Privacy: aggregate counts only; no visitor identifiers.\n')
+}
+
 async function versions(slug, options) {
   const data = await apiRequest(
     `/api/v1/sites/${encodeURIComponent(slug)}/versions`,
@@ -940,6 +958,15 @@ program
   .argument('<site>', 'site name')
   .description('List immutable versions and preview URLs')
   .action(async (site) => versions(site, program.opts()))
+
+program
+  .command('analytics')
+  .argument('<site>', 'site name')
+  .option('--days <number>', 'report window from 1 to 90 days', '30')
+  .description('Show privacy-preserving aggregate pageviews and top paths')
+  .action(async (site, options) =>
+    analytics(site, { ...program.opts(), ...options }),
+  )
 
 program
   .command('rollback')

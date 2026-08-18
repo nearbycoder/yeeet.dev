@@ -1148,6 +1148,7 @@ Exit codes are 0 for success, 2 when authentication is required, and 1 for valid
 - yeeet channel list <site> --json: list mutable deployment channels.
 - yeeet channel set <site> <channel> <version> --json: point a channel at a ready version.
 - yeeet channel remove <site> <channel> --json: remove an alias without deleting its version.
+- yeeet analytics <site> --days 30 --json: return daily page views, normalized top paths, and status totals without visitor tracking.
 - yeeet version remove <site> <version> --yes --json: delete one immutable version.
 - yeeet remove <site> --yes --json: delete a site and every version.
 - yeeet access protect <site> <version> --password <password> --json: protect an existing version.
@@ -1175,6 +1176,7 @@ Exit codes are 0 for success, 2 when authentication is required, and 1 for valid
 - Passwords are 8–128 characters. YEEET_DEPLOY_PASSWORD avoids a password in shell history.
 - Never log or commit YEEET_TOKEN.
 - Webhook requests use X-Yeeet-Signature: t=<unix>,v1=<HMAC-SHA256> over <unix>.<raw body>. Reject stale timestamps and deduplicate X-Yeeet-Delivery.
+- Analytics store only aggregate UTC day, normalized path, response status, and count. They never store IPs, cookies, user agents, referrers, or visitor IDs, and do not report unique visitors.
 `
 
 const LLMS_FULL_TXT = String.raw`# Yeeet CLI Guide
@@ -1220,6 +1222,10 @@ The first-party @yeeet.dev/mcp package speaks stdio MCP and supports modern and 
 ## Signed event webhooks
 
 Create an endpoint with yeeet webhook add https://example.com/hook --events deployment.ready,deployment.activated. The secret is shown once. Each request body has id, event, createdAt, and data. X-Yeeet-Signature is t=<unix>,v1=<hex HMAC-SHA256> over <unix>.<raw body>; X-Yeeet-Delivery is stable for deduplication. Reject stale timestamps. Yeeet persists an outbox row before delivery, atomically claims work across replicas, blocks callbacks to private networks, does not follow redirects, times out slow endpoints, and retries with backoff. Supported events: deployment.ready, deployment.activated, deployment.deleted, site.deleted, channel.updated, channel.deleted.
+
+## Privacy-first analytics
+
+Use yeeet analytics <site> --days 30 --json or the dashboard to inspect aggregate page views. The gateway counts HTML page responses by UTC day, normalized path, and response status. Dynamic identifiers and error paths are collapsed and per-site path cardinality is capped. Yeeet does not store IP addresses, cookies, user agents, referrers, or visitor IDs, and does not estimate unique visitors. The API accepts a 1–90 day window.
 
 ## Deploy
 
@@ -1369,6 +1375,7 @@ Yeeet and Railway manage certificate issuance after DNS verification. Remove a m
     yeeet channel list <site> [--json]
     yeeet channel set <site> <channel> <version> [--json]
     yeeet channel remove|rm <site> <channel> [--json]
+    yeeet analytics <site> [--days <1-90>] [--json]
     yeeet version remove <site> <version> --yes [--json]
     yeeet remove|rm <site> --yes [--json]
     yeeet share <site> [version] [--json]
@@ -1595,6 +1602,10 @@ yeeet deploy ./dist --name comet --dry-run --json</code></pre><button class="cop
 yeeet channel list comet
 yeeet channel set comet staging 52eabb5f
 yeeet channel remove comet staging</code></pre><button class="copy-button" type="button" data-copy="code-channels">Copy</button></div>
+            <h3>See Traffic, Not Visitors</h3>
+            <p>Cookie-free analytics count HTML page responses by UTC day, normalized path, and status. Yeeet never stores IP addresses, user agents, referrers, cookies, or visitor IDs, and does not pretend page views are unique people.</p>
+            <div class="code-block"><pre><code id="code-analytics">yeeet analytics comet --days 30
+yeeet analytics comet --days 7 --json</code></pre><button class="copy-button" type="button" data-copy="code-analytics">Copy</button></div>
             <h3>Remove What You No Longer Need</h3>
             <div class="code-block"><pre><code id="code-remove">yeeet version remove comet 52eabb5f --yes
 yeeet remove comet --yes</code></pre><button class="copy-button" type="button" data-copy="code-remove">Copy</button></div>
@@ -1691,6 +1702,7 @@ yeeet webhook rotate-secret &lt;id&gt;</code></pre><button class="copy-button" t
                   <tr><td>sites</td><td>List live sites owned by the current account.</td></tr>
                   <tr><td>versions &lt;site&gt;</td><td>List immutable releases, preview URLs, status, routing mode, and privacy.</td></tr>
                   <tr><td>rollback &lt;site&gt; [version]</td><td>Promote an older ready release, or the previous release when omitted.</td></tr>
+                  <tr><td>analytics &lt;site&gt;</td><td>Inspect aggregate daily views, normalized paths, and response statuses without visitor tracking.</td></tr>
                   <tr><td>version remove …</td><td>Permanently remove one release and its stored objects.</td></tr>
                   <tr><td>remove &lt;site&gt;</td><td>Permanently remove a site, its releases, domains, and stored objects.</td></tr>
                   <tr><td>share &lt;site&gt; [version]</td><td>Print the signed one-click URL for a protected release.</td></tr>

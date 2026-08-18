@@ -183,6 +183,35 @@ export const webhookDeliveries = pgTable(
   ],
 )
 
+export const siteAnalyticsDaily = pgTable(
+  'site_analytics_daily',
+  {
+    id: text('id').primaryKey(),
+    siteId: text('site_id')
+      .notNull()
+      .references(() => sites.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    date: text('date').notNull(),
+    path: text('path').notNull(),
+    status: integer('status').notNull(),
+    views: bigint('views', { mode: 'number' }).default(0).notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('site_analytics_daily_bucket_idx').on(
+      table.siteId,
+      table.date,
+      table.path,
+      table.status,
+    ),
+    index('site_analytics_daily_site_date_idx').on(table.siteId, table.date),
+    index('site_analytics_daily_user_id_idx').on(table.userId),
+  ],
+)
+
 export const invitations = pgTable(
   'invitations',
   {
@@ -321,6 +350,20 @@ export const webhookDeliveryRelations = relations(
     }),
     owner: one(user, {
       fields: [webhookDeliveries.userId],
+      references: [user.id],
+    }),
+  }),
+)
+
+export const siteAnalyticsDailyRelations = relations(
+  siteAnalyticsDaily,
+  ({ one }) => ({
+    site: one(sites, {
+      fields: [siteAnalyticsDaily.siteId],
+      references: [sites.id],
+    }),
+    owner: one(user, {
+      fields: [siteAnalyticsDaily.userId],
       references: [user.id],
     }),
   }),

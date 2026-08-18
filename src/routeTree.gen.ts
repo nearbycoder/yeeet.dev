@@ -29,6 +29,7 @@ import { Route as ApiV1WebhooksDeliveriesRouteImport } from './routes/api/v1/web
 import { Route as ApiV1AdminInvitationsIndexRouteImport } from './routes/api/v1/admin/invitations/index'
 import { Route as ApiV1AdminSitesSiteIdRouteImport } from './routes/api/v1/admin/sites/$siteId'
 import { Route as ApiV1DeploymentsDeploymentIdCompleteRouteImport } from './routes/api/v1/deployments/$deploymentId/complete'
+import { Route as ApiV1SitesSlugAnalyticsRouteImport } from './routes/api/v1/sites/$slug/analytics'
 import { Route as ApiV1SitesSlugChannelsRouteImport } from './routes/api/v1/sites/$slug/channels'
 import { Route as ApiV1SitesSlugVersionsRouteImport } from './routes/api/v1/sites/$slug/versions'
 import { Route as ApiV1AdminInvitationsInvitationIdRevokeRouteImport } from './routes/api/v1/admin/invitations/$invitationId/revoke'
@@ -146,6 +147,11 @@ const ApiV1DeploymentsDeploymentIdCompleteRoute =
     path: '/api/v1/deployments/$deploymentId/complete',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiV1SitesSlugAnalyticsRoute = ApiV1SitesSlugAnalyticsRouteImport.update({
+  id: '/analytics',
+  path: '/analytics',
+  getParentRoute: () => ApiV1SitesSlugRoute,
+} as any)
 const ApiV1SitesSlugChannelsRoute = ApiV1SitesSlugChannelsRouteImport.update({
   id: '/channels',
   path: '/channels',
@@ -243,6 +249,7 @@ export interface FileRoutesByFullPath {
   '/api/v1/deployments/': typeof ApiV1DeploymentsIndexRoute
   '/api/v1/admin/sites/$siteId': typeof ApiV1AdminSitesSiteIdRoute
   '/api/v1/deployments/$deploymentId/complete': typeof ApiV1DeploymentsDeploymentIdCompleteRoute
+  '/api/v1/sites/$slug/analytics': typeof ApiV1SitesSlugAnalyticsRoute
   '/api/v1/sites/$slug/channels': typeof ApiV1SitesSlugChannelsRouteWithChildren
   '/api/v1/sites/$slug/versions': typeof ApiV1SitesSlugVersionsRouteWithChildren
   '/api/v1/admin/invitations/': typeof ApiV1AdminInvitationsIndexRoute
@@ -278,6 +285,7 @@ export interface FileRoutesByTo {
   '/api/v1/deployments': typeof ApiV1DeploymentsIndexRoute
   '/api/v1/admin/sites/$siteId': typeof ApiV1AdminSitesSiteIdRoute
   '/api/v1/deployments/$deploymentId/complete': typeof ApiV1DeploymentsDeploymentIdCompleteRoute
+  '/api/v1/sites/$slug/analytics': typeof ApiV1SitesSlugAnalyticsRoute
   '/api/v1/sites/$slug/channels': typeof ApiV1SitesSlugChannelsRouteWithChildren
   '/api/v1/sites/$slug/versions': typeof ApiV1SitesSlugVersionsRouteWithChildren
   '/api/v1/admin/invitations': typeof ApiV1AdminInvitationsIndexRoute
@@ -314,6 +322,7 @@ export interface FileRoutesById {
   '/api/v1/deployments/': typeof ApiV1DeploymentsIndexRoute
   '/api/v1/admin/sites/$siteId': typeof ApiV1AdminSitesSiteIdRoute
   '/api/v1/deployments/$deploymentId/complete': typeof ApiV1DeploymentsDeploymentIdCompleteRoute
+  '/api/v1/sites/$slug/analytics': typeof ApiV1SitesSlugAnalyticsRoute
   '/api/v1/sites/$slug/channels': typeof ApiV1SitesSlugChannelsRouteWithChildren
   '/api/v1/sites/$slug/versions': typeof ApiV1SitesSlugVersionsRouteWithChildren
   '/api/v1/admin/invitations/': typeof ApiV1AdminInvitationsIndexRoute
@@ -351,6 +360,7 @@ export interface FileRouteTypes {
     | '/api/v1/deployments/'
     | '/api/v1/admin/sites/$siteId'
     | '/api/v1/deployments/$deploymentId/complete'
+    | '/api/v1/sites/$slug/analytics'
     | '/api/v1/sites/$slug/channels'
     | '/api/v1/sites/$slug/versions'
     | '/api/v1/admin/invitations/'
@@ -386,6 +396,7 @@ export interface FileRouteTypes {
     | '/api/v1/deployments'
     | '/api/v1/admin/sites/$siteId'
     | '/api/v1/deployments/$deploymentId/complete'
+    | '/api/v1/sites/$slug/analytics'
     | '/api/v1/sites/$slug/channels'
     | '/api/v1/sites/$slug/versions'
     | '/api/v1/admin/invitations'
@@ -421,6 +432,7 @@ export interface FileRouteTypes {
     | '/api/v1/deployments/'
     | '/api/v1/admin/sites/$siteId'
     | '/api/v1/deployments/$deploymentId/complete'
+    | '/api/v1/sites/$slug/analytics'
     | '/api/v1/sites/$slug/channels'
     | '/api/v1/sites/$slug/versions'
     | '/api/v1/admin/invitations/'
@@ -603,6 +615,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiV1DeploymentsDeploymentIdCompleteRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/v1/sites/$slug/analytics': {
+      id: '/api/v1/sites/$slug/analytics'
+      path: '/analytics'
+      fullPath: '/api/v1/sites/$slug/analytics'
+      preLoaderRoute: typeof ApiV1SitesSlugAnalyticsRouteImport
+      parentRoute: typeof ApiV1SitesSlugRoute
+    }
     '/api/v1/sites/$slug/channels': {
       id: '/api/v1/sites/$slug/channels'
       path: '/channels'
@@ -745,6 +764,7 @@ const ApiV1SitesSlugVersionsRouteWithChildren =
   )
 
 interface ApiV1SitesSlugRouteChildren {
+  ApiV1SitesSlugAnalyticsRoute: typeof ApiV1SitesSlugAnalyticsRoute
   ApiV1SitesSlugChannelsRoute: typeof ApiV1SitesSlugChannelsRouteWithChildren
   ApiV1SitesSlugVersionsRoute: typeof ApiV1SitesSlugVersionsRouteWithChildren
   ApiV1SitesSlugDomainsIndexRoute: typeof ApiV1SitesSlugDomainsIndexRoute
@@ -753,6 +773,7 @@ interface ApiV1SitesSlugRouteChildren {
 }
 
 const ApiV1SitesSlugRouteChildren: ApiV1SitesSlugRouteChildren = {
+  ApiV1SitesSlugAnalyticsRoute: ApiV1SitesSlugAnalyticsRoute,
   ApiV1SitesSlugChannelsRoute: ApiV1SitesSlugChannelsRouteWithChildren,
   ApiV1SitesSlugVersionsRoute: ApiV1SitesSlugVersionsRouteWithChildren,
   ApiV1SitesSlugDomainsIndexRoute: ApiV1SitesSlugDomainsIndexRoute,

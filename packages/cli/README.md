@@ -53,6 +53,17 @@ yeeet domain refresh my-site www.example.com
 yeeet domain remove my-site www.example.com
 ```
 
+Inspect cookie-free aggregate page views without collecting visitor identities:
+
+```sh
+yeeet analytics my-site --days 30
+yeeet analytics my-site --days 7 --json
+```
+
+Analytics contain UTC daily totals, normalized top paths, and response status
+classes. Yeeet does not store IP addresses, cookies, user agents, referrers, or
+visitor IDs.
+
 Run `yeeet --help` or `yeeet <command> --help` for the complete command reference.
 
 ## Self-hosted instances

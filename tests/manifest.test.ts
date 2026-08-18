@@ -11,6 +11,7 @@ import {
   versionUrl,
 } from '../src/server/deployments'
 import { normalizeCustomDomain } from '../src/server/custom-domains'
+import { normalizeAnalyticsPath } from '../src/server/analytics'
 import {
   generateShareNonce,
   hashDeploymentPassword,
@@ -162,6 +163,23 @@ test('calculates deterministic deployment diffs and byte totals', () => {
     unchangedBytes: 11,
     removedBytes: 13,
   })
+})
+
+test('normalizes analytics paths without retaining high-cardinality identifiers', () => {
+  assert.equal(normalizeAnalyticsPath('/products/12345', 200), '/products/:id')
+  assert.equal(
+    normalizeAnalyticsPath('/invite/person@example.com', 200),
+    '/invite/:id',
+  )
+  assert.equal(
+    normalizeAnalyticsPath('/build/52eabb5f36c842468422893db39607d3', 200),
+    '/build/:id',
+  )
+  assert.equal(
+    normalizeAnalyticsPath('/one/two/three/four/five', 200),
+    '/one/two/three/four/*',
+  )
+  assert.equal(normalizeAnalyticsPath('/private/account-name', 404), '/(error)')
 })
 
 test('builds immutable version URLs from the configured site domain', async () => {
