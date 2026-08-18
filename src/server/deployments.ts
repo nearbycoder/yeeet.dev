@@ -31,6 +31,20 @@ import {
   parseHeaderRules,
   parseRedirectRules,
 } from './site-rules'
+import { queueWebhookEvent } from './webhooks'
+
+async function emitDeploymentEvent(
+  userId: string,
+  event: Parameters<typeof queueWebhookEvent>[1],
+  data: Record<string, unknown>,
+  eventId?: string,
+) {
+  try {
+    await queueWebhookEvent(userId, event, data, eventId)
+  } catch (error) {
+    console.error('Could not queue webhook event', { event, eventId, error })
+  }
+}
 
 const SLUG = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/
 const MAX_FILE_COUNT = 5_000
@@ -769,6 +783,24 @@ export async function completeDeployment(actor: Actor, deploymentId: string) {
     }
   })
 
+  await emitDeploymentEvent(
+    deployment.userId,
+    'deployment.ready',
+    {
+      deploymentId: deployment.id,
+      site: deployment.site.slug,
+      channel: deployment.channel,
+      url: deployment.channel
+        ? channelUrl(deployment.site.slug, deployment.channel)
+        : siteUrl(deployment.site.slug),
+      versionUrl: versionUrl(deployment.id),
+      source: deployment.source,
+      fileCount: deployment.fileCount,
+      totalBytes: deployment.totalBytes,
+    },
+    `deployment.ready:${deployment.id}`,
+  )
+
   return deploymentResult(
     deployment.site.slug,
     deployment.id,
@@ -920,6 +952,14 @@ export async function setSiteChannel(
     })
     .returning({ id: siteChannels.id })
 
+  await emitDeploymentEvent(userId, 'channel.updated', {
+    deploymentId: version.id,
+    site: history.site.slug,
+    channel,
+    url: siteUrl(hostnameLabel),
+    versionUrl: versionUrl(version.id),
+  })
+
   return {
     id: rows[0].id,
     site: history.site.slug,
@@ -954,6 +994,11 @@ export async function deleteSiteChannel(
     .returning({ id: siteChannels.id, deploymentId: siteChannels.deploymentId })
   const removed = rows.at(0)
   if (!removed) throw new HttpError(404, 'Channel not found.', 'not_found')
+  await emitDeploymentEvent(userId, 'channel.deleted', {
+    deploymentId: removed.deploymentId,
+    site: slug,
+    channel,
+  })
   return { ...removed, site: slug, channel, deleted: true as const }
 }
 
@@ -982,6 +1027,14 @@ export async function activateSiteVersion(
       .update(deployments)
       .set({ activatedAt })
       .where(eq(deployments.id, version.id))
+  })
+
+  await emitDeploymentEvent(userId, 'deployment.activated', {
+    deploymentId: version.id,
+    site: history.site.slug,
+    url: history.site.url,
+    versionUrl: version.previewUrl,
+    activatedAt: activatedAt.toISOString(),
   })
 
   return {
@@ -1117,6 +1170,15 @@ export async function deleteSiteVersion(
       )
   })
 
+  await emitDeploymentEvent(userId, 'deployment.deleted', {
+    deploymentId: version.id,
+    site: history.site.slug,
+    wasActive,
+    activeDeploymentId: wasActive
+      ? (replacement?.id ?? null)
+      : history.site.activeDeploymentId,
+  })
+
   return {
     id: version.id,
     site: history.site.slug,
@@ -1145,6 +1207,13 @@ export async function deleteOwnedSite(userId: string, value: string) {
   await db
     .delete(sites)
     .where(and(eq(sites.id, site.id), eq(sites.userId, userId)))
+
+  await emitDeploymentEvent(userId, 'site.deleted', {
+    siteId: site.id,
+    site: site.slug,
+    deletedObjects,
+    customDomains: domains.map((domain) => domain.hostname),
+  })
 
   return {
     id: site.id,

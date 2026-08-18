@@ -36,6 +36,11 @@ import {
   siteResponsePolicy,
 } from '../src/server/site-gateway'
 import {
+  isPrivateWebhookAddress,
+  normalizeWebhookUrl,
+  webhookSignature,
+} from '../src/server/webhooks'
+import {
   applySiteHeaders,
   matchingRedirect,
   parseHeaderRules,
@@ -430,6 +435,42 @@ test('hashes deployment passwords and validates signed share tokens', async () =
   )
   if (original === undefined) delete process.env.BETTER_AUTH_SECRET
   else process.env.BETTER_AUTH_SECRET = original
+})
+
+test('signs webhook payloads and rejects private callback networks', async () => {
+  const body = '{"event":"deployment.ready"}'
+  const signature = webhookSignature('whsec_example', 1_700_000_000, body)
+  assert.match(signature, /^t=1700000000,v1=[a-f0-9]{64}$/)
+  assert.equal(
+    signature,
+    webhookSignature('whsec_example', 1_700_000_000, body),
+  )
+  assert.notEqual(
+    signature,
+    webhookSignature('whsec_example', 1_700_000_001, body),
+  )
+  for (const address of [
+    '127.0.0.1',
+    '10.0.0.1',
+    '172.16.0.1',
+    '192.168.1.1',
+    '169.254.169.254',
+    '::1',
+    'fd00::1',
+  ]) {
+    assert.equal(isPrivateWebhookAddress(address), true)
+  }
+  assert.equal(isPrivateWebhookAddress('8.8.8.8'), false)
+  await assert.rejects(
+    normalizeWebhookUrl('https://127.0.0.1/hook'),
+    /private or loopback/,
+  )
+  await withEnvironment({ NODE_ENV: 'development' }, async () => {
+    assert.equal(
+      await normalizeWebhookUrl('http://localhost:4000/hook'),
+      'http://localhost:4000/hook',
+    )
+  })
 })
 
 test('serves configured human and machine-readable docs', async () => {

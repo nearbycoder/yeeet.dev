@@ -72,6 +72,8 @@ builds or replace a framework's build command.
 - An OpenAPI contract, LLM-readable docs, API keys, and stable JSON output.
 - A first-party stdio MCP server with typed deploy, release, channel, domain,
   sharing, and confirmed cleanup tools.
+- Signed event webhooks with a durable Postgres outbox, SSRF-safe public
+  endpoints, atomic delivery claims, and exponential retries.
 - A responsive control plane and a deterministic animated mascot for each site.
 
 ## How it works
@@ -230,6 +232,32 @@ Agents can plan a content diff before deployment, deploy a local path, inspect
 and roll back releases, move channels, manage domains, and retrieve private
 share links. Permanent site and version deletion each require a literal
 `confirm: true` tool argument. See [`packages/mcp`](packages/mcp).
+
+### Deployment event webhooks
+
+Register a public HTTPS endpoint and subscribe to every event or a selected
+set. The signing secret is derived from platform key material and shown only on
+creation or rotation.
+
+```sh
+yeeet webhook add https://example.com/yeeet \
+  --events deployment.ready,deployment.activated \
+  --label production-bot
+yeeet webhook list
+yeeet webhook deliveries
+```
+
+Each JSON request includes `id`, `event`, `createdAt`, and `data`. Verify
+`X-Yeeet-Signature`, formatted as `t=<unix>,v1=<hex>`, by computing HMAC-SHA256
+with the webhook secret over `<unix>.<raw request body>`. Also reject stale
+timestamps and deduplicate the stable `X-Yeeet-Delivery` ID. Yeeet never follows
+redirects, blocks private/loopback DNS targets, times out slow receivers, and
+retries failed delivery from a durable Postgres outbox.
+
+Supported events are `deployment.ready`, `deployment.activated`,
+`deployment.deleted`, `site.deleted`, `channel.updated`, and
+`channel.deleted`. Use `yeeet webhook rotate-secret <id>` to revoke a signing
+secret and receive its replacement once.
 
 ## One-click Railway deploy
 

@@ -576,6 +576,101 @@ async function removeChannel(site, channel, options) {
   )
 }
 
+async function webhooks(options) {
+  const data = await apiRequest('/api/v1/webhooks', {}, options)
+  if (options.json) return print(data, true)
+  if (!data.webhooks.length) {
+    return console.log(
+      'No webhooks. Run `yeeet webhook add https://example.com/hook`.',
+    )
+  }
+  console.log('\n  Webhooks\n')
+  for (const webhook of data.webhooks) {
+    console.log(
+      `  ${webhook.id.slice(0, 8)}  ${(webhook.active ? 'active' : 'paused').padEnd(7)}  ${webhook.label}  ${webhook.url}`,
+    )
+    console.log(`            ${webhook.events.join(', ')}`)
+  }
+  console.log('')
+}
+
+async function addWebhook(url, options) {
+  const result = await apiRequest(
+    '/api/v1/webhooks',
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        url,
+        label: options.label,
+        events: options.events
+          ?.split(',')
+          .map((event) => event.trim())
+          .filter(Boolean),
+      }),
+    },
+    options,
+  )
+  if (options.json) return print(result, true)
+  console.log(`✓ Added ${result.label}: ${result.url}`)
+  console.log('Signing secret (shown once):')
+  console.log(result.secret)
+}
+
+async function findWebhook(selector, options) {
+  const data = await apiRequest('/api/v1/webhooks', {}, options)
+  const matches = data.webhooks.filter(
+    (webhook) => webhook.id === selector || webhook.id.startsWith(selector),
+  )
+  if (matches.length !== 1) {
+    const error = new Error(
+      matches.length ? 'Webhook prefix is ambiguous.' : 'Webhook not found.',
+    )
+    error.code = matches.length ? 'ambiguous_webhook' : 'webhook_not_found'
+    throw error
+  }
+  return matches[0]
+}
+
+async function removeWebhook(selector, options) {
+  const webhook = await findWebhook(selector, options)
+  const result = await apiRequest(
+    `/api/v1/webhooks/${webhook.id}`,
+    { method: 'DELETE' },
+    options,
+  )
+  print(options.json ? result : `✓ Removed ${webhook.label}.`, options.json)
+}
+
+async function rotateWebhookSecret(selector, options) {
+  const webhook = await findWebhook(selector, options)
+  const result = await apiRequest(
+    `/api/v1/webhooks/${webhook.id}`,
+    {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ rotateSecret: true }),
+    },
+    options,
+  )
+  if (options.json) return print(result, true)
+  console.log(`✓ Rotated ${result.label}. New signing secret (shown once):`)
+  console.log(result.secret)
+}
+
+async function webhookDeliveries(options) {
+  const data = await apiRequest('/api/v1/webhooks/deliveries', {}, options)
+  if (options.json) return print(data, true)
+  if (!data.deliveries.length) return console.log('No webhook deliveries yet.')
+  console.log('\n  Recent webhook deliveries\n')
+  for (const delivery of data.deliveries) {
+    console.log(
+      `  ${delivery.id.slice(0, 8)}  ${delivery.status.padEnd(9)}  ${delivery.event}  attempts:${delivery.attempts}`,
+    )
+  }
+  console.log('')
+}
+
 async function versions(slug, options) {
   const data = await apiRequest(
     `/api/v1/sites/${encodeURIComponent(slug)}/versions`,
@@ -952,6 +1047,43 @@ channelCommand
   .argument('<channel>', 'channel name')
   .description('Remove a deployment channel without deleting its version')
   .action(async (site, channel) => removeChannel(site, channel, program.opts()))
+
+const webhookCommand = program
+  .command('webhook')
+  .description('Manage signed deployment event webhooks')
+
+webhookCommand
+  .command('list')
+  .description('List webhook endpoints and event subscriptions')
+  .action(async () => webhooks(program.opts()))
+
+webhookCommand
+  .command('add')
+  .argument('<url>', 'public HTTPS endpoint')
+  .option('--label <label>', 'readable endpoint label')
+  .option('--events <events>', 'comma-separated events (defaults to *)')
+  .description('Create a webhook and show its signing secret once')
+  .action(async (url, options) =>
+    addWebhook(url, { ...program.opts(), ...options }),
+  )
+
+webhookCommand
+  .command('rotate-secret')
+  .argument('<webhook>', 'webhook ID or prefix')
+  .description('Rotate the signing secret and show the replacement once')
+  .action(async (webhook) => rotateWebhookSecret(webhook, program.opts()))
+
+webhookCommand
+  .command('remove')
+  .alias('rm')
+  .argument('<webhook>', 'webhook ID or prefix')
+  .description('Remove a webhook and its delivery history')
+  .action(async (webhook) => removeWebhook(webhook, program.opts()))
+
+webhookCommand
+  .command('deliveries')
+  .description('List recent webhook delivery attempts')
+  .action(async () => webhookDeliveries(program.opts()))
 
 const domainCommand = program
   .command('domain')

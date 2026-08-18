@@ -1159,6 +1159,7 @@ Exit codes are 0 for success, 2 when authentication is required, and 1 for valid
 - yeeet init [name]: create .yeeet.json for repeatable deploy defaults.
 - GitHub Action: use nearbycoder/yeeet.dev@main to deploy a directory or maintain a per-PR preview and comment. Use cleanup mode when the PR closes.
 - MCP server: @yeeet.dev/mcp exposes typed planning, deploy, release, channel, domain, sharing, and confirmed deletion tools over stdio. Configure YEEET_TOKEN in the MCP host.
+- Webhooks: yeeet webhook add <https-url> [--events <comma-list>] creates a signed endpoint and shows its secret once; list, deliveries, rotate-secret, and remove manage it.
 
 ## Invariants useful to agents
 
@@ -1173,6 +1174,7 @@ Exit codes are 0 for success, 2 when authentication is required, and 1 for valid
 - Version identifiers accept an unambiguous prefix of at least 8 characters where supported.
 - Passwords are 8–128 characters. YEEET_DEPLOY_PASSWORD avoids a password in shell history.
 - Never log or commit YEEET_TOKEN.
+- Webhook requests use X-Yeeet-Signature: t=<unix>,v1=<HMAC-SHA256> over <unix>.<raw body>. Reject stale timestamps and deduplicate X-Yeeet-Delivery.
 `
 
 const LLMS_FULL_TXT = String.raw`# Yeeet CLI Guide
@@ -1214,6 +1216,10 @@ Yeeet ships a JavaScript action at nearbycoder/yeeet.dev@main. Give it a Yeeet A
 ## MCP server
 
 The first-party @yeeet.dev/mcp package speaks stdio MCP and supports modern and legacy clients. Set YEEET_TOKEN in the host environment, and optionally YEEET_API for a self-hosted instance. Its typed tools cover list_sites, list_versions, plan_deploy, deploy_path, rollback_site, channels, domains, private share-link lookup, and deletion. delete_site and delete_version require confirm=true. The server never writes logs to stdout because that stream is reserved for MCP protocol messages.
+
+## Signed event webhooks
+
+Create an endpoint with yeeet webhook add https://example.com/hook --events deployment.ready,deployment.activated. The secret is shown once. Each request body has id, event, createdAt, and data. X-Yeeet-Signature is t=<unix>,v1=<hex HMAC-SHA256> over <unix>.<raw body>; X-Yeeet-Delivery is stable for deduplication. Reject stale timestamps. Yeeet persists an outbox row before delivery, atomically claims work across replicas, blocks callbacks to private networks, does not follow redirects, times out slow endpoints, and retries with backoff. Supported events: deployment.ready, deployment.activated, deployment.deleted, site.deleted, channel.updated, channel.deleted.
 
 ## Deploy
 
@@ -1647,6 +1653,12 @@ yeeet deploy ./dist --json</code></pre><button class="copy-button" type="button"
     }
   }
 }</code></pre><button class="copy-button" type="button" data-copy="code-mcp">Copy</button></div>
+            <h3>Signed Deployment Events</h3>
+            <p>Webhooks use a durable outbox and retry failed public HTTPS endpoints. The secret appears once. Verify HMAC-SHA256 over the timestamp and raw body, reject stale requests, and deduplicate the delivery ID.</p>
+            <div class="code-block"><pre><code id="code-webhooks">yeeet webhook add https://example.com/yeeet \\
+  --events deployment.ready,deployment.activated
+yeeet webhook deliveries
+yeeet webhook rotate-secret &lt;id&gt;</code></pre><button class="copy-button" type="button" data-copy="code-webhooks">Copy</button></div>
             <div class="agent-panel">
               <div class="agent-panel-content">
                 <h3>Start with One Plain-Text URL</h3>

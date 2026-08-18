@@ -426,6 +426,47 @@ export function createYeeetMcpServer() {
   )
   register(
     server,
+    'list_webhooks',
+    {
+      description:
+        'List signed deployment-event webhook endpoints and subscriptions.',
+      inputSchema: z.object({}),
+      annotations: { readOnlyHint: true },
+    },
+    () => apiRequest('/api/v1/webhooks'),
+  )
+  register(
+    server,
+    'create_webhook',
+    {
+      description:
+        'Create a public HTTPS webhook endpoint. The signing secret is returned once.',
+      inputSchema: z.object({
+        url: z.url(),
+        label: z.string().min(1).max(100).optional(),
+        events: z.array(z.string()).optional(),
+      }),
+    },
+    (input) =>
+      apiRequest('/api/v1/webhooks', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(input),
+      }),
+  )
+  register(
+    server,
+    'list_webhook_deliveries',
+    {
+      description:
+        'List recent webhook delivery status, attempts, and response codes.',
+      inputSchema: z.object({}),
+      annotations: { readOnlyHint: true },
+    },
+    () => apiRequest('/api/v1/webhooks/deliveries'),
+  )
+  register(
+    server,
     'delete_version',
     {
       description:

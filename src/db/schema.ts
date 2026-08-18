@@ -130,6 +130,59 @@ export const customDomains = pgTable(
   ],
 )
 
+export const webhookEndpoints = pgTable(
+  'webhook_endpoints',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    url: text('url').notNull(),
+    label: text('label').default('Webhook').notNull(),
+    events: text('events').default('["*"]').notNull(),
+    secretNonce: text('secret_nonce').notNull(),
+    active: boolean('active').default(true).notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  (table) => [
+    index('webhook_endpoints_user_id_idx').on(table.userId),
+    index('webhook_endpoints_active_idx').on(table.active),
+  ],
+)
+
+export const webhookDeliveries = pgTable(
+  'webhook_deliveries',
+  {
+    id: text('id').primaryKey(),
+    endpointId: text('endpoint_id')
+      .notNull()
+      .references(() => webhookEndpoints.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    eventId: text('event_id').notNull(),
+    event: text('event').notNull(),
+    payload: text('payload').notNull(),
+    status: text('status').default('pending').notNull(),
+    attempts: integer('attempts').default(0).notNull(),
+    responseStatus: integer('response_status'),
+    nextAttemptAt: timestamp('next_attempt_at').defaultNow().notNull(),
+    error: text('error'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    deliveredAt: timestamp('delivered_at'),
+  },
+  (table) => [
+    uniqueIndex('webhook_deliveries_event_endpoint_idx').on(
+      table.eventId,
+      table.endpointId,
+    ),
+    index('webhook_deliveries_due_idx').on(table.status, table.nextAttemptAt),
+    index('webhook_deliveries_user_id_idx').on(table.userId),
+    index('webhook_deliveries_created_at_idx').on(table.createdAt),
+  ],
+)
+
 export const invitations = pgTable(
   'invitations',
   {
@@ -247,3 +300,28 @@ export const customDomainRelations = relations(customDomains, ({ one }) => ({
     references: [user.id],
   }),
 }))
+
+export const webhookEndpointRelations = relations(
+  webhookEndpoints,
+  ({ many, one }) => ({
+    owner: one(user, {
+      fields: [webhookEndpoints.userId],
+      references: [user.id],
+    }),
+    deliveries: many(webhookDeliveries),
+  }),
+)
+
+export const webhookDeliveryRelations = relations(
+  webhookDeliveries,
+  ({ one }) => ({
+    endpoint: one(webhookEndpoints, {
+      fields: [webhookDeliveries.endpointId],
+      references: [webhookEndpoints.id],
+    }),
+    owner: one(user, {
+      fields: [webhookDeliveries.userId],
+      references: [user.id],
+    }),
+  }),
+)

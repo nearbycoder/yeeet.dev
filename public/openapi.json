@@ -248,6 +248,86 @@
         }
       }
     },
+    "/api/v1/webhooks": {
+      "get": {
+        "operationId": "listWebhookEndpoints",
+        "responses": {
+          "200": {
+            "description": "Webhook endpoints and supported event names"
+          }
+        }
+      },
+      "post": {
+        "operationId": "createWebhookEndpoint",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["url"],
+                "properties": {
+                  "url": { "type": "string", "format": "uri" },
+                  "label": { "type": "string", "maxLength": 100 },
+                  "events": {
+                    "type": "array",
+                    "items": {
+                      "enum": [
+                        "*",
+                        "deployment.ready",
+                        "deployment.activated",
+                        "deployment.deleted",
+                        "site.deleted",
+                        "channel.updated",
+                        "channel.deleted"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Webhook created; signing secret shown once"
+          },
+          "400": { "description": "Unsafe URL or unsupported event" }
+        }
+      }
+    },
+    "/api/v1/webhooks/{webhookId}": {
+      "parameters": [
+        {
+          "name": "webhookId",
+          "in": "path",
+          "required": true,
+          "schema": { "type": "string", "format": "uuid" }
+        }
+      ],
+      "patch": {
+        "operationId": "updateWebhookEndpoint",
+        "responses": {
+          "200": {
+            "description": "Webhook updated; a rotated secret is shown once"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteWebhookEndpoint",
+        "responses": {
+          "200": { "description": "Webhook and delivery history deleted" }
+        }
+      }
+    },
+    "/api/v1/webhooks/deliveries": {
+      "get": {
+        "operationId": "listWebhookDeliveries",
+        "responses": {
+          "200": { "description": "Recent durable webhook delivery attempts" }
+        }
+      }
+    },
     "/api/v1/deployments": {
       "get": {
         "operationId": "listDeployments",

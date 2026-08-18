@@ -19,10 +19,13 @@ import { Route as MascotRouteImport } from './routes/mascot'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ApiV1MeRouteImport } from './routes/api/v1/me'
 import { Route as ApiV1SitesRouteImport } from './routes/api/v1/sites'
+import { Route as ApiV1WebhooksRouteImport } from './routes/api/v1/webhooks'
 import { Route as ApiV1AdminIndexRouteImport } from './routes/api/v1/admin/index'
 import { Route as ApiV1DeploymentsIndexRouteImport } from './routes/api/v1/deployments/index'
 import { Route as ApiV1InvitationsAuthorizeRouteImport } from './routes/api/v1/invitations/authorize'
 import { Route as ApiV1SitesSlugRouteImport } from './routes/api/v1/sites/$slug'
+import { Route as ApiV1WebhooksWebhookIdRouteImport } from './routes/api/v1/webhooks/$webhookId'
+import { Route as ApiV1WebhooksDeliveriesRouteImport } from './routes/api/v1/webhooks/deliveries'
 import { Route as ApiV1AdminInvitationsIndexRouteImport } from './routes/api/v1/admin/invitations/index'
 import { Route as ApiV1AdminSitesSiteIdRouteImport } from './routes/api/v1/admin/sites/$siteId'
 import { Route as ApiV1DeploymentsDeploymentIdCompleteRouteImport } from './routes/api/v1/deployments/$deploymentId/complete'
@@ -90,6 +93,11 @@ const ApiV1SitesRoute = ApiV1SitesRouteImport.update({
   path: '/api/v1/sites',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiV1WebhooksRoute = ApiV1WebhooksRouteImport.update({
+  id: '/api/v1/webhooks',
+  path: '/api/v1/webhooks',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiV1AdminIndexRoute = ApiV1AdminIndexRouteImport.update({
   id: '/api/v1/admin/',
   path: '/api/v1/admin/',
@@ -110,6 +118,16 @@ const ApiV1SitesSlugRoute = ApiV1SitesSlugRouteImport.update({
   id: '/$slug',
   path: '/$slug',
   getParentRoute: () => ApiV1SitesRoute,
+} as any)
+const ApiV1WebhooksWebhookIdRoute = ApiV1WebhooksWebhookIdRouteImport.update({
+  id: '/$webhookId',
+  path: '/$webhookId',
+  getParentRoute: () => ApiV1WebhooksRoute,
+} as any)
+const ApiV1WebhooksDeliveriesRoute = ApiV1WebhooksDeliveriesRouteImport.update({
+  id: '/deliveries',
+  path: '/deliveries',
+  getParentRoute: () => ApiV1WebhooksRoute,
 } as any)
 const ApiV1AdminInvitationsIndexRoute =
   ApiV1AdminInvitationsIndexRouteImport.update({
@@ -216,8 +234,11 @@ export interface FileRoutesByFullPath {
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/v1/me': typeof ApiV1MeRoute
   '/api/v1/sites': typeof ApiV1SitesRouteWithChildren
+  '/api/v1/webhooks': typeof ApiV1WebhooksRouteWithChildren
   '/api/v1/invitations/authorize': typeof ApiV1InvitationsAuthorizeRoute
   '/api/v1/sites/$slug': typeof ApiV1SitesSlugRouteWithChildren
+  '/api/v1/webhooks/$webhookId': typeof ApiV1WebhooksWebhookIdRoute
+  '/api/v1/webhooks/deliveries': typeof ApiV1WebhooksDeliveriesRoute
   '/api/v1/admin/': typeof ApiV1AdminIndexRoute
   '/api/v1/deployments/': typeof ApiV1DeploymentsIndexRoute
   '/api/v1/admin/sites/$siteId': typeof ApiV1AdminSitesSiteIdRoute
@@ -248,8 +269,11 @@ export interface FileRoutesByTo {
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/v1/me': typeof ApiV1MeRoute
   '/api/v1/sites': typeof ApiV1SitesRouteWithChildren
+  '/api/v1/webhooks': typeof ApiV1WebhooksRouteWithChildren
   '/api/v1/invitations/authorize': typeof ApiV1InvitationsAuthorizeRoute
   '/api/v1/sites/$slug': typeof ApiV1SitesSlugRouteWithChildren
+  '/api/v1/webhooks/$webhookId': typeof ApiV1WebhooksWebhookIdRoute
+  '/api/v1/webhooks/deliveries': typeof ApiV1WebhooksDeliveriesRoute
   '/api/v1/admin': typeof ApiV1AdminIndexRoute
   '/api/v1/deployments': typeof ApiV1DeploymentsIndexRoute
   '/api/v1/admin/sites/$siteId': typeof ApiV1AdminSitesSiteIdRoute
@@ -281,8 +305,11 @@ export interface FileRoutesById {
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/v1/me': typeof ApiV1MeRoute
   '/api/v1/sites': typeof ApiV1SitesRouteWithChildren
+  '/api/v1/webhooks': typeof ApiV1WebhooksRouteWithChildren
   '/api/v1/invitations/authorize': typeof ApiV1InvitationsAuthorizeRoute
   '/api/v1/sites/$slug': typeof ApiV1SitesSlugRouteWithChildren
+  '/api/v1/webhooks/$webhookId': typeof ApiV1WebhooksWebhookIdRoute
+  '/api/v1/webhooks/deliveries': typeof ApiV1WebhooksDeliveriesRoute
   '/api/v1/admin/': typeof ApiV1AdminIndexRoute
   '/api/v1/deployments/': typeof ApiV1DeploymentsIndexRoute
   '/api/v1/admin/sites/$siteId': typeof ApiV1AdminSitesSiteIdRoute
@@ -315,8 +342,11 @@ export interface FileRouteTypes {
     | '/api/auth/$'
     | '/api/v1/me'
     | '/api/v1/sites'
+    | '/api/v1/webhooks'
     | '/api/v1/invitations/authorize'
     | '/api/v1/sites/$slug'
+    | '/api/v1/webhooks/$webhookId'
+    | '/api/v1/webhooks/deliveries'
     | '/api/v1/admin/'
     | '/api/v1/deployments/'
     | '/api/v1/admin/sites/$siteId'
@@ -347,8 +377,11 @@ export interface FileRouteTypes {
     | '/api/auth/$'
     | '/api/v1/me'
     | '/api/v1/sites'
+    | '/api/v1/webhooks'
     | '/api/v1/invitations/authorize'
     | '/api/v1/sites/$slug'
+    | '/api/v1/webhooks/$webhookId'
+    | '/api/v1/webhooks/deliveries'
     | '/api/v1/admin'
     | '/api/v1/deployments'
     | '/api/v1/admin/sites/$siteId'
@@ -379,8 +412,11 @@ export interface FileRouteTypes {
     | '/api/auth/$'
     | '/api/v1/me'
     | '/api/v1/sites'
+    | '/api/v1/webhooks'
     | '/api/v1/invitations/authorize'
     | '/api/v1/sites/$slug'
+    | '/api/v1/webhooks/$webhookId'
+    | '/api/v1/webhooks/deliveries'
     | '/api/v1/admin/'
     | '/api/v1/deployments/'
     | '/api/v1/admin/sites/$siteId'
@@ -412,6 +448,7 @@ export interface RootRouteChildren {
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiV1MeRoute: typeof ApiV1MeRoute
   ApiV1SitesRoute: typeof ApiV1SitesRouteWithChildren
+  ApiV1WebhooksRoute: typeof ApiV1WebhooksRouteWithChildren
   ApiV1InvitationsAuthorizeRoute: typeof ApiV1InvitationsAuthorizeRoute
   ApiV1AdminIndexRoute: typeof ApiV1AdminIndexRoute
   ApiV1DeploymentsIndexRoute: typeof ApiV1DeploymentsIndexRoute
@@ -496,6 +533,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiV1SitesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/v1/webhooks': {
+      id: '/api/v1/webhooks'
+      path: '/api/v1/webhooks'
+      fullPath: '/api/v1/webhooks'
+      preLoaderRoute: typeof ApiV1WebhooksRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/v1/admin/': {
       id: '/api/v1/admin/'
       path: '/api/v1/admin'
@@ -523,6 +567,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/v1/sites/$slug'
       preLoaderRoute: typeof ApiV1SitesSlugRouteImport
       parentRoute: typeof ApiV1SitesRoute
+    }
+    '/api/v1/webhooks/$webhookId': {
+      id: '/api/v1/webhooks/$webhookId'
+      path: '/$webhookId'
+      fullPath: '/api/v1/webhooks/$webhookId'
+      preLoaderRoute: typeof ApiV1WebhooksWebhookIdRouteImport
+      parentRoute: typeof ApiV1WebhooksRoute
+    }
+    '/api/v1/webhooks/deliveries': {
+      id: '/api/v1/webhooks/deliveries'
+      path: '/deliveries'
+      fullPath: '/api/v1/webhooks/deliveries'
+      preLoaderRoute: typeof ApiV1WebhooksDeliveriesRouteImport
+      parentRoute: typeof ApiV1WebhooksRoute
     }
     '/api/v1/admin/invitations/': {
       id: '/api/v1/admin/invitations/'
@@ -720,6 +778,20 @@ const ApiV1SitesRouteWithChildren = ApiV1SitesRoute._addFileChildren(
   ApiV1SitesRouteChildren,
 )
 
+interface ApiV1WebhooksRouteChildren {
+  ApiV1WebhooksWebhookIdRoute: typeof ApiV1WebhooksWebhookIdRoute
+  ApiV1WebhooksDeliveriesRoute: typeof ApiV1WebhooksDeliveriesRoute
+}
+
+const ApiV1WebhooksRouteChildren: ApiV1WebhooksRouteChildren = {
+  ApiV1WebhooksWebhookIdRoute: ApiV1WebhooksWebhookIdRoute,
+  ApiV1WebhooksDeliveriesRoute: ApiV1WebhooksDeliveriesRoute,
+}
+
+const ApiV1WebhooksRouteWithChildren = ApiV1WebhooksRoute._addFileChildren(
+  ApiV1WebhooksRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
@@ -731,6 +803,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiV1MeRoute: ApiV1MeRoute,
   ApiV1SitesRoute: ApiV1SitesRouteWithChildren,
+  ApiV1WebhooksRoute: ApiV1WebhooksRouteWithChildren,
   ApiV1InvitationsAuthorizeRoute: ApiV1InvitationsAuthorizeRoute,
   ApiV1AdminIndexRoute: ApiV1AdminIndexRoute,
   ApiV1DeploymentsIndexRoute: ApiV1DeploymentsIndexRoute,

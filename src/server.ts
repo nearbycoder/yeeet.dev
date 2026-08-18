@@ -1,6 +1,9 @@
 import handler, { createServerEntry } from '@tanstack/react-start/server-entry'
 import { maybeServeDocs } from '#/server/docs-site'
 import { maybeServeSite } from '#/server/site-gateway'
+import { startWebhookWorker } from '#/server/webhooks'
+
+startWebhookWorker()
 
 export default createServerEntry({
   async fetch(request) {
