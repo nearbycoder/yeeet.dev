@@ -1,0 +1,56 @@
+name: Yeeet static site
+description: Deploy a static directory to Yeeet, with optional PR previews and cleanup.
+author: Yeeet
+
+branding:
+  icon: send
+  color: green
+
+inputs:
+  token:
+    description: Yeeet API key. Store it as a GitHub Actions secret.
+    required: true
+  directory:
+    description: Static file or directory to deploy.
+    default: .
+  site:
+    description: Stable site name. PR previews append -pr-<number>.
+    required: false
+  api:
+    description: Yeeet control-plane URL.
+    default: https://yeeet.dev
+  mode:
+    description: Use deploy to publish or cleanup to delete a PR preview.
+    default: deploy
+  pr-number:
+    description: Pull request number. Usually detected from the event payload.
+    required: false
+  spa:
+    description: Serve index.html for missing navigation routes.
+    default: 'true'
+  password:
+    description: Optional deployment password. Prefer a GitHub Actions secret.
+    required: false
+  github-token:
+    description: Optional GITHUB_TOKEN used to create or update the PR comment.
+    required: false
+  comment:
+    description: Create or update a PR comment when github-token is supplied.
+    default: 'true'
+  cli-version:
+    description: Version of @yeeet.dev/cli to execute.
+    default: latest
+
+outputs:
+  site:
+    description: Deployed Yeeet site name.
+  url:
+    description: Live or preview URL.
+  version-url:
+    description: Immutable deployment URL.
+  deployment:
+    description: Immutable deployment identifier.
+
+runs:
+  using: node20
+  main: github-action/index.mjs

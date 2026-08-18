@@ -1152,6 +1152,7 @@ Exit codes are 0 for success, 2 when authentication is required, and 1 for valid
 - yeeet domain add <site> <hostname> --json: attach a custom hostname and return required DNS records.
 - yeeet domain list <site> --json: inspect DNS and TLS status.
 - yeeet init [name]: create .yeeet.json for repeatable deploy defaults.
+- GitHub Action: use nearbycoder/yeeet.dev@main to deploy a directory or maintain a per-PR preview and comment. Use cleanup mode when the PR closes.
 
 ## Invariants useful to agents
 
@@ -1195,6 +1196,10 @@ For CI or agents, create an API key in the Yeeet dashboard and pass it through t
     yeeet whoami --json
 
 Never put YEEET_TOKEN in source control, command output, screenshots, or prompts.
+
+## GitHub Actions and pull request previews
+
+Yeeet ships a JavaScript action at nearbycoder/yeeet.dev@main. Give it a Yeeet API key, a build directory, and a stable site base name. On pull_request events it deploys to <site>-pr-<number>, updates one PR comment with the live and immutable URLs, and removes the preview when called with mode cleanup. GitHub does not expose repository secrets to untrusted fork pull requests; keep that protection in place.
 
 ## Deploy
 
@@ -1584,6 +1589,14 @@ yeeet domain list comet --json</code></pre><button class="copy-button" type="but
 yeeet whoami --json
 yeeet deploy ./dist --json</code></pre><button class="copy-button" type="button" data-copy="code-agent">Copy</button></div>
             <div class="callout"><p><strong>Secret handling:</strong> never print, commit, or place <span class="inline-code" translate="no">YEEET_TOKEN</span> in a prompt. Inject it from your CI secret store or agent environment.</p></div>
+            <h3>Pull Request Previews</h3>
+            <p>Use <span class="inline-code" translate="no">nearbycoder/yeeet.dev@main</span> in GitHub Actions. Each trusted pull request gets a stable <span class="inline-code" translate="no">&lt;site&gt;-pr-&lt;number&gt;</span> URL, an updated PR comment, and cleanup when the PR closes.</p>
+            <div class="code-block"><pre><code id="code-github-action">- uses: nearbycoder/yeeet.dev@main
+  with:
+    token: \${{ secrets.YEEET_TOKEN }}
+    github-token: \${{ github.token }}
+    site: docs
+    directory: dist</code></pre><button class="copy-button" type="button" data-copy="code-github-action">Copy</button></div>
             <div class="agent-panel">
               <div class="agent-panel-content">
                 <h3>Start with One Plain-Text URL</h3>

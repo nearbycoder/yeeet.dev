@@ -155,6 +155,28 @@ YEEET_TOKEN=yeeet_... yeeet deploy ./dist --name comet --json
 The CLI can target any self-hosted instance with `--api https://your-domain` or
 the `YEEET_API` environment variable.
 
+### GitHub Action and PR previews
+
+The repository is also a dependency-free JavaScript action. It deploys a normal
+site from any workflow, or manages a stable `<site>-pr-<number>` preview and an
+idempotently updated pull-request comment. Closing the pull request can remove
+the temporary site automatically.
+
+```yaml
+- uses: nearbycoder/yeeet.dev@main
+  with:
+    token: ${{ secrets.YEEET_TOKEN }}
+    github-token: ${{ github.token }}
+    site: docs
+    directory: dist
+```
+
+Copy the complete deploy-and-cleanup workflow from
+[`docs/examples/yeeet-preview.yml`](docs/examples/yeeet-preview.yml). It runs
+only for branches in the same repository because GitHub correctly withholds
+secrets from untrusted forks. Pin the action to a commit SHA when your security
+policy requires immutable third-party actions.
+
 ## One-click Railway deploy
 
 [![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/new/template/yeeet?utm_medium=integration&utm_source=button&utm_campaign=yeeet)
