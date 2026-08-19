@@ -20,12 +20,17 @@ import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ApiV1MeRouteImport } from './routes/api/v1/me'
 import { Route as ApiV1SitesRouteImport } from './routes/api/v1/sites'
 import { Route as ApiV1WebhooksRouteImport } from './routes/api/v1/webhooks'
+import { Route as DashboardSitesSlugRouteRouteImport } from './routes/dashboard_/sites/$slug/route'
 import { Route as ApiV1AdminIndexRouteImport } from './routes/api/v1/admin/index'
 import { Route as ApiV1DeploymentsIndexRouteImport } from './routes/api/v1/deployments/index'
 import { Route as ApiV1InvitationsAuthorizeRouteImport } from './routes/api/v1/invitations/authorize'
 import { Route as ApiV1SitesSlugRouteImport } from './routes/api/v1/sites/$slug'
 import { Route as ApiV1WebhooksWebhookIdRouteImport } from './routes/api/v1/webhooks/$webhookId'
 import { Route as ApiV1WebhooksDeliveriesRouteImport } from './routes/api/v1/webhooks/deliveries'
+import { Route as DashboardSitesSlugIndexRouteImport } from './routes/dashboard_/sites/$slug/index'
+import { Route as DashboardSitesSlugAnalyticsRouteImport } from './routes/dashboard_/sites/$slug/analytics'
+import { Route as DashboardSitesSlugDomainsRouteImport } from './routes/dashboard_/sites/$slug/domains'
+import { Route as DashboardSitesSlugVersionsRouteImport } from './routes/dashboard_/sites/$slug/versions'
 import { Route as ApiV1AdminInvitationsIndexRouteImport } from './routes/api/v1/admin/invitations/index'
 import { Route as ApiV1AdminSitesSiteIdRouteImport } from './routes/api/v1/admin/sites/$siteId'
 import { Route as ApiV1DeploymentsDeploymentIdCompleteRouteImport } from './routes/api/v1/deployments/$deploymentId/complete'
@@ -99,6 +104,11 @@ const ApiV1WebhooksRoute = ApiV1WebhooksRouteImport.update({
   path: '/api/v1/webhooks',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DashboardSitesSlugRouteRoute = DashboardSitesSlugRouteRouteImport.update({
+  id: '/dashboard_/sites/$slug',
+  path: '/dashboard/sites/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiV1AdminIndexRoute = ApiV1AdminIndexRouteImport.update({
   id: '/api/v1/admin/',
   path: '/api/v1/admin/',
@@ -130,6 +140,29 @@ const ApiV1WebhooksDeliveriesRoute = ApiV1WebhooksDeliveriesRouteImport.update({
   path: '/deliveries',
   getParentRoute: () => ApiV1WebhooksRoute,
 } as any)
+const DashboardSitesSlugIndexRoute = DashboardSitesSlugIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => DashboardSitesSlugRouteRoute,
+} as any)
+const DashboardSitesSlugAnalyticsRoute =
+  DashboardSitesSlugAnalyticsRouteImport.update({
+    id: '/analytics',
+    path: '/analytics',
+    getParentRoute: () => DashboardSitesSlugRouteRoute,
+  } as any)
+const DashboardSitesSlugDomainsRoute =
+  DashboardSitesSlugDomainsRouteImport.update({
+    id: '/domains',
+    path: '/domains',
+    getParentRoute: () => DashboardSitesSlugRouteRoute,
+  } as any)
+const DashboardSitesSlugVersionsRoute =
+  DashboardSitesSlugVersionsRouteImport.update({
+    id: '/versions',
+    path: '/versions',
+    getParentRoute: () => DashboardSitesSlugRouteRoute,
+  } as any)
 const ApiV1AdminInvitationsIndexRoute =
   ApiV1AdminInvitationsIndexRouteImport.update({
     id: '/api/v1/admin/invitations/',
@@ -237,6 +270,7 @@ export interface FileRoutesByFullPath {
   '/health': typeof HealthRoute
   '/login': typeof LoginRoute
   '/mascot': typeof MascotRoute
+  '/dashboard/sites/$slug': typeof DashboardSitesSlugRouteRouteWithChildren
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/v1/me': typeof ApiV1MeRoute
   '/api/v1/sites': typeof ApiV1SitesRouteWithChildren
@@ -245,8 +279,12 @@ export interface FileRoutesByFullPath {
   '/api/v1/sites/$slug': typeof ApiV1SitesSlugRouteWithChildren
   '/api/v1/webhooks/$webhookId': typeof ApiV1WebhooksWebhookIdRoute
   '/api/v1/webhooks/deliveries': typeof ApiV1WebhooksDeliveriesRoute
+  '/dashboard/sites/$slug/analytics': typeof DashboardSitesSlugAnalyticsRoute
+  '/dashboard/sites/$slug/domains': typeof DashboardSitesSlugDomainsRoute
+  '/dashboard/sites/$slug/versions': typeof DashboardSitesSlugVersionsRoute
   '/api/v1/admin/': typeof ApiV1AdminIndexRoute
   '/api/v1/deployments/': typeof ApiV1DeploymentsIndexRoute
+  '/dashboard/sites/$slug/': typeof DashboardSitesSlugIndexRoute
   '/api/v1/admin/sites/$siteId': typeof ApiV1AdminSitesSiteIdRoute
   '/api/v1/deployments/$deploymentId/complete': typeof ApiV1DeploymentsDeploymentIdCompleteRoute
   '/api/v1/sites/$slug/analytics': typeof ApiV1SitesSlugAnalyticsRoute
@@ -281,8 +319,12 @@ export interface FileRoutesByTo {
   '/api/v1/sites/$slug': typeof ApiV1SitesSlugRouteWithChildren
   '/api/v1/webhooks/$webhookId': typeof ApiV1WebhooksWebhookIdRoute
   '/api/v1/webhooks/deliveries': typeof ApiV1WebhooksDeliveriesRoute
+  '/dashboard/sites/$slug/analytics': typeof DashboardSitesSlugAnalyticsRoute
+  '/dashboard/sites/$slug/domains': typeof DashboardSitesSlugDomainsRoute
+  '/dashboard/sites/$slug/versions': typeof DashboardSitesSlugVersionsRoute
   '/api/v1/admin': typeof ApiV1AdminIndexRoute
   '/api/v1/deployments': typeof ApiV1DeploymentsIndexRoute
+  '/dashboard/sites/$slug': typeof DashboardSitesSlugIndexRoute
   '/api/v1/admin/sites/$siteId': typeof ApiV1AdminSitesSiteIdRoute
   '/api/v1/deployments/$deploymentId/complete': typeof ApiV1DeploymentsDeploymentIdCompleteRoute
   '/api/v1/sites/$slug/analytics': typeof ApiV1SitesSlugAnalyticsRoute
@@ -310,6 +352,7 @@ export interface FileRoutesById {
   '/health': typeof HealthRoute
   '/login': typeof LoginRoute
   '/mascot': typeof MascotRoute
+  '/dashboard_/sites/$slug': typeof DashboardSitesSlugRouteRouteWithChildren
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/v1/me': typeof ApiV1MeRoute
   '/api/v1/sites': typeof ApiV1SitesRouteWithChildren
@@ -318,8 +361,12 @@ export interface FileRoutesById {
   '/api/v1/sites/$slug': typeof ApiV1SitesSlugRouteWithChildren
   '/api/v1/webhooks/$webhookId': typeof ApiV1WebhooksWebhookIdRoute
   '/api/v1/webhooks/deliveries': typeof ApiV1WebhooksDeliveriesRoute
+  '/dashboard_/sites/$slug/analytics': typeof DashboardSitesSlugAnalyticsRoute
+  '/dashboard_/sites/$slug/domains': typeof DashboardSitesSlugDomainsRoute
+  '/dashboard_/sites/$slug/versions': typeof DashboardSitesSlugVersionsRoute
   '/api/v1/admin/': typeof ApiV1AdminIndexRoute
   '/api/v1/deployments/': typeof ApiV1DeploymentsIndexRoute
+  '/dashboard_/sites/$slug/': typeof DashboardSitesSlugIndexRoute
   '/api/v1/admin/sites/$siteId': typeof ApiV1AdminSitesSiteIdRoute
   '/api/v1/deployments/$deploymentId/complete': typeof ApiV1DeploymentsDeploymentIdCompleteRoute
   '/api/v1/sites/$slug/analytics': typeof ApiV1SitesSlugAnalyticsRoute
@@ -348,6 +395,7 @@ export interface FileRouteTypes {
     | '/health'
     | '/login'
     | '/mascot'
+    | '/dashboard/sites/$slug'
     | '/api/auth/$'
     | '/api/v1/me'
     | '/api/v1/sites'
@@ -356,8 +404,12 @@ export interface FileRouteTypes {
     | '/api/v1/sites/$slug'
     | '/api/v1/webhooks/$webhookId'
     | '/api/v1/webhooks/deliveries'
+    | '/dashboard/sites/$slug/analytics'
+    | '/dashboard/sites/$slug/domains'
+    | '/dashboard/sites/$slug/versions'
     | '/api/v1/admin/'
     | '/api/v1/deployments/'
+    | '/dashboard/sites/$slug/'
     | '/api/v1/admin/sites/$siteId'
     | '/api/v1/deployments/$deploymentId/complete'
     | '/api/v1/sites/$slug/analytics'
@@ -392,8 +444,12 @@ export interface FileRouteTypes {
     | '/api/v1/sites/$slug'
     | '/api/v1/webhooks/$webhookId'
     | '/api/v1/webhooks/deliveries'
+    | '/dashboard/sites/$slug/analytics'
+    | '/dashboard/sites/$slug/domains'
+    | '/dashboard/sites/$slug/versions'
     | '/api/v1/admin'
     | '/api/v1/deployments'
+    | '/dashboard/sites/$slug'
     | '/api/v1/admin/sites/$siteId'
     | '/api/v1/deployments/$deploymentId/complete'
     | '/api/v1/sites/$slug/analytics'
@@ -420,6 +476,7 @@ export interface FileRouteTypes {
     | '/health'
     | '/login'
     | '/mascot'
+    | '/dashboard_/sites/$slug'
     | '/api/auth/$'
     | '/api/v1/me'
     | '/api/v1/sites'
@@ -428,8 +485,12 @@ export interface FileRouteTypes {
     | '/api/v1/sites/$slug'
     | '/api/v1/webhooks/$webhookId'
     | '/api/v1/webhooks/deliveries'
+    | '/dashboard_/sites/$slug/analytics'
+    | '/dashboard_/sites/$slug/domains'
+    | '/dashboard_/sites/$slug/versions'
     | '/api/v1/admin/'
     | '/api/v1/deployments/'
+    | '/dashboard_/sites/$slug/'
     | '/api/v1/admin/sites/$siteId'
     | '/api/v1/deployments/$deploymentId/complete'
     | '/api/v1/sites/$slug/analytics'
@@ -457,6 +518,7 @@ export interface RootRouteChildren {
   HealthRoute: typeof HealthRoute
   LoginRoute: typeof LoginRoute
   MascotRoute: typeof MascotRoute
+  DashboardSitesSlugRouteRoute: typeof DashboardSitesSlugRouteRouteWithChildren
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiV1MeRoute: typeof ApiV1MeRoute
   ApiV1SitesRoute: typeof ApiV1SitesRouteWithChildren
@@ -552,6 +614,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiV1WebhooksRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/dashboard_/sites/$slug': {
+      id: '/dashboard_/sites/$slug'
+      path: '/dashboard/sites/$slug'
+      fullPath: '/dashboard/sites/$slug'
+      preLoaderRoute: typeof DashboardSitesSlugRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/v1/admin/': {
       id: '/api/v1/admin/'
       path: '/api/v1/admin'
@@ -593,6 +662,34 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/v1/webhooks/deliveries'
       preLoaderRoute: typeof ApiV1WebhooksDeliveriesRouteImport
       parentRoute: typeof ApiV1WebhooksRoute
+    }
+    '/dashboard_/sites/$slug/': {
+      id: '/dashboard_/sites/$slug/'
+      path: '/'
+      fullPath: '/dashboard/sites/$slug/'
+      preLoaderRoute: typeof DashboardSitesSlugIndexRouteImport
+      parentRoute: typeof DashboardSitesSlugRouteRoute
+    }
+    '/dashboard_/sites/$slug/analytics': {
+      id: '/dashboard_/sites/$slug/analytics'
+      path: '/analytics'
+      fullPath: '/dashboard/sites/$slug/analytics'
+      preLoaderRoute: typeof DashboardSitesSlugAnalyticsRouteImport
+      parentRoute: typeof DashboardSitesSlugRouteRoute
+    }
+    '/dashboard_/sites/$slug/domains': {
+      id: '/dashboard_/sites/$slug/domains'
+      path: '/domains'
+      fullPath: '/dashboard/sites/$slug/domains'
+      preLoaderRoute: typeof DashboardSitesSlugDomainsRouteImport
+      parentRoute: typeof DashboardSitesSlugRouteRoute
+    }
+    '/dashboard_/sites/$slug/versions': {
+      id: '/dashboard_/sites/$slug/versions'
+      path: '/versions'
+      fullPath: '/dashboard/sites/$slug/versions'
+      preLoaderRoute: typeof DashboardSitesSlugVersionsRouteImport
+      parentRoute: typeof DashboardSitesSlugRouteRoute
     }
     '/api/v1/admin/invitations/': {
       id: '/api/v1/admin/invitations/'
@@ -716,6 +813,26 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface DashboardSitesSlugRouteRouteChildren {
+  DashboardSitesSlugAnalyticsRoute: typeof DashboardSitesSlugAnalyticsRoute
+  DashboardSitesSlugDomainsRoute: typeof DashboardSitesSlugDomainsRoute
+  DashboardSitesSlugVersionsRoute: typeof DashboardSitesSlugVersionsRoute
+  DashboardSitesSlugIndexRoute: typeof DashboardSitesSlugIndexRoute
+}
+
+const DashboardSitesSlugRouteRouteChildren: DashboardSitesSlugRouteRouteChildren =
+  {
+    DashboardSitesSlugAnalyticsRoute: DashboardSitesSlugAnalyticsRoute,
+    DashboardSitesSlugDomainsRoute: DashboardSitesSlugDomainsRoute,
+    DashboardSitesSlugVersionsRoute: DashboardSitesSlugVersionsRoute,
+    DashboardSitesSlugIndexRoute: DashboardSitesSlugIndexRoute,
+  }
+
+const DashboardSitesSlugRouteRouteWithChildren =
+  DashboardSitesSlugRouteRoute._addFileChildren(
+    DashboardSitesSlugRouteRouteChildren,
+  )
+
 interface ApiV1SitesSlugChannelsRouteChildren {
   ApiV1SitesSlugChannelsChannelRoute: typeof ApiV1SitesSlugChannelsChannelRoute
 }
@@ -821,6 +938,7 @@ const rootRouteChildren: RootRouteChildren = {
   HealthRoute: HealthRoute,
   LoginRoute: LoginRoute,
   MascotRoute: MascotRoute,
+  DashboardSitesSlugRouteRoute: DashboardSitesSlugRouteRouteWithChildren,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiV1MeRoute: ApiV1MeRoute,
   ApiV1SitesRoute: ApiV1SitesRouteWithChildren,

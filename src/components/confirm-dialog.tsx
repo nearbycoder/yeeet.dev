@@ -10,6 +10,8 @@ type ConfirmDialogProps = {
   busy?: boolean
   busyLabel?: string
   eyebrow?: string
+  cancelLabel?: string
+  tone?: 'danger' | 'neutral'
   onCancel: () => void
   onConfirm: () => void
 }
@@ -31,6 +33,8 @@ export function ConfirmDialog({
   busy = false,
   busyLabel = 'Deleting…',
   eyebrow = 'DANGER ZONE',
+  cancelLabel = 'Keep it',
+  tone = 'danger',
   onCancel,
   onConfirm,
 }: ConfirmDialogProps) {
@@ -104,8 +108,11 @@ export function ConfirmDialog({
         aria-busy={busy}
         onKeyDown={handleKeyDown}
       >
-        <div className="confirm-dialog-mark" aria-hidden="true">
-          !
+        <div
+          className={`confirm-dialog-mark ${tone === 'neutral' ? 'is-neutral' : ''}`}
+          aria-hidden="true"
+        >
+          {tone === 'neutral' ? '↗' : '!'}
         </div>
         <div className="confirm-dialog-copy">
           <span>{eyebrow}</span>
@@ -120,11 +127,11 @@ export function ConfirmDialog({
             disabled={busy}
             onClick={onCancel}
           >
-            Keep it
+            {cancelLabel}
           </button>
           <button
             type="button"
-            className="button confirm-dialog-danger"
+            className={`button ${tone === 'danger' ? 'confirm-dialog-danger' : 'button-ink'}`}
             disabled={busy}
             onClick={onConfirm}
           >

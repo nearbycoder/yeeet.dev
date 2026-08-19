@@ -1,12 +1,12 @@
-import { Fragment, useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import {
   Link,
   createFileRoute,
   redirect,
   useRouter,
 } from '@tanstack/react-router'
-import { Brand } from '#/components/brand'
 import { ConfirmDialog } from '#/components/confirm-dialog'
+import { DashboardHeader } from '#/components/dashboard-header'
 import { Yeeetling, getYeeetlingDesign } from '#/components/yeeetling'
 import type { YeeetlingPhase } from '#/components/yeeetling'
 import { authClient } from '#/lib/auth-client'
@@ -32,82 +32,12 @@ async function sha256File(file: File) {
   ).join('')
 }
 
-type CustomDomainData = {
-  id: string
-  hostname: string
-  url: string
-  verificationToken: string | null
-  verificationHost: string | null
-  certificateStatus: string
-  error: string | null
-  dnsRecords: Array<{
-    hostlabel: string
-    requiredValue: string
-    currentValue?: string | null
-    status: string
-  }>
+type DashboardDeleteTarget = {
+  siteSlug: string
+  title: string
+  description: string
+  confirmLabel: string
 }
-
-type VersionHistoryData = {
-  site: {
-    id: string
-    slug: string
-    url: string
-    activeDeploymentId: string | null
-  }
-  versions: Array<{
-    id: string
-    status: 'uploading' | 'ready' | 'failed'
-    source: string
-    fileCount: number
-    totalBytes: number
-    current: boolean
-    previewUrl: string | null
-    channel: string | null
-    spaFallback: boolean
-    protected: boolean
-    shareUrl: string | null
-    createdAt: string
-  }>
-}
-
-type AnalyticsData = {
-  site: { id: string; slug: string; url: string }
-  period: { days: number; from: string; to: string }
-  totalViews: number
-  statuses: { successful: number; redirects: number; errors: number }
-  daily: Array<{ date: string; views: number }>
-  topPaths: Array<{ path: string; views: number }>
-  privacy: {
-    uniqueVisitors: false
-    stored: Array<string>
-    notStored: Array<string>
-  }
-}
-
-type DashboardDeleteTarget =
-  | {
-      kind: 'version'
-      deploymentId: string
-      title: string
-      description: string
-      confirmLabel: string
-    }
-  | {
-      kind: 'site'
-      siteSlug: string
-      title: string
-      description: string
-      confirmLabel: string
-    }
-  | {
-      kind: 'domain'
-      siteSlug: string
-      domain: CustomDomainData
-      title: string
-      description: string
-      confirmLabel: string
-    }
 
 type FileSystemEntryLike = {
   isFile: boolean
@@ -162,466 +92,6 @@ function stripCommonRoot(files: Array<UploadFile>) {
     ...item,
     path: item.path.split('/').slice(1).join('/'),
   }))
-}
-
-function VersionHistory(props: {
-  data: VersionHistoryData
-  busy: string
-  onActivate: (id: string) => void
-  onDelete: (id: string) => void
-  onAccess: (
-    id: string,
-    input: { password?: string | null; rotateShareLink?: boolean },
-  ) => Promise<void>
-  onClose: () => void
-}) {
-  const [accessVersion, setAccessVersion] = useState('')
-  const [password, setPassword] = useState('')
-  useEffect(() => {
-    function closeOnEscape(event: KeyboardEvent) {
-      if (event.key === 'Escape') props.onClose()
-    }
-    window.addEventListener('keydown', closeOnEscape)
-    return () => window.removeEventListener('keydown', closeOnEscape)
-  }, [props.onClose])
-  const currentIndex = props.data.versions.findIndex(
-    (version) => version.current,
-  )
-  const previous =
-    currentIndex >= 0
-      ? props.data.versions
-          .slice(currentIndex + 1)
-          .find((version) => version.status === 'ready')
-      : undefined
-
-  const headingId = `version-history-${props.data.site.slug}`
-
-  return (
-    <div className="version-drawer-shell">
-      <button
-        type="button"
-        className="version-drawer-backdrop"
-        aria-label="Close version history"
-        onClick={props.onClose}
-      />
-      <section
-        className="version-drawer"
-        aria-labelledby={headingId}
-        tabIndex={-1}
-      >
-        <div className="version-heading">
-          <div>
-            <span>VERSION HISTORY</span>
-            <h3 id={headingId}>{props.data.site.slug}</h3>
-          </div>
-          <button type="button" onClick={props.onClose}>
-            Close
-          </button>
-        </div>
-        {previous ? (
-          <button
-            type="button"
-            className="button button-ink version-rollback"
-            disabled={Boolean(props.busy)}
-            onClick={() => props.onActivate(previous.id)}
-          >
-            Roll back to previous
-          </button>
-        ) : null}
-        <div className="version-list">
-          {props.data.versions.length === 0 ? (
-            <p className="version-empty">
-              No versions remain. Deploy new files to bring this site back
-              online.
-            </p>
-          ) : null}
-          {props.data.versions.map((version, index) => (
-            <Fragment key={version.id}>
-              <div
-                className={`version-row ${version.current ? 'is-current' : ''}`}
-              >
-                <span className="version-number">
-                  v{props.data.versions.length - index}
-                </span>
-                <span className="version-details">
-                  <b>{version.id.slice(0, 8)}</b>
-                  <small>
-                    {version.source} · {timeAgo(version.createdAt)}
-                    {' · '}
-                    {version.spaFallback ? 'SPA' : 'static'} ·{' '}
-                    {version.protected ? 'private' : 'public'}
-                    {version.channel ? ` · ${version.channel} channel` : ''}
-                  </small>
-                </span>
-                <span className="version-size">
-                  {version.fileCount} files · {formatBytes(version.totalBytes)}
-                </span>
-                <span
-                  className={`state-pill ${version.status === 'ready' ? 'live' : 'blocked'}`}
-                >
-                  {version.current ? 'live' : version.status}
-                </span>
-                <span className="version-actions">
-                  {version.previewUrl ? (
-                    <a
-                      href={version.previewUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      Preview ↗
-                    </a>
-                  ) : null}
-                  {version.shareUrl ? (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        navigator.clipboard.writeText(version.shareUrl!)
-                      }
-                    >
-                      Copy share link
-                    </button>
-                  ) : null}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setAccessVersion(
-                        accessVersion === version.id ? '' : version.id,
-                      )
-                      setPassword('')
-                    }}
-                  >
-                    {version.protected ? 'Access' : 'Protect'}
-                  </button>
-                  {!version.current && version.status === 'ready' ? (
-                    <button
-                      type="button"
-                      disabled={Boolean(props.busy)}
-                      onClick={() => props.onActivate(version.id)}
-                    >
-                      {props.busy === version.id ? 'Switching…' : 'Make live'}
-                    </button>
-                  ) : null}
-                  <button
-                    type="button"
-                    className="danger-link"
-                    disabled={Boolean(props.busy)}
-                    onClick={() => props.onDelete(version.id)}
-                  >
-                    {props.busy === `delete-${version.id}`
-                      ? 'Deleting…'
-                      : 'Delete'}
-                  </button>
-                </span>
-              </div>
-              {accessVersion === version.id ? (
-                <form
-                  className="version-access-editor"
-                  onSubmit={(event) => {
-                    event.preventDefault()
-                    if (password.length < 8) return
-                    void props
-                      .onAccess(version.id, { password })
-                      .then(() => {
-                        setPassword('')
-                        setAccessVersion('')
-                      })
-                      .catch(() => undefined)
-                  }}
-                >
-                  <div>
-                    <b>
-                      {version.protected
-                        ? 'Change password'
-                        : 'Password protect this version'}
-                    </b>
-                    <small>
-                      Share links bypass the password without requiring an
-                      account.
-                    </small>
-                  </div>
-                  <label>
-                    <span className="sr-only">Deployment password</span>
-                    <input
-                      name="version-password"
-                      type="password"
-                      value={password}
-                      onChange={(event) => setPassword(event.target.value)}
-                      placeholder="At least 8 characters…"
-                      minLength={8}
-                      maxLength={128}
-                      autoComplete="new-password"
-                    />
-                  </label>
-                  <button
-                    type="submit"
-                    className="button button-coral"
-                    disabled={password.length < 8 || Boolean(props.busy)}
-                  >
-                    Save password
-                  </button>
-                  {version.protected ? (
-                    <>
-                      <button
-                        type="button"
-                        disabled={Boolean(props.busy)}
-                        onClick={() => {
-                          if (!window.confirm('Make this version public?'))
-                            return
-                          void props.onAccess(version.id, { password: null })
-                        }}
-                      >
-                        Make public
-                      </button>
-                      <button
-                        type="button"
-                        disabled={Boolean(props.busy)}
-                        onClick={() => {
-                          if (
-                            !window.confirm(
-                              'Rotate this share link? The old link will stop working.',
-                            )
-                          )
-                            return
-                          void props.onAccess(version.id, {
-                            rotateShareLink: true,
-                          })
-                        }}
-                      >
-                        Rotate share link
-                      </button>
-                    </>
-                  ) : null}
-                </form>
-              ) : null}
-            </Fragment>
-          ))}
-        </div>
-        <p className="version-note">
-          Live aliases revalidate at the edge within about 10 seconds. Version
-          preview URLs never change.
-        </p>
-      </section>
-    </div>
-  )
-}
-
-function SiteAnalytics(props: { data: AnalyticsData; onClose: () => void }) {
-  useEffect(() => {
-    function closeOnEscape(event: KeyboardEvent) {
-      if (event.key === 'Escape') props.onClose()
-    }
-    window.addEventListener('keydown', closeOnEscape)
-    return () => window.removeEventListener('keydown', closeOnEscape)
-  }, [props.onClose])
-
-  const headingId = `site-analytics-${props.data.site.slug}`
-  const maxViews = Math.max(...props.data.daily.map((day) => day.views), 1)
-
-  return (
-    <div className="version-drawer-shell">
-      <button
-        type="button"
-        className="version-drawer-backdrop"
-        aria-label="Close analytics"
-        onClick={props.onClose}
-      />
-      <section
-        className="version-drawer analytics-drawer"
-        aria-labelledby={headingId}
-        tabIndex={-1}
-      >
-        <div className="version-heading">
-          <div>
-            <span>PRIVACY-FIRST ANALYTICS</span>
-            <h3 id={headingId}>{props.data.site.slug}</h3>
-          </div>
-          <button type="button" onClick={props.onClose}>
-            Close
-          </button>
-        </div>
-        <div className="analytics-summary">
-          <div className="analytics-stat">
-            <strong>{props.data.totalViews.toLocaleString()}</strong>
-            <span>page views</span>
-          </div>
-          <div className="analytics-stat">
-            <strong>{props.data.statuses.successful.toLocaleString()}</strong>
-            <span>successful</span>
-          </div>
-          <div className="analytics-stat">
-            <strong>{props.data.statuses.errors.toLocaleString()}</strong>
-            <span>errors</span>
-          </div>
-        </div>
-        <div className="analytics-grid">
-          <section aria-labelledby={`${headingId}-daily`}>
-            <div className="analytics-section-heading">
-              <h4 id={`${headingId}-daily`}>
-                Last {props.data.period.days} days
-              </h4>
-              <span>UTC</span>
-            </div>
-            <div className="analytics-list analytics-daily-list">
-              {props.data.daily.map((day) => (
-                <div className="analytics-row" key={day.date}>
-                  <time dateTime={day.date}>
-                    {new Date(`${day.date}T00:00:00Z`).toLocaleDateString(
-                      undefined,
-                      { month: 'short', day: 'numeric', timeZone: 'UTC' },
-                    )}
-                  </time>
-                  <span className="analytics-bar-track" aria-hidden="true">
-                    <i
-                      style={{
-                        width: `${Math.max((day.views / maxViews) * 100, day.views ? 3 : 0)}%`,
-                      }}
-                    />
-                  </span>
-                  <b>{day.views.toLocaleString()}</b>
-                </div>
-              ))}
-            </div>
-          </section>
-          <section aria-labelledby={`${headingId}-paths`}>
-            <div className="analytics-section-heading">
-              <h4 id={`${headingId}-paths`}>Top paths</h4>
-              <span>normalized</span>
-            </div>
-            <div className="analytics-list">
-              {props.data.topPaths.length ? (
-                props.data.topPaths.map((item) => (
-                  <div className="analytics-row analytics-path" key={item.path}>
-                    <code>{item.path}</code>
-                    <b>{item.views.toLocaleString()}</b>
-                  </div>
-                ))
-              ) : (
-                <p className="analytics-empty">
-                  No page views yet. Open the live site to start the chart.
-                </p>
-              )}
-            </div>
-          </section>
-        </div>
-        <p className="analytics-privacy">
-          No cookies or visitor profiles. Yeeet stores only daily aggregate
-          counts, normalized paths, and response status classes—not IPs, user
-          agents, referrers, or visitor IDs.
-        </p>
-      </section>
-    </div>
-  )
-}
-
-function DomainManager(props: {
-  site: { slug: string; customDomains: Array<CustomDomainData> }
-  busy: string
-  onAdd: (hostname: string) => Promise<void>
-  onRefresh: (id: string) => Promise<void>
-  onDelete: (domain: CustomDomainData) => void
-  onClose: () => void
-}) {
-  const [hostname, setHostname] = useState('')
-
-  return (
-    <div className="domain-drawer">
-      <div className="version-heading">
-        <div>
-          <span>CUSTOM DOMAINS</span>
-          <h3>{props.site.slug}</h3>
-        </div>
-        <button type="button" onClick={props.onClose}>
-          Close
-        </button>
-      </div>
-      <form
-        className="domain-add"
-        onSubmit={(event) => {
-          event.preventDefault()
-          if (!hostname.trim()) return
-          void props
-            .onAdd(hostname)
-            .then(() => setHostname(''))
-            .catch(() => undefined)
-        }}
-      >
-        <label>
-          <span>Hostname</span>
-          <input
-            name="custom-domain"
-            value={hostname}
-            onChange={(event) => setHostname(event.target.value)}
-            placeholder="e.g. docs.example.com…"
-            autoComplete="off"
-            spellCheck={false}
-          />
-        </label>
-        <button
-          type="submit"
-          className="button button-paper"
-          disabled={!hostname.trim() || Boolean(props.busy)}
-        >
-          {props.busy === 'add' ? 'Attaching…' : 'Attach domain'}
-        </button>
-      </form>
-      {props.site.customDomains.length ? (
-        <div className="domain-list">
-          {props.site.customDomains.map((domain) => (
-            <article key={domain.id} className="domain-card">
-              <div className="domain-card-heading">
-                <a href={domain.url} target="_blank" rel="noreferrer">
-                  {domain.hostname} ↗
-                </a>
-                <span
-                  className={`state-pill ${domain.certificateStatus === 'ISSUED' ? 'live' : 'admin'}`}
-                >
-                  TLS {domain.certificateStatus.toLowerCase()}
-                </span>
-              </div>
-              <p>
-                Add both the routing and ownership records at your DNS host.
-              </p>
-              <div className="dns-records">
-                {domain.dnsRecords.map((record) => (
-                  <code key={`${record.hostlabel}-${record.requiredValue}`}>
-                    <i>{record.status === 'VALID' ? '✓' : '→'}</i>{' '}
-                    {record.hostlabel} CNAME {record.requiredValue}
-                  </code>
-                ))}
-                {domain.verificationToken ? (
-                  <code>
-                    <i>→</i> {domain.verificationHost} TXT{' '}
-                    {domain.verificationToken}
-                  </code>
-                ) : null}
-              </div>
-              <div className="domain-actions">
-                <button
-                  type="button"
-                  disabled={Boolean(props.busy)}
-                  onClick={() => props.onRefresh(domain.id)}
-                >
-                  {props.busy === `refresh-${domain.id}`
-                    ? 'Checking…'
-                    : 'Refresh status'}
-                </button>
-                <button
-                  type="button"
-                  className="danger-link"
-                  disabled={Boolean(props.busy)}
-                  onClick={() => props.onDelete(domain)}
-                >
-                  Remove
-                </button>
-              </div>
-            </article>
-          ))}
-        </div>
-      ) : (
-        <p className="domain-empty">No custom domains attached yet.</p>
-      )}
-    </div>
-  )
 }
 
 function readFileEntry(entry: FileSystemFileEntryLike) {
@@ -722,13 +192,6 @@ function Dashboard() {
   const [resultShareUrl, setResultShareUrl] = useState('')
   const [newKey, setNewKey] = useState('')
   const [keyBusy, setKeyBusy] = useState(false)
-  const [history, setHistory] = useState<VersionHistoryData | null>(null)
-  const [historyLoading, setHistoryLoading] = useState('')
-  const [analytics, setAnalytics] = useState<AnalyticsData | null>(null)
-  const [analyticsLoading, setAnalyticsLoading] = useState('')
-  const [versionBusy, setVersionBusy] = useState('')
-  const [domainSiteSlug, setDomainSiteSlug] = useState('')
-  const [domainBusy, setDomainBusy] = useState('')
   const [siteBusy, setSiteBusy] = useState('')
   const [deleteTarget, setDeleteTarget] =
     useState<DashboardDeleteTarget | null>(null)
@@ -867,141 +330,6 @@ function Dashboard() {
     setNewKey(response.data.key)
   }
 
-  async function showVersions(siteSlug: string) {
-    setAnalytics(null)
-    setDomainSiteSlug('')
-    setHistoryLoading(siteSlug)
-    setError('')
-    try {
-      const response = await fetch(
-        `/api/v1/sites/${encodeURIComponent(siteSlug)}/versions`,
-      )
-      const body = await response.json()
-      if (!response.ok)
-        throw new Error(body.error?.message || 'Could not load versions.')
-      setHistory(body)
-    } catch (historyError) {
-      setError(
-        historyError instanceof Error
-          ? historyError.message
-          : 'Could not load versions.',
-      )
-    } finally {
-      setHistoryLoading('')
-    }
-  }
-
-  async function showAnalytics(siteSlug: string) {
-    setAnalyticsLoading(siteSlug)
-    setError('')
-    setHistory(null)
-    setDomainSiteSlug('')
-    try {
-      const response = await fetch(
-        `/api/v1/sites/${encodeURIComponent(siteSlug)}/analytics?days=30`,
-      )
-      const body = await response.json()
-      if (!response.ok)
-        throw new Error(body.error?.message || 'Could not load analytics.')
-      setAnalytics(body)
-    } catch (analyticsError) {
-      setError(
-        analyticsError instanceof Error
-          ? analyticsError.message
-          : 'Could not load analytics.',
-      )
-    } finally {
-      setAnalyticsLoading('')
-    }
-  }
-
-  async function activateVersion(deploymentId: string) {
-    if (!history) return
-    if (
-      !window.confirm(
-        `Make version ${deploymentId.slice(0, 8)} live on ${history.site.slug}?`,
-      )
-    )
-      return
-    setVersionBusy(deploymentId)
-    setError('')
-    try {
-      const response = await fetch(
-        `/api/v1/sites/${encodeURIComponent(history.site.slug)}/versions/${deploymentId}/activate`,
-        { method: 'POST' },
-      )
-      const body = await response.json()
-      if (!response.ok)
-        throw new Error(body.error?.message || 'Could not activate version.')
-      await Promise.all([showVersions(history.site.slug), router.invalidate()])
-    } catch (activateError) {
-      setError(
-        activateError instanceof Error
-          ? activateError.message
-          : 'Could not activate version.',
-      )
-    } finally {
-      setVersionBusy('')
-    }
-  }
-
-  async function updateVersionAccess(
-    deploymentId: string,
-    input: { password?: string | null; rotateShareLink?: boolean },
-  ) {
-    if (!history) return
-    setVersionBusy(`access-${deploymentId}`)
-    setError('')
-    try {
-      const response = await fetch(
-        `/api/v1/sites/${encodeURIComponent(history.site.slug)}/versions/${deploymentId}/access`,
-        {
-          method: 'PATCH',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify(input),
-        },
-      )
-      const body = await response.json()
-      if (!response.ok)
-        throw new Error(body.error?.message || 'Could not update access.')
-      await Promise.all([showVersions(history.site.slug), router.invalidate()])
-    } catch (accessError) {
-      setError(
-        accessError instanceof Error
-          ? accessError.message
-          : 'Could not update access.',
-      )
-      throw accessError
-    } finally {
-      setVersionBusy('')
-    }
-  }
-
-  async function deleteVersion(deploymentId: string) {
-    if (!history) return
-    setVersionBusy(`delete-${deploymentId}`)
-    setError('')
-    try {
-      const response = await fetch(
-        `/api/v1/sites/${encodeURIComponent(history.site.slug)}/versions/${deploymentId}`,
-        { method: 'DELETE' },
-      )
-      const body = await response.json()
-      if (!response.ok)
-        throw new Error(body.error?.message || 'Could not delete version.')
-      await Promise.all([showVersions(history.site.slug), router.invalidate()])
-    } catch (deleteError) {
-      setError(
-        deleteError instanceof Error
-          ? deleteError.message
-          : 'Could not delete version.',
-      )
-      throw deleteError
-    } finally {
-      setVersionBusy('')
-    }
-  }
-
   async function deleteSite(siteSlug: string) {
     setSiteBusy(siteSlug)
     setError('')
@@ -1013,8 +341,6 @@ function Dashboard() {
       const body = await response.json()
       if (!response.ok)
         throw new Error(body.error?.message || 'Could not delete site.')
-      if (history?.site.slug === siteSlug) setHistory(null)
-      if (domainSiteSlug === siteSlug) setDomainSiteSlug('')
       await router.invalidate()
     } catch (deleteError) {
       setError(
@@ -1028,59 +354,19 @@ function Dashboard() {
     }
   }
 
-  async function domainRequest(
-    key: string,
-    path: string,
-    init: RequestInit = {},
-  ) {
-    setDomainBusy(key)
-    setError('')
-    try {
-      const response = await fetch(path, init)
-      const body = await response.json()
-      if (!response.ok)
-        throw new Error(body.error?.message || 'Custom-domain action failed.')
-      await router.invalidate()
-    } catch (domainError) {
-      setError(
-        domainError instanceof Error
-          ? domainError.message
-          : 'Custom-domain action failed.',
-      )
-      throw domainError
-    } finally {
-      setDomainBusy('')
-    }
-  }
-
   async function confirmDelete() {
     const target = deleteTarget
     if (!target) return
     try {
-      if (target.kind === 'version') {
-        await deleteVersion(target.deploymentId)
-      } else if (target.kind === 'site') {
-        await deleteSite(target.siteSlug)
-      } else {
-        await domainRequest(
-          `delete-${target.domain.id}`,
-          `/api/v1/sites/${encodeURIComponent(target.siteSlug)}/domains/${target.domain.id}`,
-          { method: 'DELETE' },
-        )
-      }
+      await deleteSite(target.siteSlug)
       setDeleteTarget(null)
     } catch {
       // The request helpers surface the error in the dashboard alert.
     }
   }
 
-  const domainSite = data.sites.find((site) => site.slug === domainSiteSlug)
   const deleteDialogBusy = deleteTarget
-    ? deleteTarget.kind === 'version'
-      ? versionBusy === `delete-${deleteTarget.deploymentId}`
-      : deleteTarget.kind === 'site'
-        ? siteBusy === deleteTarget.siteSlug
-        : domainBusy === `delete-${deleteTarget.domain.id}`
+    ? siteBusy === deleteTarget.siteSlug
     : false
   const mascotSeed = slug || files.at(0)?.path || 'launchpad'
   const mascot = getYeeetlingDesign(mascotSeed)
@@ -1110,39 +396,7 @@ function Dashboard() {
       <a className="skip-link" href="#main-content">
         Skip to content
       </a>
-      <header className="dashboard-header">
-        <Brand />
-        <nav>
-          <Link to="/mascot" className="mascot-lab-link">
-            Yeeetlings
-          </Link>
-          <a href={data.platform.docsUrl} className="agent-docs-link">
-            Docs
-          </a>
-          {(user as { role?: string }).role?.split(',').includes('admin') ? (
-            <Link to="/admin">Admin</Link>
-          ) : null}
-          <span className="user-chip">
-            <span>
-              {user.image ? (
-                <img src={user.image} alt="" width="30" height="30" />
-              ) : (
-                user.name.slice(0, 1).toUpperCase()
-              )}
-            </span>
-            {user.name}
-          </span>
-          <button
-            type="button"
-            onClick={async () => {
-              await authClient.signOut()
-              window.location.assign('/')
-            }}
-          >
-            Sign out
-          </button>
-        </nav>
-      </header>
+      <DashboardHeader user={user} docsUrl={data.platform.docsUrl} />
 
       <main className="dashboard-main" id="main-content">
         <section className="dashboard-intro">
@@ -1255,6 +509,11 @@ function Dashboard() {
           </div>
 
           <div className="deploy-controls">
+            <div className="deploy-controls-heading">
+              <span>Launch settings</span>
+              <h2>Choose the destination</h2>
+              <p>Name the site, pick its routing, and send it to the edge.</p>
+            </div>
             <label>
               <span>Site address</span>
               <div className="slug-input">
@@ -1431,12 +690,16 @@ function Dashboard() {
                         label={`${getYeeetlingDesign(site.slug).name}, ${site.slug}’s Yeeetling`}
                       />
                     </span>
-                    <span className="site-name">
+                    <Link
+                      className="site-name"
+                      to="/dashboard/sites/$slug"
+                      params={{ slug: site.slug }}
+                    >
                       <b>{site.slug}</b>
                       <small>
                         {site.slug}.{data.platform.siteDomain}
                       </small>
-                    </span>
+                    </Link>
                     <span className="site-meta">
                       <b>{site.fileCount ?? 0} files</b>
                       <small>
@@ -1449,38 +712,33 @@ function Dashboard() {
                       <i /> {timeAgo(site.updatedAt)}
                     </span>
                     <span className="site-row-actions">
-                      <button
-                        type="button"
-                        onClick={() => showAnalytics(site.slug)}
+                      <Link
+                        to="/dashboard/sites/$slug/analytics"
+                        params={{ slug: site.slug }}
                       >
-                        {analyticsLoading === site.slug ? '…' : 'Analytics'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setAnalytics(null)
-                          setHistory(null)
-                          setDomainSiteSlug(site.slug)
-                        }}
+                        Analytics
+                      </Link>
+                      <Link
+                        to="/dashboard/sites/$slug/domains"
+                        params={{ slug: site.slug }}
                       >
                         Domains
                         {site.customDomains.length
                           ? ` (${site.customDomains.length})`
                           : ''}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => showVersions(site.slug)}
+                      </Link>
+                      <Link
+                        to="/dashboard/sites/$slug/versions"
+                        params={{ slug: site.slug }}
                       >
-                        {historyLoading === site.slug ? '…' : 'Versions'}
-                      </button>
+                        Versions
+                      </Link>
                       <button
                         type="button"
                         className="danger-link"
                         disabled={siteBusy === site.slug}
                         onClick={() =>
                           setDeleteTarget({
-                            kind: 'site',
                             siteSlug: site.slug,
                             title: `Delete ${site.slug}?`,
                             description:
@@ -1507,72 +765,6 @@ function Dashboard() {
             ) : (
               <div className="empty-state">Your first site will land here.</div>
             )}
-            {history ? (
-              <VersionHistory
-                data={history}
-                busy={versionBusy}
-                onActivate={activateVersion}
-                onDelete={(deploymentId) => {
-                  const version = history.versions.find(
-                    (item) => item.id === deploymentId,
-                  )
-                  setDeleteTarget({
-                    kind: 'version',
-                    deploymentId,
-                    title: `Delete version ${deploymentId.slice(0, 8)}?`,
-                    description: version?.current
-                      ? 'This is the live version. The newest remaining ready version will become live automatically.'
-                      : 'This immutable version and every stored file belonging to it will be permanently removed.',
-                    confirmLabel: version?.current
-                      ? 'Delete live version'
-                      : 'Delete version',
-                  })
-                }}
-                onAccess={updateVersionAccess}
-                onClose={() => setHistory(null)}
-              />
-            ) : null}
-            {analytics ? (
-              <SiteAnalytics
-                data={analytics}
-                onClose={() => setAnalytics(null)}
-              />
-            ) : null}
-            {domainSite ? (
-              <DomainManager
-                site={domainSite}
-                busy={domainBusy}
-                onClose={() => setDomainSiteSlug('')}
-                onAdd={(hostname) =>
-                  domainRequest(
-                    'add',
-                    `/api/v1/sites/${encodeURIComponent(domainSite.slug)}/domains`,
-                    {
-                      method: 'POST',
-                      headers: { 'content-type': 'application/json' },
-                      body: JSON.stringify({ domain: hostname }),
-                    },
-                  )
-                }
-                onRefresh={(id) =>
-                  domainRequest(
-                    `refresh-${id}`,
-                    `/api/v1/sites/${encodeURIComponent(domainSite.slug)}/domains/${id}/refresh`,
-                    { method: 'POST' },
-                  )
-                }
-                onDelete={(domain) =>
-                  setDeleteTarget({
-                    kind: 'domain',
-                    siteSlug: domainSite.slug,
-                    domain,
-                    title: `Remove ${domain.hostname}?`,
-                    description: `Managed TLS and routing to ${domainSite.slug} will stop. The site and its versions will stay intact.`,
-                    confirmLabel: 'Remove domain',
-                  })
-                }
-              />
-            ) : null}
           </div>
 
           <aside className="agent-panel panel">
