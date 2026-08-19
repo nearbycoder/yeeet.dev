@@ -756,7 +756,15 @@ function Dashboard() {
                         className="site-open"
                         aria-label={`Open ${site.slug} in a new tab`}
                       >
-                        ↗
+                        <svg
+                          aria-hidden="true"
+                          width="18"
+                          height="18"
+                          viewBox="0 0 18 18"
+                          fill="none"
+                        >
+                          <path d="M5 13 13 5M7 5h6v6" />
+                        </svg>
                       </a>
                     </span>
                   </div>
