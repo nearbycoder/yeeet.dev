@@ -11,7 +11,7 @@ import fg from 'fast-glob'
 import mime from 'mime-types'
 import open from 'open'
 
-const VERSION = '0.0.1'
+const VERSION = '0.0.2'
 const CLIENT_ID = 'yeeet-cli'
 const DEFAULT_API = 'https://yeeet.dev'
 const GRANT_TYPE = 'urn:ietf:params:oauth:grant-type:device_code'
