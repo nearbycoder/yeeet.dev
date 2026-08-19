@@ -1,6 +1,6 @@
 {
   "name": "@yeeet.dev/cli",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Yeeet static sites at terminal velocity.",
   "type": "module",
   "license": "MIT",
