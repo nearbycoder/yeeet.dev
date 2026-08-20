@@ -70,19 +70,19 @@
   "devDependencies": {
     "@tanstack/devtools-vite": "latest",
     "@tanstack/eslint-config": "latest",
-    "@tanstack/router-cli": "^1.132.0",
+    "@tanstack/router-cli": "^1.167.30",
     "@types/mime-types": "^3.0.1",
-    "@types/node": "^22.10.2",
+    "@types/node": "^26.2.0",
     "@types/pg": "^8.15.6",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^6.0.1",
     "dotenv": "^17.3.1",
     "drizzle-kit": "^0.31.9",
-    "eslint": "^9.20.0",
+    "eslint": "^10.8.1",
     "prettier": "^3.8.1",
     "tsx": "^4.21.0",
-    "typescript": "^6.0.2",
+    "typescript": "^7.0.2",
     "vite": "^8.0.0"
   },
   "pnpm": {
