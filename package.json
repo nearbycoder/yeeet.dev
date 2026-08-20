@@ -44,9 +44,9 @@
     "test": "node --import tsx --test tests/**/*.test.ts"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.1109.0",
-    "@aws-sdk/s3-request-presigner": "^3.1109.0",
-    "@better-auth/api-key": "^1.6.27",
+    "@aws-sdk/client-s3": "^3.1111.0",
+    "@aws-sdk/s3-request-presigner": "^3.1111.0",
+    "@better-auth/api-key": "^1.6.29",
     "@expo-google-fonts/open-sans": "^0.4.2",
     "@resvg/resvg-js": "^2.6.2",
     "@tanstack/react-devtools": "latest",
