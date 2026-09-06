@@ -17,6 +17,7 @@ import { Route as HealthRouteImport } from './routes/health'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as MascotRouteImport } from './routes/mascot'
 import { Route as DashboardSettingsRouteImport } from './routes/dashboard_/settings'
+import { Route as DashboardWorkspacesRouteImport } from './routes/dashboard_/workspaces'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ApiV1MeRouteImport } from './routes/api/v1/me'
 import { Route as ApiV1SitesRouteImport } from './routes/api/v1/sites'
@@ -92,6 +93,11 @@ const MascotRoute = MascotRouteImport.update({
 const DashboardSettingsRoute = DashboardSettingsRouteImport.update({
   id: '/dashboard_/settings',
   path: '/dashboard/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DashboardWorkspacesRoute = DashboardWorkspacesRouteImport.update({
+  id: '/dashboard_/workspaces',
+  path: '/dashboard/workspaces',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
@@ -305,6 +311,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/mascot': typeof MascotRoute
   '/dashboard/settings': typeof DashboardSettingsRoute
+  '/dashboard/workspaces': typeof DashboardWorkspacesRoute
   '/dashboard/sites/$slug': typeof DashboardSitesSlugRouteRouteWithChildren
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/v1/me': typeof ApiV1MeRoute
@@ -351,6 +358,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/mascot': typeof MascotRoute
   '/dashboard/settings': typeof DashboardSettingsRoute
+  '/dashboard/workspaces': typeof DashboardWorkspacesRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/v1/me': typeof ApiV1MeRoute
   '/api/v1/sites': typeof ApiV1SitesRouteWithChildren
@@ -397,6 +405,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/mascot': typeof MascotRoute
   '/dashboard_/settings': typeof DashboardSettingsRoute
+  '/dashboard_/workspaces': typeof DashboardWorkspacesRoute
   '/dashboard_/sites/$slug': typeof DashboardSitesSlugRouteRouteWithChildren
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/v1/me': typeof ApiV1MeRoute
@@ -445,6 +454,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/mascot'
     | '/dashboard/settings'
+    | '/dashboard/workspaces'
     | '/dashboard/sites/$slug'
     | '/api/auth/$'
     | '/api/v1/me'
@@ -491,6 +501,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/mascot'
     | '/dashboard/settings'
+    | '/dashboard/workspaces'
     | '/api/auth/$'
     | '/api/v1/me'
     | '/api/v1/sites'
@@ -536,6 +547,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/mascot'
     | '/dashboard_/settings'
+    | '/dashboard_/workspaces'
     | '/dashboard_/sites/$slug'
     | '/api/auth/$'
     | '/api/v1/me'
@@ -583,6 +595,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   MascotRoute: typeof MascotRoute
   DashboardSettingsRoute: typeof DashboardSettingsRoute
+  DashboardWorkspacesRoute: typeof DashboardWorkspacesRoute
   DashboardSitesSlugRouteRoute: typeof DashboardSitesSlugRouteRouteWithChildren
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiV1MeRoute: typeof ApiV1MeRoute
@@ -656,6 +669,13 @@ declare module '@tanstack/react-router' {
       path: '/dashboard/settings'
       fullPath: '/dashboard/settings'
       preLoaderRoute: typeof DashboardSettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dashboard_/workspaces': {
+      id: '/dashboard_/workspaces'
+      path: '/dashboard/workspaces'
+      fullPath: '/dashboard/workspaces'
+      preLoaderRoute: typeof DashboardWorkspacesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/auth/$': {
@@ -1060,6 +1080,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   MascotRoute: MascotRoute,
   DashboardSettingsRoute: DashboardSettingsRoute,
+  DashboardWorkspacesRoute: DashboardWorkspacesRoute,
   DashboardSitesSlugRouteRoute: DashboardSitesSlugRouteRouteWithChildren,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiV1MeRoute: ApiV1MeRoute,

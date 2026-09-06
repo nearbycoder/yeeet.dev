@@ -29,6 +29,12 @@ export function DashboardHeader({
         >
           Dashboard
         </Link>
+        <Link
+          to="/dashboard/workspaces"
+          activeProps={{ 'aria-current': 'page' }}
+        >
+          Workspaces
+        </Link>
         <Link to="/mascot" className="mascot-lab-link">
           Yeeetlings
         </Link>

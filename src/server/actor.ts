@@ -5,6 +5,7 @@ import { eq } from 'drizzle-orm'
 import { HttpError } from './http'
 
 export type Actor = {
+  actingUserId?: string
   userId: string
   email?: string
   name?: string
