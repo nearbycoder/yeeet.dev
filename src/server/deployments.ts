@@ -1,3 +1,7 @@
+import {
+  actorForWorkspaceSite,
+  actorForWorkspaceDeployment,
+} from './workspaces'
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { and, desc, eq, inArray } from 'drizzle-orm'
 import { db } from '#/db'
@@ -342,6 +346,10 @@ export async function planDeployment(input: {
   files: Array<ManifestFile>
   channel?: string
 }) {
+  input = {
+    ...input,
+    actor: await actorForWorkspaceSite(input.actor, input.slug),
+  }
   const manifest = validateManifest(input.files)
   const channel = input.channel ? normalizeChannelName(input.channel) : null
   const slug = input.slug?.trim() ? normalizeSlug(input.slug) : null
@@ -454,6 +462,10 @@ export async function createDeployment(input: {
   channel?: string
   idempotencyKey?: string
 }) {
+  input = {
+    ...input,
+    actor: await actorForWorkspaceSite(input.actor, input.slug),
+  }
   const manifest = validateManifest(input.files)
   const channel = input.channel ? normalizeChannelName(input.channel) : null
   const requestedSlug = input.slug?.trim()
@@ -462,7 +474,11 @@ export async function createDeployment(input: {
   const password = input.password
     ? validateDeploymentPassword(input.password)
     : null
-  const idempotencyKey = normalizeIdempotencyKey(input.idempotencyKey)
+  const rawIdempotencyKey = normalizeIdempotencyKey(input.idempotencyKey)
+  const idempotencyKey =
+    rawIdempotencyKey && input.actor.actingUserId
+      ? `${input.actor.actingUserId}:${rawIdempotencyKey}`
+      : rawIdempotencyKey
   const fingerprint = requestFingerprint({
     slug: requestedSlug,
     channel,
@@ -530,6 +546,9 @@ export async function createDeployment(input: {
           and(
             eq(deployments.userId, input.actor.userId),
             eq(deployments.status, 'ready'),
+            input.actor.actingUserId
+              ? eq(deployments.siteId, siteId)
+              : undefined,
             inArray(deploymentFiles.checksum, checksums),
           ),
         )
@@ -667,6 +686,7 @@ export async function createDeployment(input: {
 }
 
 export async function completeDeployment(actor: Actor, deploymentId: string) {
+  actor = await actorForWorkspaceDeployment(actor, deploymentId)
   const deployment = await db.query.deployments.findFirst({
     where: and(
       eq(deployments.id, deploymentId),

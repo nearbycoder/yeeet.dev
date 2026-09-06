@@ -390,3 +390,77 @@ export const sitePreferences = pgTable(
     ),
   ],
 )
+
+export const workspaces = pgTable(
+  'workspaces',
+  {
+    id: text('id').primaryKey(),
+    ownerId: text('owner_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  (table) => [index('workspaces_owner_idx').on(table.ownerId)],
+)
+export const workspaceMembers = pgTable(
+  'workspace_members',
+  {
+    id: text('id').primaryKey(),
+    workspaceId: text('workspace_id')
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    role: text('role').notNull(),
+  },
+  (table) => [
+    uniqueIndex('workspace_members_unique_idx').on(
+      table.workspaceId,
+      table.userId,
+    ),
+    index('workspace_members_user_idx').on(table.userId),
+  ],
+)
+export const workspaceSites = pgTable(
+  'workspace_sites',
+  {
+    id: text('id').primaryKey(),
+    workspaceId: text('workspace_id')
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    siteId: text('site_id')
+      .notNull()
+      .references(() => sites.id, { onDelete: 'cascade' }),
+  },
+  (table) => [
+    uniqueIndex('workspace_sites_site_idx').on(table.siteId),
+    index('workspace_sites_workspace_idx').on(table.workspaceId),
+  ],
+)
+export const deploymentFeedback = pgTable(
+  'deployment_feedback',
+  {
+    id: text('id').primaryKey(),
+    workspaceId: text('workspace_id')
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    deploymentId: text('deployment_id')
+      .notNull()
+      .references(() => deployments.id, { onDelete: 'cascade' }),
+    authorId: text('author_id').references(() => user.id, {
+      onDelete: 'set null',
+    }),
+    body: text('body').notNull(),
+    path: text('path').default('/').notNull(),
+    resolved: boolean('resolved').default(false).notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  (table) => [
+    index('deployment_feedback_version_idx').on(
+      table.workspaceId,
+      table.deploymentId,
+    ),
+  ],
+)

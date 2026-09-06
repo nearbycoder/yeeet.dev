@@ -168,3 +168,24 @@ export const updateSiteOrganization = createServerFn({ method: 'POST' })
     const actor = await requireActor(getRequest())
     return saveSiteOrganization(actor.userId, data)
   })
+
+export const getWorkspaceConsole = createServerFn({ method: 'GET' })
+  .validator(
+    (data: { workspace?: string; site?: string; version?: string }) => data,
+  )
+  .handler(async ({ data }) => {
+    const actor = await requireActor(getRequest())
+    const { workspaceConsole } = await import('./workspaces')
+    return {
+      ...(await workspaceConsole(actor.userId, data)),
+      platform: publicPlatformConfig(),
+      userId: actor.userId,
+    }
+  })
+export const updateWorkspace = createServerFn({ method: 'POST' })
+  .validator((data: unknown) => data)
+  .handler(async ({ data }) => {
+    const actor = await requireActor(getRequest())
+    const { mutateWorkspace } = await import('./workspaces')
+    return mutateWorkspace(actor.userId, data)
+  })

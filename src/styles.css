@@ -4504,6 +4504,8 @@ summary:focus-visible {
   font-size: 13px;
   font-weight: 700;
 }
+.console-field input,
+.console-field select,
 .console-form-grid input,
 .console-form-grid select,
 .console-form-grid textarea,
@@ -4633,4 +4635,24 @@ summary:focus-visible {
   min-height: 36px;
   gap: 8px;
   font-size: 13px;
+}
+
+.feedback-body {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.console-field {
+  display: grid;
+  gap: 0.5rem;
+  margin-block: 1rem;
+}
+.site-page-stack textarea {
+  width: 100%;
+  padding: 0.8rem;
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font: inherit;
+  resize: vertical;
 }

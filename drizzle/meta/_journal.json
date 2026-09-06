@@ -78,6 +78,13 @@
       "when": 1788736159893,
       "tag": "0010_lyrical_hex",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1788736564790,
+      "tag": "0011_old_pet_avengers",
+      "breakpoints": true
     }
   ]
 }
