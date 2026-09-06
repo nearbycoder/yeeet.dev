@@ -492,3 +492,51 @@ export function startWebhookWorker() {
   }, 15_000)
   timer.unref()
 }
+
+export async function retryWebhookDelivery(userId: string, id: string) {
+  const delivery = await db.query.webhookDeliveries.findFirst({
+    where: and(
+      eq(webhookDeliveries.id, id),
+      eq(webhookDeliveries.userId, userId),
+    ),
+  })
+  if (!delivery) throw new HttpError(404, 'Delivery not found.', 'not_found')
+  const endpoint = await db.query.webhookEndpoints.findFirst({
+    where: and(
+      eq(webhookEndpoints.id, delivery.endpointId),
+      eq(webhookEndpoints.userId, userId),
+      eq(webhookEndpoints.active, true),
+    ),
+  })
+  if (!endpoint)
+    throw new HttpError(
+      409,
+      'Enable the webhook before retrying.',
+      'webhook_disabled',
+    )
+  const rows = await db
+    .update(webhookDeliveries)
+    .set({
+      status: 'pending',
+      attempts: 0,
+      error: null,
+      responseStatus: null,
+      nextAttemptAt: new Date(),
+      deliveredAt: null,
+    })
+    .where(
+      and(
+        eq(webhookDeliveries.id, id),
+        eq(webhookDeliveries.userId, userId),
+        eq(webhookDeliveries.status, 'failed'),
+      ),
+    )
+    .returning({ id: webhookDeliveries.id })
+  if (!rows.length)
+    throw new HttpError(
+      409,
+      'Only failed deliveries can be retried.',
+      'delivery_not_failed',
+    )
+  return { id, status: 'pending' }
+}

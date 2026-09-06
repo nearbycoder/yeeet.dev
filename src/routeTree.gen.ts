@@ -16,6 +16,7 @@ import { Route as DeviceRouteImport } from './routes/device'
 import { Route as HealthRouteImport } from './routes/health'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as MascotRouteImport } from './routes/mascot'
+import { Route as DashboardSettingsRouteImport } from './routes/dashboard_/settings'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ApiV1MeRouteImport } from './routes/api/v1/me'
 import { Route as ApiV1SitesRouteImport } from './routes/api/v1/sites'
@@ -47,6 +48,7 @@ import { Route as ApiV1AdminUsersUserIdUnbanRouteImport } from './routes/api/v1/
 import { Route as ApiV1SitesSlugChannelsChannelRouteImport } from './routes/api/v1/sites/$slug/channels/$channel'
 import { Route as ApiV1SitesSlugDomainsIndexRouteImport } from './routes/api/v1/sites/$slug/domains/index'
 import { Route as ApiV1SitesSlugVersionsDeploymentIdRouteImport } from './routes/api/v1/sites/$slug/versions/$deploymentId'
+import { Route as ApiV1WebhooksDeliveriesDeliveryIdRetryRouteImport } from './routes/api/v1/webhooks/deliveries/$deliveryId/retry'
 import { Route as ApiV1SitesSlugDomainsDomainIdIndexRouteImport } from './routes/api/v1/sites/$slug/domains/$domainId/index'
 import { Route as ApiV1SitesSlugDomainsDomainIdRefreshRouteImport } from './routes/api/v1/sites/$slug/domains/$domainId/refresh'
 import { Route as ApiV1SitesSlugVersionsDeploymentIdAccessRouteImport } from './routes/api/v1/sites/$slug/versions/$deploymentId/access'
@@ -85,6 +87,11 @@ const LoginRoute = LoginRouteImport.update({
 const MascotRoute = MascotRouteImport.update({
   id: '/mascot',
   path: '/mascot',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DashboardSettingsRoute = DashboardSettingsRouteImport.update({
+  id: '/dashboard_/settings',
+  path: '/dashboard/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
@@ -258,6 +265,12 @@ const ApiV1SitesSlugVersionsDeploymentIdRoute =
     path: '/$deploymentId',
     getParentRoute: () => ApiV1SitesSlugVersionsRoute,
   } as any)
+const ApiV1WebhooksDeliveriesDeliveryIdRetryRoute =
+  ApiV1WebhooksDeliveriesDeliveryIdRetryRouteImport.update({
+    id: '/$deliveryId/retry',
+    path: '/$deliveryId/retry',
+    getParentRoute: () => ApiV1WebhooksDeliveriesRoute,
+  } as any)
 const ApiV1SitesSlugDomainsDomainIdIndexRoute =
   ApiV1SitesSlugDomainsDomainIdIndexRouteImport.update({
     id: '/domains/$domainId/',
@@ -291,6 +304,7 @@ export interface FileRoutesByFullPath {
   '/health': typeof HealthRoute
   '/login': typeof LoginRoute
   '/mascot': typeof MascotRoute
+  '/dashboard/settings': typeof DashboardSettingsRoute
   '/dashboard/sites/$slug': typeof DashboardSitesSlugRouteRouteWithChildren
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/v1/me': typeof ApiV1MeRoute
@@ -299,7 +313,7 @@ export interface FileRoutesByFullPath {
   '/api/v1/invitations/authorize': typeof ApiV1InvitationsAuthorizeRoute
   '/api/v1/sites/$slug': typeof ApiV1SitesSlugRouteWithChildren
   '/api/v1/webhooks/$webhookId': typeof ApiV1WebhooksWebhookIdRoute
-  '/api/v1/webhooks/deliveries': typeof ApiV1WebhooksDeliveriesRoute
+  '/api/v1/webhooks/deliveries': typeof ApiV1WebhooksDeliveriesRouteWithChildren
   '/dashboard/sites/$slug/analytics': typeof DashboardSitesSlugAnalyticsRoute
   '/dashboard/sites/$slug/channels': typeof DashboardSitesSlugChannelsRoute
   '/dashboard/sites/$slug/domains': typeof DashboardSitesSlugDomainsRoute
@@ -321,6 +335,7 @@ export interface FileRoutesByFullPath {
   '/api/v1/admin/users/$userId/unban': typeof ApiV1AdminUsersUserIdUnbanRoute
   '/api/v1/sites/$slug/channels/$channel': typeof ApiV1SitesSlugChannelsChannelRoute
   '/api/v1/sites/$slug/versions/$deploymentId': typeof ApiV1SitesSlugVersionsDeploymentIdRouteWithChildren
+  '/api/v1/webhooks/deliveries/$deliveryId/retry': typeof ApiV1WebhooksDeliveriesDeliveryIdRetryRoute
   '/api/v1/sites/$slug/domains/': typeof ApiV1SitesSlugDomainsIndexRoute
   '/api/v1/sites/$slug/domains/$domainId/refresh': typeof ApiV1SitesSlugDomainsDomainIdRefreshRoute
   '/api/v1/sites/$slug/versions/$deploymentId/access': typeof ApiV1SitesSlugVersionsDeploymentIdAccessRoute
@@ -335,6 +350,7 @@ export interface FileRoutesByTo {
   '/health': typeof HealthRoute
   '/login': typeof LoginRoute
   '/mascot': typeof MascotRoute
+  '/dashboard/settings': typeof DashboardSettingsRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/v1/me': typeof ApiV1MeRoute
   '/api/v1/sites': typeof ApiV1SitesRouteWithChildren
@@ -342,7 +358,7 @@ export interface FileRoutesByTo {
   '/api/v1/invitations/authorize': typeof ApiV1InvitationsAuthorizeRoute
   '/api/v1/sites/$slug': typeof ApiV1SitesSlugRouteWithChildren
   '/api/v1/webhooks/$webhookId': typeof ApiV1WebhooksWebhookIdRoute
-  '/api/v1/webhooks/deliveries': typeof ApiV1WebhooksDeliveriesRoute
+  '/api/v1/webhooks/deliveries': typeof ApiV1WebhooksDeliveriesRouteWithChildren
   '/dashboard/sites/$slug/analytics': typeof DashboardSitesSlugAnalyticsRoute
   '/dashboard/sites/$slug/channels': typeof DashboardSitesSlugChannelsRoute
   '/dashboard/sites/$slug/domains': typeof DashboardSitesSlugDomainsRoute
@@ -364,6 +380,7 @@ export interface FileRoutesByTo {
   '/api/v1/admin/users/$userId/unban': typeof ApiV1AdminUsersUserIdUnbanRoute
   '/api/v1/sites/$slug/channels/$channel': typeof ApiV1SitesSlugChannelsChannelRoute
   '/api/v1/sites/$slug/versions/$deploymentId': typeof ApiV1SitesSlugVersionsDeploymentIdRouteWithChildren
+  '/api/v1/webhooks/deliveries/$deliveryId/retry': typeof ApiV1WebhooksDeliveriesDeliveryIdRetryRoute
   '/api/v1/sites/$slug/domains': typeof ApiV1SitesSlugDomainsIndexRoute
   '/api/v1/sites/$slug/domains/$domainId/refresh': typeof ApiV1SitesSlugDomainsDomainIdRefreshRoute
   '/api/v1/sites/$slug/versions/$deploymentId/access': typeof ApiV1SitesSlugVersionsDeploymentIdAccessRoute
@@ -379,6 +396,7 @@ export interface FileRoutesById {
   '/health': typeof HealthRoute
   '/login': typeof LoginRoute
   '/mascot': typeof MascotRoute
+  '/dashboard_/settings': typeof DashboardSettingsRoute
   '/dashboard_/sites/$slug': typeof DashboardSitesSlugRouteRouteWithChildren
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/v1/me': typeof ApiV1MeRoute
@@ -387,7 +405,7 @@ export interface FileRoutesById {
   '/api/v1/invitations/authorize': typeof ApiV1InvitationsAuthorizeRoute
   '/api/v1/sites/$slug': typeof ApiV1SitesSlugRouteWithChildren
   '/api/v1/webhooks/$webhookId': typeof ApiV1WebhooksWebhookIdRoute
-  '/api/v1/webhooks/deliveries': typeof ApiV1WebhooksDeliveriesRoute
+  '/api/v1/webhooks/deliveries': typeof ApiV1WebhooksDeliveriesRouteWithChildren
   '/dashboard_/sites/$slug/analytics': typeof DashboardSitesSlugAnalyticsRoute
   '/dashboard_/sites/$slug/channels': typeof DashboardSitesSlugChannelsRoute
   '/dashboard_/sites/$slug/domains': typeof DashboardSitesSlugDomainsRoute
@@ -409,6 +427,7 @@ export interface FileRoutesById {
   '/api/v1/admin/users/$userId/unban': typeof ApiV1AdminUsersUserIdUnbanRoute
   '/api/v1/sites/$slug/channels/$channel': typeof ApiV1SitesSlugChannelsChannelRoute
   '/api/v1/sites/$slug/versions/$deploymentId': typeof ApiV1SitesSlugVersionsDeploymentIdRouteWithChildren
+  '/api/v1/webhooks/deliveries/$deliveryId/retry': typeof ApiV1WebhooksDeliveriesDeliveryIdRetryRoute
   '/api/v1/sites/$slug/domains/': typeof ApiV1SitesSlugDomainsIndexRoute
   '/api/v1/sites/$slug/domains/$domainId/refresh': typeof ApiV1SitesSlugDomainsDomainIdRefreshRoute
   '/api/v1/sites/$slug/versions/$deploymentId/access': typeof ApiV1SitesSlugVersionsDeploymentIdAccessRoute
@@ -425,6 +444,7 @@ export interface FileRouteTypes {
     | '/health'
     | '/login'
     | '/mascot'
+    | '/dashboard/settings'
     | '/dashboard/sites/$slug'
     | '/api/auth/$'
     | '/api/v1/me'
@@ -455,6 +475,7 @@ export interface FileRouteTypes {
     | '/api/v1/admin/users/$userId/unban'
     | '/api/v1/sites/$slug/channels/$channel'
     | '/api/v1/sites/$slug/versions/$deploymentId'
+    | '/api/v1/webhooks/deliveries/$deliveryId/retry'
     | '/api/v1/sites/$slug/domains/'
     | '/api/v1/sites/$slug/domains/$domainId/refresh'
     | '/api/v1/sites/$slug/versions/$deploymentId/access'
@@ -469,6 +490,7 @@ export interface FileRouteTypes {
     | '/health'
     | '/login'
     | '/mascot'
+    | '/dashboard/settings'
     | '/api/auth/$'
     | '/api/v1/me'
     | '/api/v1/sites'
@@ -498,6 +520,7 @@ export interface FileRouteTypes {
     | '/api/v1/admin/users/$userId/unban'
     | '/api/v1/sites/$slug/channels/$channel'
     | '/api/v1/sites/$slug/versions/$deploymentId'
+    | '/api/v1/webhooks/deliveries/$deliveryId/retry'
     | '/api/v1/sites/$slug/domains'
     | '/api/v1/sites/$slug/domains/$domainId/refresh'
     | '/api/v1/sites/$slug/versions/$deploymentId/access'
@@ -512,6 +535,7 @@ export interface FileRouteTypes {
     | '/health'
     | '/login'
     | '/mascot'
+    | '/dashboard_/settings'
     | '/dashboard_/sites/$slug'
     | '/api/auth/$'
     | '/api/v1/me'
@@ -542,6 +566,7 @@ export interface FileRouteTypes {
     | '/api/v1/admin/users/$userId/unban'
     | '/api/v1/sites/$slug/channels/$channel'
     | '/api/v1/sites/$slug/versions/$deploymentId'
+    | '/api/v1/webhooks/deliveries/$deliveryId/retry'
     | '/api/v1/sites/$slug/domains/'
     | '/api/v1/sites/$slug/domains/$domainId/refresh'
     | '/api/v1/sites/$slug/versions/$deploymentId/access'
@@ -557,6 +582,7 @@ export interface RootRouteChildren {
   HealthRoute: typeof HealthRoute
   LoginRoute: typeof LoginRoute
   MascotRoute: typeof MascotRoute
+  DashboardSettingsRoute: typeof DashboardSettingsRoute
   DashboardSitesSlugRouteRoute: typeof DashboardSitesSlugRouteRouteWithChildren
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiV1MeRoute: typeof ApiV1MeRoute
@@ -623,6 +649,13 @@ declare module '@tanstack/react-router' {
       path: '/mascot'
       fullPath: '/mascot'
       preLoaderRoute: typeof MascotRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dashboard_/settings': {
+      id: '/dashboard_/settings'
+      path: '/dashboard/settings'
+      fullPath: '/dashboard/settings'
+      preLoaderRoute: typeof DashboardSettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/auth/$': {
@@ -842,6 +875,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiV1SitesSlugVersionsDeploymentIdRouteImport
       parentRoute: typeof ApiV1SitesSlugVersionsRoute
     }
+    '/api/v1/webhooks/deliveries/$deliveryId/retry': {
+      id: '/api/v1/webhooks/deliveries/$deliveryId/retry'
+      path: '/$deliveryId/retry'
+      fullPath: '/api/v1/webhooks/deliveries/$deliveryId/retry'
+      preLoaderRoute: typeof ApiV1WebhooksDeliveriesDeliveryIdRetryRouteImport
+      parentRoute: typeof ApiV1WebhooksDeliveriesRoute
+    }
     '/api/v1/sites/$slug/domains/$domainId/': {
       id: '/api/v1/sites/$slug/domains/$domainId/'
       path: '/domains/$domainId'
@@ -982,14 +1022,29 @@ const ApiV1SitesRouteWithChildren = ApiV1SitesRoute._addFileChildren(
   ApiV1SitesRouteChildren,
 )
 
+interface ApiV1WebhooksDeliveriesRouteChildren {
+  ApiV1WebhooksDeliveriesDeliveryIdRetryRoute: typeof ApiV1WebhooksDeliveriesDeliveryIdRetryRoute
+}
+
+const ApiV1WebhooksDeliveriesRouteChildren: ApiV1WebhooksDeliveriesRouteChildren =
+  {
+    ApiV1WebhooksDeliveriesDeliveryIdRetryRoute:
+      ApiV1WebhooksDeliveriesDeliveryIdRetryRoute,
+  }
+
+const ApiV1WebhooksDeliveriesRouteWithChildren =
+  ApiV1WebhooksDeliveriesRoute._addFileChildren(
+    ApiV1WebhooksDeliveriesRouteChildren,
+  )
+
 interface ApiV1WebhooksRouteChildren {
   ApiV1WebhooksWebhookIdRoute: typeof ApiV1WebhooksWebhookIdRoute
-  ApiV1WebhooksDeliveriesRoute: typeof ApiV1WebhooksDeliveriesRoute
+  ApiV1WebhooksDeliveriesRoute: typeof ApiV1WebhooksDeliveriesRouteWithChildren
 }
 
 const ApiV1WebhooksRouteChildren: ApiV1WebhooksRouteChildren = {
   ApiV1WebhooksWebhookIdRoute: ApiV1WebhooksWebhookIdRoute,
-  ApiV1WebhooksDeliveriesRoute: ApiV1WebhooksDeliveriesRoute,
+  ApiV1WebhooksDeliveriesRoute: ApiV1WebhooksDeliveriesRouteWithChildren,
 }
 
 const ApiV1WebhooksRouteWithChildren = ApiV1WebhooksRoute._addFileChildren(
@@ -1004,6 +1059,7 @@ const rootRouteChildren: RootRouteChildren = {
   HealthRoute: HealthRoute,
   LoginRoute: LoginRoute,
   MascotRoute: MascotRoute,
+  DashboardSettingsRoute: DashboardSettingsRoute,
   DashboardSitesSlugRouteRoute: DashboardSitesSlugRouteRouteWithChildren,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiV1MeRoute: ApiV1MeRoute,

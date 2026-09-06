@@ -972,6 +972,9 @@ function Dashboard() {
                 {keyBusy ? 'Minting…' : 'Create API key'}
               </button>
             )}
+            <Link to="/dashboard/settings" className="text-link">
+              Manage API keys and webhooks →
+            </Link>
             <pre>
               <code>YEEET_TOKEN=yeeet_… yeeet deploy ./dist --json</code>
             </pre>

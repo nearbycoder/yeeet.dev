@@ -125,3 +125,24 @@ export const getSiteChannelsData = createServerFn({ method: 'GET' })
     ])
     return { history, channels: result.channels }
   })
+
+export const getAccountConsoleData = createServerFn({ method: 'GET' }).handler(
+  async () => {
+    const actor = await requireActor(getRequest())
+    const { listAccountKeys } = await import('./account-console')
+    const { listWebhookEndpoints, listWebhookDeliveries, WEBHOOK_EVENTS } =
+      await import('./webhooks')
+    const [keys, webhooks, deliveries] = await Promise.all([
+      listAccountKeys(actor.userId),
+      listWebhookEndpoints(actor.userId),
+      listWebhookDeliveries(actor.userId),
+    ])
+    return {
+      keys,
+      webhooks,
+      deliveries,
+      events: WEBHOOK_EVENTS,
+      platform: publicPlatformConfig(),
+    }
+  },
+)

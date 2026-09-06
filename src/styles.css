@@ -4613,3 +4613,24 @@ summary:focus-visible {
   color: var(--muted);
   line-height: 1.6;
 }
+.secret-value {
+  display: block;
+  overflow-wrap: anywhere;
+  padding: 12px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+}
+.console-checkboxes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  border: 1px solid var(--line);
+  padding: 16px;
+}
+.console-checkboxes label {
+  display: flex;
+  align-items: center;
+  min-height: 36px;
+  gap: 8px;
+  font-size: 13px;
+}

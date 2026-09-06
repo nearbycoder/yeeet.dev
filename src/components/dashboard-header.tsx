@@ -46,6 +46,9 @@ export function DashboardHeader({
           </span>
           {user.name}
         </span>
+        <Link to="/dashboard/settings" activeProps={{ 'aria-current': 'page' }}>
+          Integrations
+        </Link>
         <SignOutButton />
       </NavigationMenu>
     </header>
