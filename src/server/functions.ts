@@ -94,3 +94,22 @@ export const getAdminData = createServerFn({ method: 'GET' }).handler(
     return adminOverview()
   },
 )
+
+export const getDeploymentInspection = createServerFn({ method: 'GET' })
+  .validator((data: { slug: string; version: string; base?: string }) => data)
+  .handler(async ({ data }) => {
+    const actor = await requireActor(getRequest())
+    const { inspectDeployment, compareDeployments } =
+      await import('./deployment-inspection')
+    return {
+      version: await inspectDeployment(actor.userId, data.slug, data.version),
+      comparison: data.base
+        ? await compareDeployments(
+            actor.userId,
+            data.slug,
+            data.version,
+            data.base,
+          )
+        : null,
+    }
+  })

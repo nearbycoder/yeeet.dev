@@ -4488,3 +4488,115 @@ summary:focus-visible {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Console forms, review panels, and detail tables */
+.console-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  gap: 16px;
+  margin-block: 20px;
+}
+.console-form-grid label,
+.console-search {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 700;
+}
+.console-form-grid input,
+.console-form-grid select,
+.console-form-grid textarea,
+.console-search input {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 10px 12px;
+  color: var(--ink);
+  background: var(--field);
+  font: inherit;
+}
+.console-form-grid textarea {
+  min-height: 100px;
+  resize: vertical;
+}
+.console-search {
+  margin-block: 20px;
+}
+.console-code {
+  overflow: auto;
+  padding: 16px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+}
+.console-table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  margin-block: 20px;
+}
+.console-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  text-align: left;
+}
+.console-table th,
+.console-table td {
+  padding: 12px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+.console-table td {
+  max-width: 360px;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+.console-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-block: 16px;
+}
+.deployment-review {
+  grid-column: 1 / -1;
+  min-width: 0;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--paper);
+}
+.manifest-diff {
+  margin-block: 16px;
+  min-width: 0;
+}
+.manifest-diff summary {
+  min-height: 44px;
+  padding-block: 12px;
+  cursor: pointer;
+  text-transform: capitalize;
+}
+.file-paths {
+  max-height: 240px;
+  overflow: auto;
+  padding-left: 24px;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+.confirm-dialog {
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
+}
+.confirm-dialog-copy > div {
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
+@media (max-width: 650px) {
+  .console-form-grid input,
+  .console-form-grid select,
+  .console-form-grid textarea {
+    font-size: 16px;
+  }
+}

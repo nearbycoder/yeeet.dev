@@ -117,7 +117,7 @@ export function ConfirmDialog({
         <div className="confirm-dialog-copy">
           <span>{eyebrow}</span>
           <h2 id={titleId}>{title}</h2>
-          <p id={descriptionId}>{description}</p>
+          <div id={descriptionId}>{description}</div>
         </div>
         <div className="confirm-dialog-actions">
           <button

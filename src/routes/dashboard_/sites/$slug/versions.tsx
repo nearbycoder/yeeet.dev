@@ -1,8 +1,13 @@
+import { ManifestDiff } from '#/components/manifest-diff'
+import type { ManifestDiffData } from '#/components/manifest-diff'
 import { CopyButton } from '#/components/copy-button'
 import { Fragment, useState } from 'react'
-import { createFileRoute, useRouter } from '@tanstack/react-router'
+import { Link, createFileRoute, useRouter } from '@tanstack/react-router'
 import { ConfirmDialog } from '#/components/confirm-dialog'
-import { getSiteVersionsData } from '#/server/functions'
+import {
+  getDeploymentInspection,
+  getSiteVersionsData,
+} from '#/server/functions'
 
 export const Route = createFileRoute('/dashboard_/sites/$slug/versions')({
   loader: ({ params }) => getSiteVersionsData({ data: { slug: params.slug } }),
@@ -14,6 +19,7 @@ type VersionAction = {
   id: string
   title: string
   description: string
+  diff?: ManifestDiffData
   confirmLabel: string
 }
 
@@ -88,6 +94,38 @@ function SiteVersions() {
     )
   }
 
+  async function previewActivation(target: {
+    id: string
+    title: string
+    description: string
+    confirmLabel: string
+  }) {
+    setBusy('comparison')
+    setError('')
+    try {
+      const detail = await getDeploymentInspection({
+        data: {
+          slug: data.site.slug,
+          version: target.id,
+          base: data.site.activeDeploymentId ?? undefined,
+        },
+      })
+      setAction({
+        ...target,
+        kind: 'activate',
+        diff: detail.comparison ?? undefined,
+      })
+    } catch (comparisonError) {
+      setError(
+        comparisonError instanceof Error
+          ? comparisonError.message
+          : 'Could not compare versions.',
+      )
+    } finally {
+      setBusy('')
+    }
+  }
+
   async function runConfirmedAction() {
     if (!action) return
     const base = `/api/v1/sites/${encodeURIComponent(data.site.slug)}/versions/${action.id}`
@@ -135,8 +173,7 @@ function SiteVersions() {
             className="button button-ink"
             disabled={Boolean(busy)}
             onClick={() =>
-              setAction({
-                kind: 'activate',
+              void previewActivation({
                 id: previous.id,
                 title: `Roll back to ${previous.id.slice(0, 8)}?`,
                 description:
@@ -196,6 +233,14 @@ function SiteVersions() {
                   </small>
                 </div>
                 <div className="site-version-actions">
+                  <Link
+                    className="button button-paper"
+                    to="/dashboard/sites/$slug/inspect"
+                    params={{ slug: data.site.slug }}
+                    search={{ version: version.id }}
+                  >
+                    Inspect / compare
+                  </Link>
                   {version.previewUrl ? (
                     <a
                       className="button button-paper"
@@ -232,8 +277,7 @@ function SiteVersions() {
                       className="button button-paper"
                       disabled={Boolean(busy)}
                       onClick={() =>
-                        setAction({
-                          kind: 'activate',
+                        void previewActivation({
                           id: version.id,
                           title: `Make ${version.id.slice(0, 8)} live?`,
                           description:
@@ -365,7 +409,12 @@ function SiteVersions() {
       <ConfirmDialog
         open={Boolean(action)}
         title={action?.title ?? ''}
-        description={action?.description ?? ''}
+        description={
+          <>
+            {action?.description}
+            {action?.diff ? <ManifestDiff diff={action.diff} /> : null}
+          </>
+        }
         confirmLabel={action?.confirmLabel ?? 'Confirm'}
         busy={Boolean(busy)}
         busyLabel="Working…"

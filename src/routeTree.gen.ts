@@ -30,6 +30,7 @@ import { Route as ApiV1WebhooksDeliveriesRouteImport } from './routes/api/v1/web
 import { Route as DashboardSitesSlugIndexRouteImport } from './routes/dashboard_/sites/$slug/index'
 import { Route as DashboardSitesSlugAnalyticsRouteImport } from './routes/dashboard_/sites/$slug/analytics'
 import { Route as DashboardSitesSlugDomainsRouteImport } from './routes/dashboard_/sites/$slug/domains'
+import { Route as DashboardSitesSlugInspectRouteImport } from './routes/dashboard_/sites/$slug/inspect'
 import { Route as DashboardSitesSlugVersionsRouteImport } from './routes/dashboard_/sites/$slug/versions'
 import { Route as ApiV1AdminInvitationsIndexRouteImport } from './routes/api/v1/admin/invitations/index'
 import { Route as ApiV1AdminSitesSiteIdRouteImport } from './routes/api/v1/admin/sites/$siteId'
@@ -157,6 +158,12 @@ const DashboardSitesSlugDomainsRoute =
     path: '/domains',
     getParentRoute: () => DashboardSitesSlugRouteRoute,
   } as any)
+const DashboardSitesSlugInspectRoute =
+  DashboardSitesSlugInspectRouteImport.update({
+    id: '/inspect',
+    path: '/inspect',
+    getParentRoute: () => DashboardSitesSlugRouteRoute,
+  } as any)
 const DashboardSitesSlugVersionsRoute =
   DashboardSitesSlugVersionsRouteImport.update({
     id: '/versions',
@@ -281,6 +288,7 @@ export interface FileRoutesByFullPath {
   '/api/v1/webhooks/deliveries': typeof ApiV1WebhooksDeliveriesRoute
   '/dashboard/sites/$slug/analytics': typeof DashboardSitesSlugAnalyticsRoute
   '/dashboard/sites/$slug/domains': typeof DashboardSitesSlugDomainsRoute
+  '/dashboard/sites/$slug/inspect': typeof DashboardSitesSlugInspectRoute
   '/dashboard/sites/$slug/versions': typeof DashboardSitesSlugVersionsRoute
   '/api/v1/admin/': typeof ApiV1AdminIndexRoute
   '/api/v1/deployments/': typeof ApiV1DeploymentsIndexRoute
@@ -321,6 +329,7 @@ export interface FileRoutesByTo {
   '/api/v1/webhooks/deliveries': typeof ApiV1WebhooksDeliveriesRoute
   '/dashboard/sites/$slug/analytics': typeof DashboardSitesSlugAnalyticsRoute
   '/dashboard/sites/$slug/domains': typeof DashboardSitesSlugDomainsRoute
+  '/dashboard/sites/$slug/inspect': typeof DashboardSitesSlugInspectRoute
   '/dashboard/sites/$slug/versions': typeof DashboardSitesSlugVersionsRoute
   '/api/v1/admin': typeof ApiV1AdminIndexRoute
   '/api/v1/deployments': typeof ApiV1DeploymentsIndexRoute
@@ -363,6 +372,7 @@ export interface FileRoutesById {
   '/api/v1/webhooks/deliveries': typeof ApiV1WebhooksDeliveriesRoute
   '/dashboard_/sites/$slug/analytics': typeof DashboardSitesSlugAnalyticsRoute
   '/dashboard_/sites/$slug/domains': typeof DashboardSitesSlugDomainsRoute
+  '/dashboard_/sites/$slug/inspect': typeof DashboardSitesSlugInspectRoute
   '/dashboard_/sites/$slug/versions': typeof DashboardSitesSlugVersionsRoute
   '/api/v1/admin/': typeof ApiV1AdminIndexRoute
   '/api/v1/deployments/': typeof ApiV1DeploymentsIndexRoute
@@ -406,6 +416,7 @@ export interface FileRouteTypes {
     | '/api/v1/webhooks/deliveries'
     | '/dashboard/sites/$slug/analytics'
     | '/dashboard/sites/$slug/domains'
+    | '/dashboard/sites/$slug/inspect'
     | '/dashboard/sites/$slug/versions'
     | '/api/v1/admin/'
     | '/api/v1/deployments/'
@@ -446,6 +457,7 @@ export interface FileRouteTypes {
     | '/api/v1/webhooks/deliveries'
     | '/dashboard/sites/$slug/analytics'
     | '/dashboard/sites/$slug/domains'
+    | '/dashboard/sites/$slug/inspect'
     | '/dashboard/sites/$slug/versions'
     | '/api/v1/admin'
     | '/api/v1/deployments'
@@ -487,6 +499,7 @@ export interface FileRouteTypes {
     | '/api/v1/webhooks/deliveries'
     | '/dashboard_/sites/$slug/analytics'
     | '/dashboard_/sites/$slug/domains'
+    | '/dashboard_/sites/$slug/inspect'
     | '/dashboard_/sites/$slug/versions'
     | '/api/v1/admin/'
     | '/api/v1/deployments/'
@@ -684,6 +697,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardSitesSlugDomainsRouteImport
       parentRoute: typeof DashboardSitesSlugRouteRoute
     }
+    '/dashboard_/sites/$slug/inspect': {
+      id: '/dashboard_/sites/$slug/inspect'
+      path: '/inspect'
+      fullPath: '/dashboard/sites/$slug/inspect'
+      preLoaderRoute: typeof DashboardSitesSlugInspectRouteImport
+      parentRoute: typeof DashboardSitesSlugRouteRoute
+    }
     '/dashboard_/sites/$slug/versions': {
       id: '/dashboard_/sites/$slug/versions'
       path: '/versions'
@@ -816,6 +836,7 @@ declare module '@tanstack/react-router' {
 interface DashboardSitesSlugRouteRouteChildren {
   DashboardSitesSlugAnalyticsRoute: typeof DashboardSitesSlugAnalyticsRoute
   DashboardSitesSlugDomainsRoute: typeof DashboardSitesSlugDomainsRoute
+  DashboardSitesSlugInspectRoute: typeof DashboardSitesSlugInspectRoute
   DashboardSitesSlugVersionsRoute: typeof DashboardSitesSlugVersionsRoute
   DashboardSitesSlugIndexRoute: typeof DashboardSitesSlugIndexRoute
 }
@@ -824,6 +845,7 @@ const DashboardSitesSlugRouteRouteChildren: DashboardSitesSlugRouteRouteChildren
   {
     DashboardSitesSlugAnalyticsRoute: DashboardSitesSlugAnalyticsRoute,
     DashboardSitesSlugDomainsRoute: DashboardSitesSlugDomainsRoute,
+    DashboardSitesSlugInspectRoute: DashboardSitesSlugInspectRoute,
     DashboardSitesSlugVersionsRoute: DashboardSitesSlugVersionsRoute,
     DashboardSitesSlugIndexRoute: DashboardSitesSlugIndexRoute,
   }

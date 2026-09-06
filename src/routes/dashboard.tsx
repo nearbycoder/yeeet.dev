@@ -1,3 +1,6 @@
+import { ManifestDiff } from '#/components/manifest-diff'
+import type { ManifestDiffData } from '#/components/manifest-diff'
+import { z } from 'zod'
 import { CopyButton } from '#/components/copy-button'
 import { useMemo, useRef, useState } from 'react'
 import {
@@ -15,6 +18,10 @@ import { getDashboardData, getSession } from '#/server/functions'
 import { filterSites } from '#/lib/site-search'
 
 export const Route = createFileRoute('/dashboard')({
+  validateSearch: z.object({
+    site: z.string().optional(),
+    channel: z.string().optional(),
+  }),
   beforeLoad: async () => {
     const session = await getSession()
     if (!session)
@@ -169,6 +176,7 @@ async function uploadInBatches<T>(
 
 function Dashboard() {
   const { user } = Route.useRouteContext()
+  const destination = Route.useSearch()
   const data = Route.useLoaderData()
   const router = useRouter()
   const fileInput = useRef<HTMLInputElement>(null)
@@ -177,10 +185,16 @@ function Dashboard() {
     null,
   )
   const [files, setFiles] = useState<Array<UploadFile>>([])
-  const [slug, setSlug] = useState('')
-  const [channel, setChannel] = useState('')
-  const [spaFallback, setSpaFallback] = useState(true)
-  const [privateDeploy, setPrivateDeploy] = useState(false)
+  const [slug, setSlug] = useState(destination.site ?? '')
+  const [channel, setChannel] = useState(destination.channel ?? '')
+  const [spaFallback, setSpaFallback] = useState(
+    data.sites.find((site) => site.slug === destination.site)?.spaFallback ??
+      true,
+  )
+  const [privateDeploy, setPrivateDeploy] = useState(
+    data.sites.find((site) => site.slug === destination.site)?.protected ??
+      false,
+  )
   const [deployPassword, setDeployPassword] = useState('')
   const [dragging, setDragging] = useState(false)
   const [phase, setPhase] = useState<
@@ -207,6 +221,22 @@ function Dashboard() {
   )
   const [deleteTarget, setDeleteTarget] =
     useState<DashboardDeleteTarget | null>(null)
+  const [review, setReview] = useState<{
+    files: Array<UploadFile>
+    options: string
+    diff: ManifestDiffData
+    baseDeploymentId: string | null
+    targetUrl: string | null
+  } | null>(null)
+  const reviewOptions = JSON.stringify({
+    slug,
+    channel,
+    spaFallback,
+    privateDeploy,
+    deployPassword,
+  })
+  const reviewIsCurrent =
+    review?.files === files && review.options === reviewOptions
   const totalBytes = files.reduce((sum, item) => sum + item.file.size, 0)
 
   function chooseFiles(selected: FileList | null) {
@@ -228,7 +258,11 @@ function Dashboard() {
     setPhase('idle')
   }
 
-  async function deploy() {
+  async function deploy(previewOnly = true) {
+    if (!previewOnly && !reviewIsCurrent) {
+      setError('Review these changes before deploying.')
+      return
+    }
     if (!files.length) return
     setError('')
     setResultUrl('')
@@ -254,6 +288,29 @@ function Dashboard() {
           contentType: item.file.type || 'application/octet-stream',
           checksum: checksums.get(item.path),
         })),
+      }
+      if (previewOnly) {
+        const response = await fetch('/api/v1/deployments', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            ...deploymentInput,
+            password: undefined,
+            dryRun: true,
+          }),
+        })
+        const plan = await response.json()
+        if (!response.ok)
+          throw new Error(plan.error?.message || 'Could not preview changes.')
+        setReview({
+          files,
+          options: reviewOptions,
+          diff: plan,
+          baseDeploymentId: plan.baseDeploymentId,
+          targetUrl: plan.targetUrl,
+        })
+        setPhase('idle')
+        return
       }
       const fingerprint = JSON.stringify(deploymentInput)
       if (deploymentKey.current?.fingerprint !== fingerprint) {
@@ -311,6 +368,7 @@ function Dashboard() {
       setDeployPassword('')
       setPrivateDeploy(false)
       deploymentKey.current = null
+      setReview(null)
       setPhase('done')
       await router.invalidate()
     } catch (uploadError) {
@@ -607,10 +665,10 @@ function Dashboard() {
                 phase !== 'idle' ||
                 (privateDeploy && deployPassword.length < 8)
               }
-              onClick={deploy}
+              onClick={() => void deploy(true)}
             >
               {phase === 'idle'
-                ? 'Yeeet it ↗'
+                ? 'Review deployment →'
                 : phase === 'preparing'
                   ? 'Plotting course…'
                   : phase === 'uploading'
@@ -639,6 +697,37 @@ function Dashboard() {
               </label>
             ) : null}
           </div>
+          {reviewIsCurrent ? (
+            <section
+              className="deployment-review"
+              aria-label="Deployment review"
+            >
+              <h3>Review your deployment</h3>
+              <p>
+                {review.targetUrl ?? 'A new generated site address'} ·{' '}
+                {channel
+                  ? `${channel} channel; production stays unchanged`
+                  : 'Production'}{' '}
+                · {privateDeploy ? 'Password protected' : 'Public'}
+              </p>
+              <ManifestDiff diff={review.diff} />
+              <p>
+                Changes are compared with{' '}
+                {review.baseDeploymentId
+                  ? review.baseDeploymentId.slice(0, 8)
+                  : 'an empty site'}
+                . A new immutable version will be created.
+              </p>
+              <button
+                type="button"
+                className="button button-coral"
+                disabled={phase !== 'idle'}
+                onClick={() => void deploy(false)}
+              >
+                Deploy this build ↗
+              </button>
+            </section>
+          ) : null}
           {phase === 'uploading' || phase === 'finalizing' ? (
             <div className="upload-progress">
               <span
