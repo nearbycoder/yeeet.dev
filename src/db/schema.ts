@@ -64,6 +64,7 @@ export const deployments = pgTable(
     createdAt: timestamp('created_at').defaultNow().notNull(),
     completedAt: timestamp('completed_at'),
     activatedAt: timestamp('activated_at'),
+    expiresAt: timestamp('expires_at'),
   },
   (table) => [
     index('deployments_site_id_idx').on(table.siteId),
@@ -462,5 +463,29 @@ export const deploymentFeedback = pgTable(
       table.workspaceId,
       table.deploymentId,
     ),
+  ],
+)
+
+export const siteHealth = pgTable(
+  'site_health',
+  {
+    siteId: text('site_id')
+      .primaryKey()
+      .references(() => sites.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    enabled: boolean('enabled').default(false).notNull(),
+    path: text('path').default('/').notNull(),
+    expectedStatus: integer('expected_status').default(200).notNull(),
+    nextCheckAt: timestamp('next_check_at').defaultNow().notNull(),
+    checkedAt: timestamp('checked_at'),
+    deploymentId: text('deployment_id'),
+    responseStatus: integer('response_status'),
+    latencyMs: integer('latency_ms'),
+    error: text('error'),
+  },
+  (table) => [
+    index('site_health_due_idx').on(table.enabled, table.nextCheckAt),
   ],
 )

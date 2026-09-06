@@ -34,6 +34,7 @@ import { Route as DashboardSitesSlugAnalyticsRouteImport } from './routes/dashbo
 import { Route as DashboardSitesSlugChannelsRouteImport } from './routes/dashboard_/sites/$slug/channels'
 import { Route as DashboardSitesSlugDomainsRouteImport } from './routes/dashboard_/sites/$slug/domains'
 import { Route as DashboardSitesSlugInspectRouteImport } from './routes/dashboard_/sites/$slug/inspect'
+import { Route as DashboardSitesSlugLifecycleRouteImport } from './routes/dashboard_/sites/$slug/lifecycle'
 import { Route as DashboardSitesSlugSharingRouteImport } from './routes/dashboard_/sites/$slug/sharing'
 import { Route as DashboardSitesSlugVersionsRouteImport } from './routes/dashboard_/sites/$slug/versions'
 import { Route as ApiV1AdminInvitationsIndexRouteImport } from './routes/api/v1/admin/invitations/index'
@@ -185,6 +186,12 @@ const DashboardSitesSlugInspectRoute =
     path: '/inspect',
     getParentRoute: () => DashboardSitesSlugRouteRoute,
   } as any)
+const DashboardSitesSlugLifecycleRoute =
+  DashboardSitesSlugLifecycleRouteImport.update({
+    id: '/lifecycle',
+    path: '/lifecycle',
+    getParentRoute: () => DashboardSitesSlugRouteRoute,
+  } as any)
 const DashboardSitesSlugSharingRoute =
   DashboardSitesSlugSharingRouteImport.update({
     id: '/sharing',
@@ -325,6 +332,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/sites/$slug/channels': typeof DashboardSitesSlugChannelsRoute
   '/dashboard/sites/$slug/domains': typeof DashboardSitesSlugDomainsRoute
   '/dashboard/sites/$slug/inspect': typeof DashboardSitesSlugInspectRoute
+  '/dashboard/sites/$slug/lifecycle': typeof DashboardSitesSlugLifecycleRoute
   '/dashboard/sites/$slug/sharing': typeof DashboardSitesSlugSharingRoute
   '/dashboard/sites/$slug/versions': typeof DashboardSitesSlugVersionsRoute
   '/api/v1/admin/': typeof ApiV1AdminIndexRoute
@@ -371,6 +379,7 @@ export interface FileRoutesByTo {
   '/dashboard/sites/$slug/channels': typeof DashboardSitesSlugChannelsRoute
   '/dashboard/sites/$slug/domains': typeof DashboardSitesSlugDomainsRoute
   '/dashboard/sites/$slug/inspect': typeof DashboardSitesSlugInspectRoute
+  '/dashboard/sites/$slug/lifecycle': typeof DashboardSitesSlugLifecycleRoute
   '/dashboard/sites/$slug/sharing': typeof DashboardSitesSlugSharingRoute
   '/dashboard/sites/$slug/versions': typeof DashboardSitesSlugVersionsRoute
   '/api/v1/admin': typeof ApiV1AdminIndexRoute
@@ -419,6 +428,7 @@ export interface FileRoutesById {
   '/dashboard_/sites/$slug/channels': typeof DashboardSitesSlugChannelsRoute
   '/dashboard_/sites/$slug/domains': typeof DashboardSitesSlugDomainsRoute
   '/dashboard_/sites/$slug/inspect': typeof DashboardSitesSlugInspectRoute
+  '/dashboard_/sites/$slug/lifecycle': typeof DashboardSitesSlugLifecycleRoute
   '/dashboard_/sites/$slug/sharing': typeof DashboardSitesSlugSharingRoute
   '/dashboard_/sites/$slug/versions': typeof DashboardSitesSlugVersionsRoute
   '/api/v1/admin/': typeof ApiV1AdminIndexRoute
@@ -468,6 +478,7 @@ export interface FileRouteTypes {
     | '/dashboard/sites/$slug/channels'
     | '/dashboard/sites/$slug/domains'
     | '/dashboard/sites/$slug/inspect'
+    | '/dashboard/sites/$slug/lifecycle'
     | '/dashboard/sites/$slug/sharing'
     | '/dashboard/sites/$slug/versions'
     | '/api/v1/admin/'
@@ -514,6 +525,7 @@ export interface FileRouteTypes {
     | '/dashboard/sites/$slug/channels'
     | '/dashboard/sites/$slug/domains'
     | '/dashboard/sites/$slug/inspect'
+    | '/dashboard/sites/$slug/lifecycle'
     | '/dashboard/sites/$slug/sharing'
     | '/dashboard/sites/$slug/versions'
     | '/api/v1/admin'
@@ -561,6 +573,7 @@ export interface FileRouteTypes {
     | '/dashboard_/sites/$slug/channels'
     | '/dashboard_/sites/$slug/domains'
     | '/dashboard_/sites/$slug/inspect'
+    | '/dashboard_/sites/$slug/lifecycle'
     | '/dashboard_/sites/$slug/sharing'
     | '/dashboard_/sites/$slug/versions'
     | '/api/v1/admin/'
@@ -790,6 +803,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardSitesSlugInspectRouteImport
       parentRoute: typeof DashboardSitesSlugRouteRoute
     }
+    '/dashboard_/sites/$slug/lifecycle': {
+      id: '/dashboard_/sites/$slug/lifecycle'
+      path: '/lifecycle'
+      fullPath: '/dashboard/sites/$slug/lifecycle'
+      preLoaderRoute: typeof DashboardSitesSlugLifecycleRouteImport
+      parentRoute: typeof DashboardSitesSlugRouteRoute
+    }
     '/dashboard_/sites/$slug/sharing': {
       id: '/dashboard_/sites/$slug/sharing'
       path: '/sharing'
@@ -938,6 +958,7 @@ interface DashboardSitesSlugRouteRouteChildren {
   DashboardSitesSlugChannelsRoute: typeof DashboardSitesSlugChannelsRoute
   DashboardSitesSlugDomainsRoute: typeof DashboardSitesSlugDomainsRoute
   DashboardSitesSlugInspectRoute: typeof DashboardSitesSlugInspectRoute
+  DashboardSitesSlugLifecycleRoute: typeof DashboardSitesSlugLifecycleRoute
   DashboardSitesSlugSharingRoute: typeof DashboardSitesSlugSharingRoute
   DashboardSitesSlugVersionsRoute: typeof DashboardSitesSlugVersionsRoute
   DashboardSitesSlugIndexRoute: typeof DashboardSitesSlugIndexRoute
@@ -949,6 +970,7 @@ const DashboardSitesSlugRouteRouteChildren: DashboardSitesSlugRouteRouteChildren
     DashboardSitesSlugChannelsRoute: DashboardSitesSlugChannelsRoute,
     DashboardSitesSlugDomainsRoute: DashboardSitesSlugDomainsRoute,
     DashboardSitesSlugInspectRoute: DashboardSitesSlugInspectRoute,
+    DashboardSitesSlugLifecycleRoute: DashboardSitesSlugLifecycleRoute,
     DashboardSitesSlugSharingRoute: DashboardSitesSlugSharingRoute,
     DashboardSitesSlugVersionsRoute: DashboardSitesSlugVersionsRoute,
     DashboardSitesSlugIndexRoute: DashboardSitesSlugIndexRoute,

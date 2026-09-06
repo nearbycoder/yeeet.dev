@@ -1,3 +1,4 @@
+import { previewHasExpired } from '#/lib/lifecycle'
 import {
   actorForWorkspaceSite,
   actorForWorkspaceDeployment,
@@ -874,6 +875,7 @@ export async function listSiteVersions(
       createdAt: deployments.createdAt,
       completedAt: deployments.completedAt,
       activatedAt: deployments.activatedAt,
+      expiresAt: deployments.expiresAt,
       error: deployments.error,
       spaFallback: deployments.spaFallback,
       channel: deployments.channel,
@@ -895,6 +897,7 @@ export async function listSiteVersions(
     versions: rows.map(({ passwordHash, shareNonce, ...row }) => ({
       ...row,
       current: row.id === site.activeDeploymentId,
+      expiresAt: row.expiresAt?.toISOString() ?? null,
       previewUrl: row.status === 'ready' ? versionUrl(row.id) : null,
       protected: Boolean(passwordHash),
       shareUrl:
@@ -1041,6 +1044,12 @@ export async function activateSiteVersion(
     )
   }
 
+  if (previewHasExpired(version.expiresAt, version.current))
+    throw new HttpError(
+      409,
+      'Extend this preview’s expiry before promoting it.',
+      'preview_expired',
+    )
   const activatedAt = new Date()
   await db.transaction(async (tx) => {
     await tx
@@ -1049,7 +1058,7 @@ export async function activateSiteVersion(
       .where(and(eq(sites.id, history.site.id), eq(sites.userId, userId)))
     await tx
       .update(deployments)
-      .set({ activatedAt })
+      .set({ activatedAt, expiresAt: null })
       .where(eq(deployments.id, version.id))
   })
 
