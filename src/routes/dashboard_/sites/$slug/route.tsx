@@ -92,6 +92,27 @@ function SiteLayout() {
           >
             Analytics
           </Link>
+          <Link
+            to="/dashboard/sites/$slug/channels"
+            params={{ slug: site.slug }}
+            activeProps={{ 'aria-current': 'page' }}
+          >
+            Channels
+          </Link>
+          <Link
+            to="/dashboard/sites/$slug/sharing"
+            params={{ slug: site.slug }}
+            activeProps={{ 'aria-current': 'page' }}
+          >
+            Sharing
+          </Link>
+          <Link
+            to="/dashboard/sites/$slug/inspect"
+            params={{ slug: site.slug }}
+            activeProps={{ 'aria-current': 'page' }}
+          >
+            Inspect
+          </Link>
         </nav>
         <Outlet />
       </main>

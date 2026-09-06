@@ -29,8 +29,10 @@ import { Route as ApiV1WebhooksWebhookIdRouteImport } from './routes/api/v1/webh
 import { Route as ApiV1WebhooksDeliveriesRouteImport } from './routes/api/v1/webhooks/deliveries'
 import { Route as DashboardSitesSlugIndexRouteImport } from './routes/dashboard_/sites/$slug/index'
 import { Route as DashboardSitesSlugAnalyticsRouteImport } from './routes/dashboard_/sites/$slug/analytics'
+import { Route as DashboardSitesSlugChannelsRouteImport } from './routes/dashboard_/sites/$slug/channels'
 import { Route as DashboardSitesSlugDomainsRouteImport } from './routes/dashboard_/sites/$slug/domains'
 import { Route as DashboardSitesSlugInspectRouteImport } from './routes/dashboard_/sites/$slug/inspect'
+import { Route as DashboardSitesSlugSharingRouteImport } from './routes/dashboard_/sites/$slug/sharing'
 import { Route as DashboardSitesSlugVersionsRouteImport } from './routes/dashboard_/sites/$slug/versions'
 import { Route as ApiV1AdminInvitationsIndexRouteImport } from './routes/api/v1/admin/invitations/index'
 import { Route as ApiV1AdminSitesSiteIdRouteImport } from './routes/api/v1/admin/sites/$siteId'
@@ -152,6 +154,12 @@ const DashboardSitesSlugAnalyticsRoute =
     path: '/analytics',
     getParentRoute: () => DashboardSitesSlugRouteRoute,
   } as any)
+const DashboardSitesSlugChannelsRoute =
+  DashboardSitesSlugChannelsRouteImport.update({
+    id: '/channels',
+    path: '/channels',
+    getParentRoute: () => DashboardSitesSlugRouteRoute,
+  } as any)
 const DashboardSitesSlugDomainsRoute =
   DashboardSitesSlugDomainsRouteImport.update({
     id: '/domains',
@@ -162,6 +170,12 @@ const DashboardSitesSlugInspectRoute =
   DashboardSitesSlugInspectRouteImport.update({
     id: '/inspect',
     path: '/inspect',
+    getParentRoute: () => DashboardSitesSlugRouteRoute,
+  } as any)
+const DashboardSitesSlugSharingRoute =
+  DashboardSitesSlugSharingRouteImport.update({
+    id: '/sharing',
+    path: '/sharing',
     getParentRoute: () => DashboardSitesSlugRouteRoute,
   } as any)
 const DashboardSitesSlugVersionsRoute =
@@ -287,8 +301,10 @@ export interface FileRoutesByFullPath {
   '/api/v1/webhooks/$webhookId': typeof ApiV1WebhooksWebhookIdRoute
   '/api/v1/webhooks/deliveries': typeof ApiV1WebhooksDeliveriesRoute
   '/dashboard/sites/$slug/analytics': typeof DashboardSitesSlugAnalyticsRoute
+  '/dashboard/sites/$slug/channels': typeof DashboardSitesSlugChannelsRoute
   '/dashboard/sites/$slug/domains': typeof DashboardSitesSlugDomainsRoute
   '/dashboard/sites/$slug/inspect': typeof DashboardSitesSlugInspectRoute
+  '/dashboard/sites/$slug/sharing': typeof DashboardSitesSlugSharingRoute
   '/dashboard/sites/$slug/versions': typeof DashboardSitesSlugVersionsRoute
   '/api/v1/admin/': typeof ApiV1AdminIndexRoute
   '/api/v1/deployments/': typeof ApiV1DeploymentsIndexRoute
@@ -328,8 +344,10 @@ export interface FileRoutesByTo {
   '/api/v1/webhooks/$webhookId': typeof ApiV1WebhooksWebhookIdRoute
   '/api/v1/webhooks/deliveries': typeof ApiV1WebhooksDeliveriesRoute
   '/dashboard/sites/$slug/analytics': typeof DashboardSitesSlugAnalyticsRoute
+  '/dashboard/sites/$slug/channels': typeof DashboardSitesSlugChannelsRoute
   '/dashboard/sites/$slug/domains': typeof DashboardSitesSlugDomainsRoute
   '/dashboard/sites/$slug/inspect': typeof DashboardSitesSlugInspectRoute
+  '/dashboard/sites/$slug/sharing': typeof DashboardSitesSlugSharingRoute
   '/dashboard/sites/$slug/versions': typeof DashboardSitesSlugVersionsRoute
   '/api/v1/admin': typeof ApiV1AdminIndexRoute
   '/api/v1/deployments': typeof ApiV1DeploymentsIndexRoute
@@ -371,8 +389,10 @@ export interface FileRoutesById {
   '/api/v1/webhooks/$webhookId': typeof ApiV1WebhooksWebhookIdRoute
   '/api/v1/webhooks/deliveries': typeof ApiV1WebhooksDeliveriesRoute
   '/dashboard_/sites/$slug/analytics': typeof DashboardSitesSlugAnalyticsRoute
+  '/dashboard_/sites/$slug/channels': typeof DashboardSitesSlugChannelsRoute
   '/dashboard_/sites/$slug/domains': typeof DashboardSitesSlugDomainsRoute
   '/dashboard_/sites/$slug/inspect': typeof DashboardSitesSlugInspectRoute
+  '/dashboard_/sites/$slug/sharing': typeof DashboardSitesSlugSharingRoute
   '/dashboard_/sites/$slug/versions': typeof DashboardSitesSlugVersionsRoute
   '/api/v1/admin/': typeof ApiV1AdminIndexRoute
   '/api/v1/deployments/': typeof ApiV1DeploymentsIndexRoute
@@ -415,8 +435,10 @@ export interface FileRouteTypes {
     | '/api/v1/webhooks/$webhookId'
     | '/api/v1/webhooks/deliveries'
     | '/dashboard/sites/$slug/analytics'
+    | '/dashboard/sites/$slug/channels'
     | '/dashboard/sites/$slug/domains'
     | '/dashboard/sites/$slug/inspect'
+    | '/dashboard/sites/$slug/sharing'
     | '/dashboard/sites/$slug/versions'
     | '/api/v1/admin/'
     | '/api/v1/deployments/'
@@ -456,8 +478,10 @@ export interface FileRouteTypes {
     | '/api/v1/webhooks/$webhookId'
     | '/api/v1/webhooks/deliveries'
     | '/dashboard/sites/$slug/analytics'
+    | '/dashboard/sites/$slug/channels'
     | '/dashboard/sites/$slug/domains'
     | '/dashboard/sites/$slug/inspect'
+    | '/dashboard/sites/$slug/sharing'
     | '/dashboard/sites/$slug/versions'
     | '/api/v1/admin'
     | '/api/v1/deployments'
@@ -498,8 +522,10 @@ export interface FileRouteTypes {
     | '/api/v1/webhooks/$webhookId'
     | '/api/v1/webhooks/deliveries'
     | '/dashboard_/sites/$slug/analytics'
+    | '/dashboard_/sites/$slug/channels'
     | '/dashboard_/sites/$slug/domains'
     | '/dashboard_/sites/$slug/inspect'
+    | '/dashboard_/sites/$slug/sharing'
     | '/dashboard_/sites/$slug/versions'
     | '/api/v1/admin/'
     | '/api/v1/deployments/'
@@ -690,6 +716,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardSitesSlugAnalyticsRouteImport
       parentRoute: typeof DashboardSitesSlugRouteRoute
     }
+    '/dashboard_/sites/$slug/channels': {
+      id: '/dashboard_/sites/$slug/channels'
+      path: '/channels'
+      fullPath: '/dashboard/sites/$slug/channels'
+      preLoaderRoute: typeof DashboardSitesSlugChannelsRouteImport
+      parentRoute: typeof DashboardSitesSlugRouteRoute
+    }
     '/dashboard_/sites/$slug/domains': {
       id: '/dashboard_/sites/$slug/domains'
       path: '/domains'
@@ -702,6 +735,13 @@ declare module '@tanstack/react-router' {
       path: '/inspect'
       fullPath: '/dashboard/sites/$slug/inspect'
       preLoaderRoute: typeof DashboardSitesSlugInspectRouteImport
+      parentRoute: typeof DashboardSitesSlugRouteRoute
+    }
+    '/dashboard_/sites/$slug/sharing': {
+      id: '/dashboard_/sites/$slug/sharing'
+      path: '/sharing'
+      fullPath: '/dashboard/sites/$slug/sharing'
+      preLoaderRoute: typeof DashboardSitesSlugSharingRouteImport
       parentRoute: typeof DashboardSitesSlugRouteRoute
     }
     '/dashboard_/sites/$slug/versions': {
@@ -835,8 +875,10 @@ declare module '@tanstack/react-router' {
 
 interface DashboardSitesSlugRouteRouteChildren {
   DashboardSitesSlugAnalyticsRoute: typeof DashboardSitesSlugAnalyticsRoute
+  DashboardSitesSlugChannelsRoute: typeof DashboardSitesSlugChannelsRoute
   DashboardSitesSlugDomainsRoute: typeof DashboardSitesSlugDomainsRoute
   DashboardSitesSlugInspectRoute: typeof DashboardSitesSlugInspectRoute
+  DashboardSitesSlugSharingRoute: typeof DashboardSitesSlugSharingRoute
   DashboardSitesSlugVersionsRoute: typeof DashboardSitesSlugVersionsRoute
   DashboardSitesSlugIndexRoute: typeof DashboardSitesSlugIndexRoute
 }
@@ -844,8 +886,10 @@ interface DashboardSitesSlugRouteRouteChildren {
 const DashboardSitesSlugRouteRouteChildren: DashboardSitesSlugRouteRouteChildren =
   {
     DashboardSitesSlugAnalyticsRoute: DashboardSitesSlugAnalyticsRoute,
+    DashboardSitesSlugChannelsRoute: DashboardSitesSlugChannelsRoute,
     DashboardSitesSlugDomainsRoute: DashboardSitesSlugDomainsRoute,
     DashboardSitesSlugInspectRoute: DashboardSitesSlugInspectRoute,
+    DashboardSitesSlugSharingRoute: DashboardSitesSlugSharingRoute,
     DashboardSitesSlugVersionsRoute: DashboardSitesSlugVersionsRoute,
     DashboardSitesSlugIndexRoute: DashboardSitesSlugIndexRoute,
   }

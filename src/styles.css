@@ -4600,3 +4600,16 @@ summary:focus-visible {
     font-size: 16px;
   }
 }
+.console-item {
+  min-width: 0;
+  padding-block: 20px;
+  border-top: 1px solid var(--line);
+  overflow-wrap: anywhere;
+}
+.console-item h3 {
+  margin-top: 0;
+}
+.console-item p {
+  color: var(--muted);
+  line-height: 1.6;
+}
