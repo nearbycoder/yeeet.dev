@@ -117,6 +117,13 @@ function SiteOverview() {
               <h2>Keep it moving</h2>
             </div>
           </div>
+          <Link
+            className="button button-coral"
+            to="/dashboard"
+            search={{ site: site.slug }}
+          >
+            Deploy an update ↗
+          </Link>
           <a
             className="button button-ink"
             href={site.url}
