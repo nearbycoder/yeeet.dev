@@ -1,3 +1,4 @@
+import { CopyButton } from '#/components/copy-button'
 import { NavigationMenu } from '#/components/navigation-menu'
 import { Link, createFileRoute, redirect } from '@tanstack/react-router'
 import { ArrowIcon, Brand } from '#/components/brand'
@@ -141,13 +142,11 @@ function Home() {
                   ✓ Live at <b>https://comet.{siteDomain}</b>
                 </p>
               </div>
-              <button
+              <CopyButton
+                value={command}
+                label="Copy command"
                 className="copy-command"
-                onClick={() => navigator.clipboard.writeText(command)}
-                type="button"
-              >
-                Copy command
-              </button>
+              />
             </div>
           </div>
         </section>
