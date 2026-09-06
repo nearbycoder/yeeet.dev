@@ -1,4 +1,4 @@
-import { useId } from 'react'
+import { memo, useId } from 'react'
 import type { CSSProperties } from 'react'
 
 export type YeeetlingPhase =
@@ -469,7 +469,7 @@ export function YeeetlingArtwork({
   )
 }
 
-export function Yeeetling({
+export const Yeeetling = memo(function Yeeetling({
   seed,
   phase = 'idle',
   compact = false,
@@ -508,4 +508,4 @@ export function Yeeetling({
       </div>
     </div>
   )
-}
+})

@@ -1,3 +1,4 @@
+import { NavigationMenu } from '#/components/navigation-menu'
 import { Link, createFileRoute, redirect } from '@tanstack/react-router'
 import { ArrowIcon, Brand } from '#/components/brand'
 import { getPublicPlatformConfig, getSession } from '#/server/functions'
@@ -17,9 +18,12 @@ function Home() {
 
   return (
     <div className="marketing-shell">
+      <a className="skip-link" href="#main-content">
+        Skip to content
+      </a>
       <header className="topbar wrap">
         <Brand />
-        <nav className="nav-links" aria-label="Main navigation">
+        <NavigationMenu label="Main navigation" className="nav-links">
           <a href="#how">How it works</a>
           <Link to="/mascot">Yeeetlings</Link>
           <a href={docsUrl}>Docs</a>
@@ -27,10 +31,10 @@ function Home() {
           <Link to="/dashboard" className="button button-small button-ink">
             Launch console <ArrowIcon />
           </Link>
-        </nav>
+        </NavigationMenu>
       </header>
 
-      <main>
+      <main id="main-content" tabIndex={-1}>
         <section className="hero wrap">
           <div className="hero-copy">
             <div className="eyebrow">

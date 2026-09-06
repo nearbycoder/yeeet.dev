@@ -1,3 +1,4 @@
+import { NavigationMenu } from '#/components/navigation-menu'
 import { Link } from '@tanstack/react-router'
 import { Brand } from './brand'
 import { authClient } from '#/lib/auth-client'
@@ -20,8 +21,12 @@ export function DashboardHeader({
   return (
     <header className="dashboard-header">
       <Brand />
-      <nav aria-label="Account navigation">
-        <Link to="/dashboard" className="dashboard-home-link">
+      <NavigationMenu label="Account navigation">
+        <Link
+          to="/dashboard"
+          className="dashboard-home-link"
+          activeProps={{ 'aria-current': 'page' }}
+        >
           Dashboard
         </Link>
         <Link to="/mascot" className="mascot-lab-link">
@@ -50,7 +55,7 @@ export function DashboardHeader({
         >
           Sign out
         </button>
-      </nav>
+      </NavigationMenu>
     </header>
   )
 }

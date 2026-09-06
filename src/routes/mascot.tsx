@@ -1,3 +1,4 @@
+import { NavigationMenu } from '#/components/navigation-menu'
 import { useState } from 'react'
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { Brand } from '#/components/brand'
@@ -68,17 +69,20 @@ function MascotLab() {
 
   return (
     <div className="mascot-lab-shell">
+      <a className="skip-link" href="#main-content">
+        Skip to content
+      </a>
       <header className="topbar wrap mascot-lab-header">
         <Brand />
-        <nav aria-label="Mascot lab navigation">
+        <NavigationMenu label="Mascot lab navigation">
           <a href={docsUrl}>Docs</a>
           <Link to="/dashboard" className="button button-small button-ink">
             Launch console ↗
           </Link>
-        </nav>
+        </NavigationMenu>
       </header>
 
-      <main className="mascot-lab-main">
+      <main className="mascot-lab-main" id="main-content" tabIndex={-1}>
         <section className="mascot-lab-copy">
           <div className="eyebrow">
             <span className="status-dot" /> Yeeetling Lab
