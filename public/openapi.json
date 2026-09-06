@@ -358,6 +358,33 @@
         }
       }
     },
+    "/api/v1/webhooks/deliveries/{deliveryId}/retry": {
+      "post": {
+        "operationId": "retryWebhookDelivery",
+        "description": "Queue a failed delivery belonging to the current account. Requires an active endpoint. Pending and successful deliveries cannot be replayed.",
+        "parameters": [
+          {
+            "name": "deliveryId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Delivery queued for another attempt"
+          },
+          "404": {
+            "description": "Delivery not found"
+          },
+          "409": {
+            "description": "Endpoint disabled or delivery not failed"
+          }
+        }
+      }
+    },
     "/api/v1/deployments": {
       "get": {
         "operationId": "listDeployments",

@@ -38,6 +38,10 @@ Railway deployment configuration, documentation site, and the
   </tr>
 </table>
 
+Read the [console guide](docs/console.md) for deployment review, channels, sharing,
+API keys and webhooks, personal organization, team workspaces, feedback, expiry,
+health checks, and retention.
+
 ## Who it is for
 
 - Developers who want to publish a static build without maintaining a pipeline.

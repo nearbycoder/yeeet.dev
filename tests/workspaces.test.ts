@@ -26,6 +26,10 @@ test('workspace feedback accepts local paths and rejects empty or excessive comm
   )
 })
 test('workspace membership is required and viewers cannot edit or manage members', async (t) => {
+  t.mock.method(db.query.user, 'findFirst', async () => ({
+    id: 'owner',
+    banned: false,
+  }))
   t.mock.method(db.query.workspaces, 'findFirst', async () => ({
     id: 'w',
     ownerId: 'owner',
@@ -83,5 +87,23 @@ test('delegated deployment access is scoped to the assigned site and revoked mem
   await assert.rejects(
     actorForWorkspaceSite(actor, 'comet'),
     /Workspace not found/,
+  )
+})
+
+test('shared workspaces cannot bypass an owner account suspension', async (t) => {
+  t.mock.method(db.query.workspaces, 'findFirst', async () => ({
+    id: 'w',
+    ownerId: 'owner',
+  }))
+  t.mock.method(db.query.workspaceMembers, 'findFirst', async () => ({
+    role: 'editor',
+  }))
+  t.mock.method(db.query.user, 'findFirst', async () => ({
+    id: 'owner',
+    banned: true,
+  }))
+  await assert.rejects(
+    requireWorkspace('editor', 'w', 'edit'),
+    /owner is unavailable/,
   )
 })

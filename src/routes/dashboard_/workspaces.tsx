@@ -544,6 +544,7 @@ function Workspaces() {
         </div>
       </main>
       <ConfirmDialog
+        busyLabel="Working…"
         open={Boolean(confirm)}
         title={confirm?.title ?? ''}
         description={confirm?.description ?? ''}

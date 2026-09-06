@@ -125,12 +125,16 @@ export async function deleteStoredPrefix(prefix: string) {
       object.Key ? [{ Key: object.Key }] : [],
     )
     if (objects.length) {
-      await client.send(
+      const result = await client.send(
         new DeleteObjectsCommand({
           Bucket: bucket,
           Delete: { Objects: objects, Quiet: true },
         }),
       )
+      if (result.Errors?.length)
+        throw new Error(
+          'Some stored files could not be deleted. Cleanup will retry.',
+        )
       deleted += objects.length
     }
     continuationToken = page.NextContinuationToken

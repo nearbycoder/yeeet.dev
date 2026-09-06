@@ -489,3 +489,42 @@ export const siteHealth = pgTable(
     index('site_health_due_idx').on(table.enabled, table.nextCheckAt),
   ],
 )
+
+export const siteRetention = pgTable(
+  'site_retention',
+  {
+    siteId: text('site_id')
+      .primaryKey()
+      .references(() => sites.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    enabled: boolean('enabled').default(false).notNull(),
+    keepCount: integer('keep_count').default(10).notNull(),
+    minAgeDays: integer('min_age_days').default(30).notNull(),
+    nextRunAt: timestamp('next_run_at').defaultNow().notNull(),
+    lastRunAt: timestamp('last_run_at'),
+    lastDeletedCount: integer('last_deleted_count').default(0).notNull(),
+    error: text('error'),
+  },
+  (table) => [
+    index('site_retention_due_idx').on(table.enabled, table.nextRunAt),
+  ],
+)
+export const storageCleanupJobs = pgTable(
+  'storage_cleanup_jobs',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id').notNull(),
+    siteId: text('site_id').notNull(),
+    prefix: text('prefix').notNull(),
+    attempts: integer('attempts').default(0).notNull(),
+    nextAttemptAt: timestamp('next_attempt_at').defaultNow().notNull(),
+    error: text('error'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  (table) => [
+    index('storage_cleanup_due_idx').on(table.nextAttemptAt),
+    index('storage_cleanup_site_idx').on(table.siteId),
+  ],
+)

@@ -4656,3 +4656,18 @@ summary:focus-visible {
   font: inherit;
   resize: vertical;
 }
+
+.checkbox-label,
+.console-form-grid label.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-height: 44px;
+}
+.checkbox-label input[type='checkbox'] {
+  width: 18px;
+  min-width: 18px;
+  min-height: 18px;
+  height: 18px;
+  accent-color: var(--coral);
+}

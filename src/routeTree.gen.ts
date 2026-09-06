@@ -32,6 +32,7 @@ import { Route as ApiV1WebhooksDeliveriesRouteImport } from './routes/api/v1/web
 import { Route as DashboardSitesSlugIndexRouteImport } from './routes/dashboard_/sites/$slug/index'
 import { Route as DashboardSitesSlugAnalyticsRouteImport } from './routes/dashboard_/sites/$slug/analytics'
 import { Route as DashboardSitesSlugChannelsRouteImport } from './routes/dashboard_/sites/$slug/channels'
+import { Route as DashboardSitesSlugCleanupRouteImport } from './routes/dashboard_/sites/$slug/cleanup'
 import { Route as DashboardSitesSlugDomainsRouteImport } from './routes/dashboard_/sites/$slug/domains'
 import { Route as DashboardSitesSlugInspectRouteImport } from './routes/dashboard_/sites/$slug/inspect'
 import { Route as DashboardSitesSlugLifecycleRouteImport } from './routes/dashboard_/sites/$slug/lifecycle'
@@ -172,6 +173,12 @@ const DashboardSitesSlugChannelsRoute =
   DashboardSitesSlugChannelsRouteImport.update({
     id: '/channels',
     path: '/channels',
+    getParentRoute: () => DashboardSitesSlugRouteRoute,
+  } as any)
+const DashboardSitesSlugCleanupRoute =
+  DashboardSitesSlugCleanupRouteImport.update({
+    id: '/cleanup',
+    path: '/cleanup',
     getParentRoute: () => DashboardSitesSlugRouteRoute,
   } as any)
 const DashboardSitesSlugDomainsRoute =
@@ -330,6 +337,7 @@ export interface FileRoutesByFullPath {
   '/api/v1/webhooks/deliveries': typeof ApiV1WebhooksDeliveriesRouteWithChildren
   '/dashboard/sites/$slug/analytics': typeof DashboardSitesSlugAnalyticsRoute
   '/dashboard/sites/$slug/channels': typeof DashboardSitesSlugChannelsRoute
+  '/dashboard/sites/$slug/cleanup': typeof DashboardSitesSlugCleanupRoute
   '/dashboard/sites/$slug/domains': typeof DashboardSitesSlugDomainsRoute
   '/dashboard/sites/$slug/inspect': typeof DashboardSitesSlugInspectRoute
   '/dashboard/sites/$slug/lifecycle': typeof DashboardSitesSlugLifecycleRoute
@@ -377,6 +385,7 @@ export interface FileRoutesByTo {
   '/api/v1/webhooks/deliveries': typeof ApiV1WebhooksDeliveriesRouteWithChildren
   '/dashboard/sites/$slug/analytics': typeof DashboardSitesSlugAnalyticsRoute
   '/dashboard/sites/$slug/channels': typeof DashboardSitesSlugChannelsRoute
+  '/dashboard/sites/$slug/cleanup': typeof DashboardSitesSlugCleanupRoute
   '/dashboard/sites/$slug/domains': typeof DashboardSitesSlugDomainsRoute
   '/dashboard/sites/$slug/inspect': typeof DashboardSitesSlugInspectRoute
   '/dashboard/sites/$slug/lifecycle': typeof DashboardSitesSlugLifecycleRoute
@@ -426,6 +435,7 @@ export interface FileRoutesById {
   '/api/v1/webhooks/deliveries': typeof ApiV1WebhooksDeliveriesRouteWithChildren
   '/dashboard_/sites/$slug/analytics': typeof DashboardSitesSlugAnalyticsRoute
   '/dashboard_/sites/$slug/channels': typeof DashboardSitesSlugChannelsRoute
+  '/dashboard_/sites/$slug/cleanup': typeof DashboardSitesSlugCleanupRoute
   '/dashboard_/sites/$slug/domains': typeof DashboardSitesSlugDomainsRoute
   '/dashboard_/sites/$slug/inspect': typeof DashboardSitesSlugInspectRoute
   '/dashboard_/sites/$slug/lifecycle': typeof DashboardSitesSlugLifecycleRoute
@@ -476,6 +486,7 @@ export interface FileRouteTypes {
     | '/api/v1/webhooks/deliveries'
     | '/dashboard/sites/$slug/analytics'
     | '/dashboard/sites/$slug/channels'
+    | '/dashboard/sites/$slug/cleanup'
     | '/dashboard/sites/$slug/domains'
     | '/dashboard/sites/$slug/inspect'
     | '/dashboard/sites/$slug/lifecycle'
@@ -523,6 +534,7 @@ export interface FileRouteTypes {
     | '/api/v1/webhooks/deliveries'
     | '/dashboard/sites/$slug/analytics'
     | '/dashboard/sites/$slug/channels'
+    | '/dashboard/sites/$slug/cleanup'
     | '/dashboard/sites/$slug/domains'
     | '/dashboard/sites/$slug/inspect'
     | '/dashboard/sites/$slug/lifecycle'
@@ -571,6 +583,7 @@ export interface FileRouteTypes {
     | '/api/v1/webhooks/deliveries'
     | '/dashboard_/sites/$slug/analytics'
     | '/dashboard_/sites/$slug/channels'
+    | '/dashboard_/sites/$slug/cleanup'
     | '/dashboard_/sites/$slug/domains'
     | '/dashboard_/sites/$slug/inspect'
     | '/dashboard_/sites/$slug/lifecycle'
@@ -789,6 +802,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardSitesSlugChannelsRouteImport
       parentRoute: typeof DashboardSitesSlugRouteRoute
     }
+    '/dashboard_/sites/$slug/cleanup': {
+      id: '/dashboard_/sites/$slug/cleanup'
+      path: '/cleanup'
+      fullPath: '/dashboard/sites/$slug/cleanup'
+      preLoaderRoute: typeof DashboardSitesSlugCleanupRouteImport
+      parentRoute: typeof DashboardSitesSlugRouteRoute
+    }
     '/dashboard_/sites/$slug/domains': {
       id: '/dashboard_/sites/$slug/domains'
       path: '/domains'
@@ -956,6 +976,7 @@ declare module '@tanstack/react-router' {
 interface DashboardSitesSlugRouteRouteChildren {
   DashboardSitesSlugAnalyticsRoute: typeof DashboardSitesSlugAnalyticsRoute
   DashboardSitesSlugChannelsRoute: typeof DashboardSitesSlugChannelsRoute
+  DashboardSitesSlugCleanupRoute: typeof DashboardSitesSlugCleanupRoute
   DashboardSitesSlugDomainsRoute: typeof DashboardSitesSlugDomainsRoute
   DashboardSitesSlugInspectRoute: typeof DashboardSitesSlugInspectRoute
   DashboardSitesSlugLifecycleRoute: typeof DashboardSitesSlugLifecycleRoute
@@ -968,6 +989,7 @@ const DashboardSitesSlugRouteRouteChildren: DashboardSitesSlugRouteRouteChildren
   {
     DashboardSitesSlugAnalyticsRoute: DashboardSitesSlugAnalyticsRoute,
     DashboardSitesSlugChannelsRoute: DashboardSitesSlugChannelsRoute,
+    DashboardSitesSlugCleanupRoute: DashboardSitesSlugCleanupRoute,
     DashboardSitesSlugDomainsRoute: DashboardSitesSlugDomainsRoute,
     DashboardSitesSlugInspectRoute: DashboardSitesSlugInspectRoute,
     DashboardSitesSlugLifecycleRoute: DashboardSitesSlugLifecycleRoute,

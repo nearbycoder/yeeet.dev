@@ -58,6 +58,13 @@ export async function requireWorkspace(
       'Your workspace role does not allow this action.',
       'forbidden',
     )
+  if (workspace.ownerId !== userId) {
+    const owner = await db.query.user.findFirst({
+      where: eq(user.id, workspace.ownerId),
+    })
+    if (!owner || owner.banned)
+      throw new HttpError(403, 'Workspace owner is unavailable.', 'forbidden')
+  }
   return { ...workspace, role }
 }
 async function workspaceSite(
@@ -100,11 +107,6 @@ export async function actorForWorkspaceSite(actor: Actor, slug?: string) {
   )
   if (workspace.ownerId !== site.userId)
     throw new HttpError(403, 'Site ownership changed.', 'forbidden')
-  const owner = await db.query.user.findFirst({
-    where: eq(user.id, site.userId),
-  })
-  if (!owner || owner.banned)
-    throw new HttpError(403, 'Workspace owner is unavailable.', 'forbidden')
   return { ...actor, userId: site.userId, actingUserId: actor.userId }
 }
 export async function actorForWorkspaceDeployment(
