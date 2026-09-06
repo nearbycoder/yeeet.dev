@@ -1,3 +1,4 @@
+import { previewHasExpired } from '#/lib/lifecycle'
 import { and, eq, inArray } from 'drizzle-orm'
 import { db } from '#/db'
 import {
@@ -117,14 +118,16 @@ export function siteResponsePolicy(
   immutableVersion: boolean,
   protectedDeployment: boolean,
   noCrawl = immutableVersion,
+  expiringPreview = false,
 ) {
-  const cacheControl = protectedDeployment
-    ? 'private, no-store, max-age=0'
-    : immutableVersion
-      ? 'public, max-age=31536000, immutable'
-      : contentType.includes('text/html')
-        ? 'public, max-age=0, s-maxage=10, stale-while-revalidate=30'
-        : 'public, max-age=0, s-maxage=10, stale-while-revalidate=30'
+  const cacheControl =
+    protectedDeployment || expiringPreview
+      ? 'private, no-store, max-age=0'
+      : immutableVersion
+        ? 'public, max-age=31536000, immutable'
+        : contentType.includes('text/html')
+          ? 'public, max-age=0, s-maxage=10, stale-while-revalidate=30'
+          : 'public, max-age=0, s-maxage=10, stale-while-revalidate=30'
   const blockCrawlers = noCrawl || protectedDeployment
   return {
     cacheControl,
@@ -323,6 +326,27 @@ export async function maybeServeSite(
     ),
   })
   if (!deployment) return notFound(target.label, noCrawlTarget)
+  if (
+    deployment.expiresAt &&
+    new Date(deployment.expiresAt).getTime() <= Date.now()
+  ) {
+    const ownerSite = await db.query.sites.findFirst({
+      where: eq(sites.id, deployment.siteId),
+    })
+    if (
+      previewHasExpired(
+        deployment.expiresAt,
+        ownerSite?.activeDeploymentId === deployment.id,
+      )
+    )
+      return new Response('This preview has expired.', {
+        status: 410,
+        headers: {
+          'cache-control': 'no-store',
+          'x-robots-tag': 'noindex, nofollow',
+        },
+      })
+  }
 
   if (!siteSlug) {
     const site = await db.query.sites.findFirst({
@@ -382,6 +406,7 @@ export async function maybeServeSite(
       target.kind === 'version',
       protectedDeployment,
       noCrawlTarget,
+      Boolean(deployment.expiresAt),
     )
     const etag = protectedDeployment ? null : `"yeeet-og-${deployment.id}-v2"`
     const headers = new Headers({
@@ -440,6 +465,7 @@ export async function maybeServeSite(
       target.kind === 'version',
       protectedDeployment,
       noCrawlTarget,
+      Boolean(deployment.expiresAt),
     )
     const headers = new Headers({
       location: redirect.to,
@@ -512,6 +538,7 @@ export async function maybeServeSite(
     target.kind === 'version',
     protectedDeployment,
     noCrawlTarget,
+    Boolean(deployment.expiresAt),
   )
   const etag =
     !protectedDeployment && file.etag
@@ -525,7 +552,11 @@ export async function maybeServeSite(
     'accept-ranges': 'bytes',
   })
   applySiteHeaders(headers, headerRules, effectivePath)
-  if (target.kind === 'version' || protectedDeployment) {
+  if (
+    target.kind === 'version' ||
+    protectedDeployment ||
+    deployment.expiresAt
+  ) {
     headers.set('cache-control', responsePolicy.cacheControl)
   }
   headers.set('content-type', file.contentType)

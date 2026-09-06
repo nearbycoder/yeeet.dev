@@ -113,6 +113,13 @@ function SiteLayout() {
           >
             Inspect
           </Link>
+          <Link
+            to="/dashboard/sites/$slug/lifecycle"
+            params={{ slug: site.slug }}
+            activeProps={{ 'aria-current': 'page' }}
+          >
+            Lifecycle
+          </Link>
         </nav>
         <Outlet />
       </main>
