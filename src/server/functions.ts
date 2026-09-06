@@ -113,3 +113,15 @@ export const getDeploymentInspection = createServerFn({ method: 'GET' })
         : null,
     }
   })
+
+export const getSiteChannelsData = createServerFn({ method: 'GET' })
+  .validator((data: { slug: string }) => data)
+  .handler(async ({ data }) => {
+    const actor = await requireActor(getRequest())
+    const { listSiteChannels } = await import('./deployments')
+    const [history, result] = await Promise.all([
+      listSiteVersions(actor.userId, data.slug),
+      listSiteChannels(actor.userId, data.slug),
+    ])
+    return { history, channels: result.channels }
+  })
