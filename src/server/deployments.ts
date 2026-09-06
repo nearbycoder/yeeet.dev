@@ -833,7 +833,11 @@ function deploymentResult(
   }
 }
 
-export async function listSiteVersions(userId: string, value: string) {
+export async function listSiteVersions(
+  userId: string,
+  value: string,
+  limit = 100,
+) {
   const slug = normalizeSlug(value)
   const site = await db.query.sites.findFirst({
     where: and(eq(sites.slug, slug), eq(sites.userId, userId)),
@@ -859,7 +863,7 @@ export async function listSiteVersions(userId: string, value: string) {
     .from(deployments)
     .where(eq(deployments.siteId, site.id))
     .orderBy(desc(deployments.createdAt))
-    .limit(100)
+    .limit(limit)
 
   return {
     site: {
@@ -1223,7 +1227,7 @@ export async function deleteOwnedSite(userId: string, value: string) {
   }
 }
 
-export async function listSites(userId: string) {
+export async function listSites(userId: string, value?: string) {
   const rows = await db
     .select({
       id: sites.id,
@@ -1239,7 +1243,12 @@ export async function listSites(userId: string) {
     })
     .from(sites)
     .leftJoin(deployments, eq(sites.activeDeploymentId, deployments.id))
-    .where(eq(sites.userId, userId))
+    .where(
+      and(
+        eq(sites.userId, userId),
+        value === undefined ? undefined : eq(sites.slug, normalizeSlug(value)),
+      ),
+    )
     .orderBy(desc(sites.updatedAt))
 
   return rows.map(({ passwordHash, shareNonce, ...row }) => ({

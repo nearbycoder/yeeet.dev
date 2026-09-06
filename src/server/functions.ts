@@ -48,16 +48,16 @@ export const getSiteWorkspaceData = createServerFn({ method: 'GET' })
   .handler(async ({ data }) => {
     const actor = await requireActor(getRequest())
     const [siteRows, domains, history] = await Promise.all([
-      listSites(actor.userId),
+      listSites(actor.userId, data.slug),
       listCustomDomains(actor.userId, data.slug),
-      listSiteVersions(actor.userId, data.slug),
+      listSiteVersions(actor.userId, data.slug, 3),
     ])
     const site = siteRows.find((row) => row.slug === history.site.slug)
     if (!site) throw new Error('Site not found.')
     return {
       platform: publicPlatformConfig(),
       site: { ...site, customDomains: domains },
-      latestVersions: history.versions.slice(0, 3),
+      latestVersions: history.versions,
     }
   })
 

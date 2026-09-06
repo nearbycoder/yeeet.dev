@@ -27,6 +27,13 @@ export const Route = createRootRouteWithContext<RouterContext>()({
     links: [
       { rel: 'stylesheet', href: appCss },
       {
+        rel: 'preload',
+        href: '/fonts/manrope-latin-400-800.woff2',
+        as: 'font',
+        type: 'font/woff2',
+        crossOrigin: 'anonymous',
+      },
+      {
         rel: 'icon',
         href: 'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22><rect width=%2264%22 height=%2264%22 rx=%2214%22 fill=%22%23171714%22/><path d=%22M14 16h11l7 12 7-12h11L37 37v11H27V37z%22 fill=%22%23f04d2f%22/></svg>',
       },
