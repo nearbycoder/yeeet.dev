@@ -1,3 +1,4 @@
+import { NavigationMenu } from '#/components/navigation-menu'
 import { useState } from 'react'
 import {
   Link,
@@ -91,7 +92,7 @@ function Admin() {
       </a>
       <header className="dashboard-header">
         <Brand />
-        <nav>
+        <NavigationMenu label="Admin navigation">
           <Link to="/dashboard">Launchpad</Link>
           <span className="admin-badge">ADMIN</span>
           <span className="user-chip">
@@ -107,10 +108,14 @@ function Admin() {
           >
             Sign out
           </button>
-        </nav>
+        </NavigationMenu>
       </header>
 
-      <main className="dashboard-main admin-main" id="main-content">
+      <main
+        className="dashboard-main admin-main"
+        id="main-content"
+        tabIndex={-1}
+      >
         <section className="dashboard-intro">
           <div>
             <div className="eyebrow">

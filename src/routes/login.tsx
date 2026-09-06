@@ -84,7 +84,7 @@ function Login() {
   }
 
   return (
-    <main className="auth-page">
+    <main id="main-content" tabIndex={-1} className="auth-page">
       <div className="auth-top">
         <Brand />
       </div>

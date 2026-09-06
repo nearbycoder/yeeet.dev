@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import {
   Link,
   createFileRoute,
@@ -11,6 +11,7 @@ import { Yeeetling, getYeeetlingDesign } from '#/components/yeeetling'
 import type { YeeetlingPhase } from '#/components/yeeetling'
 import { authClient } from '#/lib/auth-client'
 import { getDashboardData, getSession } from '#/server/functions'
+import { filterSites } from '#/lib/site-search'
 
 export const Route = createFileRoute('/dashboard')({
   beforeLoad: async () => {
@@ -193,6 +194,15 @@ function Dashboard() {
   const [newKey, setNewKey] = useState('')
   const [keyBusy, setKeyBusy] = useState(false)
   const [siteBusy, setSiteBusy] = useState('')
+  const [siteSearch, setSiteSearch] = useState('')
+  const [siteStatus, setSiteStatus] = useState<'all' | 'live' | 'inactive'>(
+    'all',
+  )
+  const [visibleSiteCount, setVisibleSiteCount] = useState(20)
+  const matchingSites = useMemo(
+    () => filterSites(data.sites, siteSearch, siteStatus),
+    [data.sites, siteSearch, siteStatus],
+  )
   const [deleteTarget, setDeleteTarget] =
     useState<DashboardDeleteTarget | null>(null)
   const totalBytes = files.reduce((sum, item) => sum + item.file.size, 0)
@@ -398,7 +408,7 @@ function Dashboard() {
       </a>
       <DashboardHeader user={user} docsUrl={data.platform.docsUrl} />
 
-      <main className="dashboard-main" id="main-content">
+      <main className="dashboard-main" id="main-content" tabIndex={-1}>
         <section className="dashboard-intro">
           <div>
             <div className="eyebrow">
@@ -680,8 +690,50 @@ function Dashboard() {
               <b>{data.sites.length}</b>
             </div>
             {data.sites.length ? (
+              <div
+                className="site-filters"
+                role="search"
+                aria-label="Find a site"
+              >
+                <label>
+                  <span>Search sites</span>
+                  <input
+                    type="search"
+                    name="site-search"
+                    autoComplete="off"
+                    spellCheck={false}
+                    placeholder="Site name or custom domain…"
+                    value={siteSearch}
+                    onChange={(event) => {
+                      setSiteSearch(event.target.value)
+                      setVisibleSiteCount(20)
+                    }}
+                  />
+                </label>
+                <label>
+                  <span>Status</span>
+                  <select
+                    value={siteStatus}
+                    onChange={(event) => {
+                      setSiteStatus(event.target.value as typeof siteStatus)
+                      setVisibleSiteCount(20)
+                    }}
+                  >
+                    <option value="all">All sites</option>
+                    <option value="live">Live</option>
+                    <option value="inactive">No live version</option>
+                  </select>
+                </label>
+                <p role="status">
+                  Showing {Math.min(visibleSiteCount, matchingSites.length)} of{' '}
+                  {matchingSites.length}{' '}
+                  {matchingSites.length === 1 ? 'site' : 'sites'}
+                </p>
+              </div>
+            ) : null}
+            {data.sites.length ? (
               <div className="site-list">
-                {data.sites.map((site) => (
+                {matchingSites.slice(0, visibleSiteCount).map((site) => (
                   <div className="site-row" key={site.id}>
                     <span className="site-icon site-mascot">
                       <Yeeetling
@@ -769,6 +821,32 @@ function Dashboard() {
                     </span>
                   </div>
                 ))}
+                {!matchingSites.length ? (
+                  <div className="empty-state">
+                    <p>No sites match these filters.</p>
+                    <button
+                      type="button"
+                      className="button button-paper"
+                      onClick={() => {
+                        setSiteSearch('')
+                        setSiteStatus('all')
+                        setVisibleSiteCount(20)
+                      }}
+                    >
+                      Clear filters
+                    </button>
+                  </div>
+                ) : null}
+                {matchingSites.length > visibleSiteCount ? (
+                  <button
+                    type="button"
+                    className="button button-paper site-show-more"
+                    onClick={() => setVisibleSiteCount((count) => count + 20)}
+                  >
+                    Show {Math.min(20, matchingSites.length - visibleSiteCount)}{' '}
+                    more sites
+                  </button>
+                ) : null}
               </div>
             ) : (
               <div className="empty-state">Your first site will land here.</div>

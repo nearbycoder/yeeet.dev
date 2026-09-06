@@ -29,7 +29,7 @@ function SiteLayout() {
         Skip to site content
       </a>
       <DashboardHeader user={user} docsUrl={platform.docsUrl} />
-      <main className="site-workspace" id="site-content">
+      <main className="site-workspace" id="site-content" tabIndex={-1}>
         <Link className="site-back-link" to="/dashboard">
           ← All sites
         </Link>

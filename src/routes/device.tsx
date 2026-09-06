@@ -67,7 +67,7 @@ function DeviceAuthorization() {
   }
 
   return (
-    <main className="auth-page device-page">
+    <main id="main-content" tabIndex={-1} className="auth-page device-page">
       <div className="auth-top">
         <Brand />
       </div>
