@@ -120,6 +120,13 @@ function SiteLayout() {
           >
             Lifecycle
           </Link>
+          <Link
+            to="/dashboard/sites/$slug/cleanup"
+            params={{ slug: site.slug }}
+            activeProps={{ 'aria-current': 'page' }}
+          >
+            Cleanup
+          </Link>
         </nav>
         <Outlet />
       </main>

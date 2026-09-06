@@ -1052,6 +1052,30 @@ export async function activateSiteVersion(
     )
   const activatedAt = new Date()
   await db.transaction(async (tx) => {
+    const fresh = await tx
+      .select({ id: deployments.id, expiresAt: deployments.expiresAt })
+      .from(deployments)
+      .where(
+        and(
+          eq(deployments.id, version.id),
+          eq(deployments.siteId, history.site.id),
+          eq(deployments.status, 'ready'),
+        ),
+      )
+      .for('update')
+    const target = fresh.at(0)
+    if (!target)
+      throw new HttpError(
+        409,
+        'This version is no longer available.',
+        'version_unavailable',
+      )
+    if (previewHasExpired(target.expiresAt, version.current))
+      throw new HttpError(
+        409,
+        'Extend this preview’s expiry before promoting it.',
+        'preview_expired',
+      )
     await tx
       .update(sites)
       .set({ activeDeploymentId: version.id, updatedAt: activatedAt })
@@ -1169,7 +1193,7 @@ export async function deleteSiteVersion(
   const history = await listSiteVersions(userId, value)
   const version = resolveSiteVersion(history.versions, selector)
   const wasActive = version.id === history.site.activeDeploymentId
-  const replacement = wasActive
+  let replacement = wasActive
     ? history.versions.find(
         (candidate) =>
           candidate.id !== version.id && candidate.status === 'ready',
@@ -1182,6 +1206,20 @@ export async function deleteSiteVersion(
   const changedAt = new Date()
   await db.transaction(async (tx) => {
     if (wasActive) {
+      if (replacement) {
+        const available = await tx
+          .select({ id: deployments.id })
+          .from(deployments)
+          .where(
+            and(
+              eq(deployments.id, replacement.id),
+              eq(deployments.siteId, history.site.id),
+              eq(deployments.status, 'ready'),
+            ),
+          )
+          .for('update')
+        if (!available.length) replacement = undefined
+      }
       await tx
         .update(sites)
         .set({

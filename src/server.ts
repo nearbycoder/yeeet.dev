@@ -1,3 +1,4 @@
+import { startRetentionWorker } from '#/server/retention'
 import { startHealthWorker } from '#/server/lifecycle'
 import handler, { createServerEntry } from '@tanstack/react-start/server-entry'
 import { recordSiteResponse, startAnalyticsWorker } from '#/server/analytics'
@@ -8,6 +9,7 @@ import { startWebhookWorker } from '#/server/webhooks'
 startWebhookWorker()
 startAnalyticsWorker()
 startHealthWorker()
+startRetentionWorker()
 
 export default createServerEntry({
   async fetch(request) {
