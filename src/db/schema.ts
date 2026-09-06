@@ -368,3 +368,25 @@ export const siteAnalyticsDailyRelations = relations(
     }),
   }),
 )
+
+export const sitePreferences = pgTable(
+  'site_preferences',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    siteId: text('site_id')
+      .notNull()
+      .references(() => sites.id, { onDelete: 'cascade' }),
+    favorite: boolean('favorite').default(false).notNull(),
+    project: text('project').default('').notNull(),
+    tags: text('tags').default('[]').notNull(),
+  },
+  (table) => [
+    uniqueIndex('site_preferences_user_site_idx').on(
+      table.userId,
+      table.siteId,
+    ),
+  ],
+)
