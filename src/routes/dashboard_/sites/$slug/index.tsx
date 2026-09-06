@@ -1,3 +1,4 @@
+import { SiteOrganization } from '#/components/site-organization'
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { Route as SiteRoute } from './route'
 
@@ -28,6 +29,11 @@ function SiteOverview() {
 
   return (
     <div className="site-page-stack">
+      <SiteOrganization
+        key={site.slug}
+        slug={site.slug}
+        organization={site.organization}
+      />
       <section className="site-metrics" aria-label="Site summary">
         <article>
           <span>Active payload</span>

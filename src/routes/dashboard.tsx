@@ -210,14 +210,28 @@ function Dashboard() {
   const [keyBusy, setKeyBusy] = useState(false)
   const [keyError, setKeyError] = useState('')
   const [siteBusy, setSiteBusy] = useState('')
+  const [projectGroup, setProjectGroup] = useState('')
+  const [favoritesOnly, setFavoritesOnly] = useState(false)
+  const projectGroups = [
+    ...new Set(
+      data.sites.map((site) => site.organization.project).filter(Boolean),
+    ),
+  ].sort()
   const [siteSearch, setSiteSearch] = useState('')
   const [siteStatus, setSiteStatus] = useState<'all' | 'live' | 'inactive'>(
     'all',
   )
   const [visibleSiteCount, setVisibleSiteCount] = useState(20)
   const matchingSites = useMemo(
-    () => filterSites(data.sites, siteSearch, siteStatus),
-    [data.sites, siteSearch, siteStatus],
+    () =>
+      filterSites(
+        data.sites,
+        siteSearch,
+        siteStatus,
+        projectGroup,
+        favoritesOnly,
+      ),
+    [data.sites, siteSearch, siteStatus, projectGroup, favoritesOnly],
   )
   const [deleteTarget, setDeleteTarget] =
     useState<DashboardDeleteTarget | null>(null)
@@ -790,7 +804,7 @@ function Dashboard() {
                     name="site-search"
                     autoComplete="off"
                     spellCheck={false}
-                    placeholder="Site name or custom domain…"
+                    placeholder="Site, domain, project, or tag…"
                     value={siteSearch}
                     onChange={(event) => {
                       setSiteSearch(event.target.value)
@@ -811,6 +825,34 @@ function Dashboard() {
                     <option value="live">Live</option>
                     <option value="inactive">No live version</option>
                   </select>
+                </label>
+                <label>
+                  Project group
+                  <select
+                    value={projectGroup}
+                    onChange={(event) => {
+                      setProjectGroup(event.target.value)
+                      setVisibleSiteCount(20)
+                    }}
+                  >
+                    <option value="">All groups</option>
+                    {projectGroups.map((group) => (
+                      <option key={group} value={group}>
+                        {group}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={favoritesOnly}
+                    onChange={(event) => {
+                      setFavoritesOnly(event.target.checked)
+                      setVisibleSiteCount(20)
+                    }}
+                  />
+                  Favorites only
                 </label>
                 <p role="status">
                   Showing {Math.min(visibleSiteCount, matchingSites.length)} of{' '}
@@ -835,9 +877,17 @@ function Dashboard() {
                       to="/dashboard/sites/$slug"
                       params={{ slug: site.slug }}
                     >
-                      <b>{site.slug}</b>
+                      <b>
+                        {site.organization.favorite ? '★ ' : ''}
+                        {site.slug}
+                      </b>
                       <small>
                         {site.slug}.{data.platform.siteDomain}
+                      </small>
+                      <small>
+                        {[site.organization.project, ...site.organization.tags]
+                          .filter(Boolean)
+                          .join(' · ')}
                       </small>
                     </Link>
                     <span className="site-meta">
@@ -918,6 +968,8 @@ function Dashboard() {
                       onClick={() => {
                         setSiteSearch('')
                         setSiteStatus('all')
+                        setProjectGroup('')
+                        setFavoritesOnly(false)
                         setVisibleSiteCount(20)
                       }}
                     >

@@ -1,3 +1,5 @@
+import { organizationSchema, emptyOrganization } from '#/lib/site-organization'
+import { listSitePreferences, saveSiteOrganization } from './site-organization'
 import { createServerFn } from '@tanstack/react-start'
 import { getRequest, getRequestHeaders } from '@tanstack/react-start/server'
 import { auth } from '#/lib/auth'
@@ -21,11 +23,16 @@ export const getSession = createServerFn({ method: 'GET' }).handler(
 export const getDashboardData = createServerFn({ method: 'GET' }).handler(
   async () => {
     const actor = await requireActor(getRequest())
-    const [siteRows, deploymentRows, domainRows] = await Promise.all([
-      listSites(actor.userId),
-      listRecentDeployments(actor.userId),
-      listUserCustomDomains(actor.userId),
-    ])
+    const [siteRows, deploymentRows, domainRows, preferences] =
+      await Promise.all([
+        listSites(actor.userId),
+        listRecentDeployments(actor.userId),
+        listUserCustomDomains(actor.userId),
+        listSitePreferences(actor.userId),
+      ])
+    const preferencesBySite = new Map(
+      preferences.map((pref) => [pref.siteId, pref]),
+    )
     const domainsBySite = new Map<string, typeof domainRows>()
     for (const domain of domainRows) {
       const current = domainsBySite.get(domain.siteId) ?? []
@@ -36,6 +43,7 @@ export const getDashboardData = createServerFn({ method: 'GET' }).handler(
       platform: publicPlatformConfig(),
       sites: siteRows.map((site) => ({
         ...site,
+        organization: preferencesBySite.get(site.id) ?? emptyOrganization,
         customDomains: domainsBySite.get(site.id) ?? [],
       })),
       deployments: deploymentRows,
@@ -47,16 +55,23 @@ export const getSiteWorkspaceData = createServerFn({ method: 'GET' })
   .validator((data: { slug: string }) => data)
   .handler(async ({ data }) => {
     const actor = await requireActor(getRequest())
-    const [siteRows, domains, history] = await Promise.all([
+    const [siteRows, domains, history, preferences] = await Promise.all([
       listSites(actor.userId, data.slug),
       listCustomDomains(actor.userId, data.slug),
       listSiteVersions(actor.userId, data.slug, 3),
+      listSitePreferences(actor.userId),
     ])
     const site = siteRows.find((row) => row.slug === history.site.slug)
     if (!site) throw new Error('Site not found.')
     return {
       platform: publicPlatformConfig(),
-      site: { ...site, customDomains: domains },
+      site: {
+        ...site,
+        organization:
+          preferences.find((pref) => pref.siteId === site.id) ??
+          emptyOrganization,
+        customDomains: domains,
+      },
       latestVersions: history.versions,
     }
   })
@@ -146,3 +161,10 @@ export const getAccountConsoleData = createServerFn({ method: 'GET' }).handler(
     }
   },
 )
+
+export const updateSiteOrganization = createServerFn({ method: 'POST' })
+  .validator((data: unknown) => organizationSchema.parse(data))
+  .handler(async ({ data }) => {
+    const actor = await requireActor(getRequest())
+    return saveSiteOrganization(actor.userId, data)
+  })
