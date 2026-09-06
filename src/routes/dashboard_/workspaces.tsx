@@ -449,7 +449,7 @@ function Workspaces() {
                             })
                           }}
                         >
-                          <label>
+                          <label className="console-field">
                             Page path
                             <input
                               value={path}
@@ -459,7 +459,7 @@ function Workspaces() {
                               placeholder="/pricing"
                             />
                           </label>
-                          <label>
+                          <label className="console-field">
                             Feedback
                             <textarea
                               value={body}

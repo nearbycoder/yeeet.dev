@@ -4504,6 +4504,8 @@ summary:focus-visible {
   font-size: 13px;
   font-weight: 700;
 }
+.console-field input,
+.console-field select,
 .console-form-grid input,
 .console-form-grid select,
 .console-form-grid textarea,
