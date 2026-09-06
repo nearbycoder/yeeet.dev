@@ -32,38 +32,54 @@ function DeviceAuthorization() {
     }
     setBusy(true)
     setMessage('')
-    const response = await authClient.device({
-      query: { user_code: formatted },
-    })
-    setBusy(false)
-    if (response.error) {
+    try {
+      const response = await authClient.device({
+        query: { user_code: formatted },
+      })
+      if (response.error) {
+        setMessage(
+          response.error.error_description ||
+            'That code is invalid or expired.',
+        )
+        return
+      }
+      setCode(formatted)
+      setClaimed(true)
+    } catch {
       setMessage(
-        response.error.error_description || 'That code is invalid or expired.',
+        'Could not check this code. Check your connection and try again.',
       )
-      return
+    } finally {
+      setBusy(false)
     }
-    setCode(formatted)
-    setClaimed(true)
   }
 
   async function decide(approve: boolean) {
     setBusy(true)
-    const response = approve
-      ? await authClient.device.approve({ userCode: code })
-      : await authClient.device.deny({ userCode: code })
-    setBusy(false)
-    if (response.error) {
+    setMessage('')
+    try {
+      const response = approve
+        ? await authClient.device.approve({ userCode: code })
+        : await authClient.device.deny({ userCode: code })
+      if (response.error) {
+        setMessage(
+          response.error.error_description || 'Could not update this request.',
+        )
+        return
+      }
+      setClaimed(false)
       setMessage(
-        response.error.error_description || 'Could not update this request.',
+        approve
+          ? 'Approved. You can return to your terminal.'
+          : 'Request denied.',
       )
-      return
+    } catch {
+      setMessage(
+        'Could not update this request. Check your connection and try again.',
+      )
+    } finally {
+      setBusy(false)
     }
-    setClaimed(false)
-    setMessage(
-      approve
-        ? 'Approved. You can return to your terminal.'
-        : 'Request denied.',
-    )
   }
 
   return (
@@ -89,6 +105,7 @@ function DeviceAuthorization() {
               <input
                 className="device-code"
                 name="device-code"
+                required
                 value={code}
                 onChange={(event) => setCode(event.target.value)}
                 placeholder="ABCD-EFGH"
@@ -98,7 +115,7 @@ function DeviceAuthorization() {
             </label>
             <button
               className="button button-coral auth-submit"
-              disabled={busy || isPending || !code}
+              disabled={busy || isPending || !code.trim()}
             >
               {busy ? 'Checking…' : 'Continue →'}
             </button>
@@ -132,6 +149,8 @@ function DeviceAuthorization() {
         )}
         {message ? (
           <p
+            role="status"
+            aria-live="polite"
             className={
               message.startsWith('Approved') ? 'form-success' : 'form-error'
             }

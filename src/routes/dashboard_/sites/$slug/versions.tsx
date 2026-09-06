@@ -1,3 +1,4 @@
+import { CopyButton } from '#/components/copy-button'
 import { Fragment, useState } from 'react'
 import { createFileRoute, useRouter } from '@tanstack/react-router'
 import { ConfirmDialog } from '#/components/confirm-dialog'
@@ -206,15 +207,11 @@ function SiteVersions() {
                     </a>
                   ) : null}
                   {version.shareUrl ? (
-                    <button
-                      type="button"
+                    <CopyButton
+                      value={version.shareUrl}
+                      label="Copy share link"
                       className="button button-paper"
-                      onClick={() =>
-                        navigator.clipboard.writeText(version.shareUrl!)
-                      }
-                    >
-                      Copy share link
-                    </button>
+                    />
                   ) : null}
                   <button
                     type="button"

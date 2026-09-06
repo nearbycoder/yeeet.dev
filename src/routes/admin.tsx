@@ -1,3 +1,5 @@
+import { SignOutButton } from '#/components/sign-out-button'
+import { CopyButton } from '#/components/copy-button'
 import { NavigationMenu } from '#/components/navigation-menu'
 import { useState } from 'react'
 import {
@@ -8,7 +10,6 @@ import {
 } from '@tanstack/react-router'
 import { Brand } from '#/components/brand'
 import { ConfirmDialog } from '#/components/confirm-dialog'
-import { authClient } from '#/lib/auth-client'
 import { getAdminData, getSession } from '#/server/functions'
 
 export const Route = createFileRoute('/admin')({
@@ -99,15 +100,7 @@ function Admin() {
             <span>{user.name.slice(0, 1).toUpperCase()}</span>
             {user.name}
           </span>
-          <button
-            type="button"
-            onClick={async () => {
-              await authClient.signOut()
-              window.location.assign('/')
-            }}
-          >
-            Sign out
-          </button>
+          <SignOutButton />
         </NavigationMenu>
       </header>
 
@@ -196,12 +189,7 @@ function Admin() {
                 <span>Shown once</span>
                 <code>{newCode}</code>
               </div>
-              <button
-                type="button"
-                onClick={() => navigator.clipboard.writeText(newCode)}
-              >
-                Copy code
-              </button>
+              <CopyButton value={newCode} label="Copy code" />
             </div>
           ) : null}
           <div className="admin-list">

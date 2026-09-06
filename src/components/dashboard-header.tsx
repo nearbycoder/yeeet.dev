@@ -1,7 +1,7 @@
+import { SignOutButton } from '#/components/sign-out-button'
 import { NavigationMenu } from '#/components/navigation-menu'
 import { Link } from '@tanstack/react-router'
 import { Brand } from './brand'
-import { authClient } from '#/lib/auth-client'
 
 type DashboardUser = {
   name: string
@@ -46,15 +46,7 @@ export function DashboardHeader({
           </span>
           {user.name}
         </span>
-        <button
-          type="button"
-          onClick={async () => {
-            await authClient.signOut()
-            window.location.assign('/')
-          }}
-        >
-          Sign out
-        </button>
+        <SignOutButton />
       </NavigationMenu>
     </header>
   )

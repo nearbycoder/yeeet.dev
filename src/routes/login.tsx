@@ -31,56 +31,74 @@ function Login() {
     event.preventDefault()
     setBusy(true)
     setError('')
-    const result =
-      mode === 'login'
-        ? await authClient.signIn.email({ email, password })
-        : await fetch('/api/auth/sign-up/email', {
-            method: 'POST',
-            headers: {
-              'content-type': 'application/json',
-              'x-yeeet-invitation': invitationCode,
-            },
-            body: JSON.stringify({ name, email, password }),
-          }).then(async (response) => {
-            const data = await response.json()
-            return response.ok
-              ? { data, error: null }
-              : {
-                  data: null,
-                  error: {
-                    message:
-                      data.message ||
-                      data.error?.message ||
-                      'Authentication failed.',
-                  },
-                }
-          })
-    setBusy(false)
-    if (result.error) {
-      setError(result.error.message || 'Authentication failed.')
-      return
+    try {
+      const result =
+        mode === 'login'
+          ? await authClient.signIn.email({ email, password })
+          : await fetch('/api/auth/sign-up/email', {
+              method: 'POST',
+              headers: {
+                'content-type': 'application/json',
+                'x-yeeet-invitation': invitationCode,
+              },
+              body: JSON.stringify({ name, email, password }),
+            }).then(async (response) => {
+              const data = await response.json()
+              return response.ok
+                ? { data, error: null }
+                : {
+                    data: null,
+                    error: {
+                      message:
+                        data.message ||
+                        data.error?.message ||
+                        'Authentication failed.',
+                    },
+                  }
+            })
+      if (result.error) {
+        setError(result.error.message || 'Authentication failed.')
+        return
+      }
+      window.location.assign(destination)
+    } catch {
+      setError('Could not reach Yeeet. Check your connection and try again.')
+    } finally {
+      setBusy(false)
     }
-    window.location.assign(destination)
   }
 
   async function github() {
+    setBusy(true)
     setError('')
-    if (mode === 'signup') {
-      const response = await fetch('/api/v1/invitations/authorize', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ code: invitationCode }),
-      })
-      if (!response.ok) {
-        const body = await response.json()
-        setError(body.error?.message || 'A valid invitation is required.')
-        return
+    try {
+      if (mode === 'signup') {
+        const response = await fetch('/api/v1/invitations/authorize', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ code: invitationCode }),
+        })
+        if (!response.ok) {
+          const body = await response.json()
+          setError(body.error?.message || 'A valid invitation is required.')
+          return
+        }
       }
+      const result = await authClient.signIn.social({
+        provider: 'github',
+        callbackURL: destination,
+      })
+      if (result.error)
+        setError(
+          result.error.message || 'Could not connect to GitHub. Try again.',
+        )
+    } catch {
+      setError(
+        'Could not reach GitHub sign-in. Check your connection and try again.',
+      )
+    } finally {
+      setBusy(false)
     }
-    await authClient.signIn.social({
-      provider: 'github',
-      callbackURL: destination,
-    })
   }
 
   return (
@@ -110,9 +128,9 @@ function Login() {
               type="button"
               className="button github-button"
               onClick={github}
-              disabled={mode === 'signup' && !invitationCode}
+              disabled={busy || (mode === 'signup' && !invitationCode)}
             >
-              <GitHubIcon /> Continue with GitHub
+              <GitHubIcon /> {busy ? 'Connecting…' : 'Continue with GitHub'}
             </button>
             <div className="auth-divider">
               <span>or use email</span>
@@ -120,7 +138,7 @@ function Login() {
           </>
         ) : null}
 
-        <form onSubmit={submit} className="auth-form">
+        <form onSubmit={submit} className="auth-form" aria-busy={busy}>
           {mode === 'signup' ? (
             <>
               <label>
@@ -195,6 +213,7 @@ function Login() {
             : 'Already have a flight plan?'}{' '}
           <button
             type="button"
+            disabled={busy}
             onClick={() => {
               setMode(mode === 'login' ? 'signup' : 'login')
               setError('')

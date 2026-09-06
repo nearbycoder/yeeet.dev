@@ -46,3 +46,15 @@ npm run build
 
 By contributing, you agree that your contribution is licensed under the
 project's [MIT License](LICENSE).
+
+For changes to copy or authentication feedback, start the app with an isolated
+local database, install the `agent-browser` CLI, then run the optional browser
+regressions against your dev server:
+
+```sh
+npm run test:browser -- http://localhost:3000
+```
+
+These checks simulate clipboard rejection and abort authentication requests;
+they do not create accounts or sign in. The normal CI checks remain independent
+of a running browser or database.

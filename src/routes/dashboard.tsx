@@ -1,3 +1,4 @@
+import { CopyButton } from '#/components/copy-button'
 import { useMemo, useRef, useState } from 'react'
 import {
   Link,
@@ -193,6 +194,7 @@ function Dashboard() {
   const [resultShareUrl, setResultShareUrl] = useState('')
   const [newKey, setNewKey] = useState('')
   const [keyBusy, setKeyBusy] = useState(false)
+  const [keyError, setKeyError] = useState('')
   const [siteBusy, setSiteBusy] = useState('')
   const [siteSearch, setSiteSearch] = useState('')
   const [siteStatus, setSiteStatus] = useState<'all' | 'live' | 'inactive'>(
@@ -323,21 +325,29 @@ function Dashboard() {
 
   async function createKey() {
     setKeyBusy(true)
-    const response = await authClient.apiKey.create({
-      name: `Agent key ${new Date().toLocaleDateString()}`,
-      prefix: 'yeeet_',
-      expiresIn: 60 * 60 * 24 * 365,
-    })
-    setKeyBusy(false)
-    if (response.error) {
-      setError(response.error.message || 'Could not create API key.')
-      return
+    setKeyError('')
+    try {
+      const response = await authClient.apiKey.create({
+        name: `Agent key ${new Date().toLocaleDateString()}`,
+        prefix: 'yeeet_',
+        expiresIn: 60 * 60 * 24 * 365,
+      })
+      if (response.error) {
+        setKeyError(response.error.message || 'Could not create API key.')
+        return
+      }
+      if (!response.data.key) {
+        setKeyError('Could not create API key.')
+        return
+      }
+      setNewKey(response.data.key)
+    } catch {
+      setKeyError(
+        'Could not create an API key. Check your connection and try again.',
+      )
+    } finally {
+      setKeyBusy(false)
     }
-    if (!response.data.key) {
-      setError('Could not create API key.')
-      return
-    }
-    setNewKey(response.data.key)
   }
 
   async function deleteSite(siteSlug: string) {
@@ -419,14 +429,7 @@ function Dashboard() {
           </div>
           <div className="quick-command">
             <span>$</span> yeeet deploy ./dist{' '}
-            <button
-              type="button"
-              onClick={() =>
-                navigator.clipboard.writeText('yeeet deploy ./dist')
-              }
-            >
-              copy
-            </button>
+            <CopyButton value={'yeeet deploy ./dist'} label="copy" />
           </div>
         </section>
 
@@ -668,14 +671,10 @@ function Dashboard() {
                   </small>
                 ) : null}
               </div>
-              <button
-                type="button"
-                onClick={() =>
-                  navigator.clipboard.writeText(resultShareUrl || resultUrl)
-                }
-              >
-                {resultShareUrl ? 'Copy share link' : 'Copy URL'}
-              </button>
+              <CopyButton
+                value={resultShareUrl || resultUrl}
+                label={resultShareUrl ? 'Copy share link' : 'Copy URL'}
+              />
             </div>
           ) : null}
         </section>
@@ -864,15 +863,15 @@ function Dashboard() {
             <p>
               Create a one-year API key for CI or an agent. It is shown once.
             </p>
+            {keyError ? (
+              <p className="form-error" role="alert">
+                {keyError}
+              </p>
+            ) : null}
             {newKey ? (
               <div className="key-reveal">
                 <code>{newKey}</code>
-                <button
-                  type="button"
-                  onClick={() => navigator.clipboard.writeText(newKey)}
-                >
-                  Copy key
-                </button>
+                <CopyButton value={newKey} label="Copy key" />
               </div>
             ) : (
               <button
