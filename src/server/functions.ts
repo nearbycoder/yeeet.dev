@@ -291,3 +291,11 @@ export const updateFeedback = createServerFn({ method: 'POST' })
     const { editFeedback } = await import('./feedback-edit')
     return editFeedback(actor.userId, data)
   })
+
+export const getFeedbackExport = createServerFn({ method: 'GET' })
+  .validator((data: unknown) => data)
+  .handler(async ({ data }) => {
+    const actor = await requireActor(getRequest())
+    const { exportFeedback } = await import('./feedback-export')
+    return exportFeedback(actor.userId, data)
+  })

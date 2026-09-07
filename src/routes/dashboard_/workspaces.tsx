@@ -1,3 +1,4 @@
+import { FeedbackExport } from '#/components/feedback-export'
 import { FeedbackComposer } from '#/components/feedback-composer'
 import { FeedbackEditor } from '#/components/feedback-editor'
 import { useState } from 'react'
@@ -548,6 +549,13 @@ function Workspaces() {
                             </button>
                           ) : null}
                         </nav>
+                        <FeedbackExport
+                          workspace={selected.id}
+                          slug={selected.history.site.slug}
+                          version={selected.version.id}
+                          q={search.feedbackQuery}
+                          status={search.feedbackStatus}
+                        />
                         <FeedbackComposer
                           key={`${data.userId}:${selected.id}:${selected.version.id}`}
                           userId={data.userId}

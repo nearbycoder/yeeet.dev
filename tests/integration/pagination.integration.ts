@@ -1,3 +1,4 @@
+import { exportFeedback } from '../../src/server/feedback-export'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { after, test } from 'node:test'
@@ -146,6 +147,34 @@ test('SQL pagination searches beyond first pages without gaps, duplicates, or cr
       cursor = page.feedbackNextCursor ?? undefined
     } while (cursor)
     assert.equal(seen.size, 111)
+    const exported = await exportFeedback(owner, {
+      workspace,
+      slug: site.slug,
+      version: oldest,
+    })
+    assert.equal(exported.comments.length, 111)
+    assert.equal(exported.truncated, false)
+    assert.equal(
+      (
+        await exportFeedback(owner, {
+          workspace,
+          slug: site.slug,
+          version: oldest,
+          q: '100%_',
+          status: 'resolved',
+        })
+      ).comments.length,
+      1,
+    )
+    await assert.rejects(
+      exportFeedback('other-owner', {
+        workspace,
+        slug: site.slug,
+        version: oldest,
+      }),
+      /Workspace not found/,
+    )
+
     const filtered = (
       await workspaceConsole(owner, {
         workspace,
@@ -160,6 +189,23 @@ test('SQL pagination searches beyond first pages without gaps, duplicates, or cr
       workspaceConsole('other-owner', { workspace, site: site.slug }),
       /Workspace not found/,
     )
+
+    await db.insert(deploymentFeedback).values(
+      Array.from({ length: 1001 }, () => ({
+        id: randomUUID(),
+        workspaceId: workspace,
+        deploymentId: oldest,
+        authorId: owner,
+        body: 'Export cap fixture',
+      })),
+    )
+    const capped = await exportFeedback(owner, {
+      workspace,
+      slug: site.slug,
+      version: oldest,
+    })
+    assert.equal(capped.comments.length, 1000)
+    assert.equal(capped.truncated, true)
   } finally {
     await db.delete(user).where(eq(user.id, owner))
   }
