@@ -274,3 +274,13 @@ use Sign out for that session. API keys are managed separately. Only a valid bro
 cookie session can use this panel; sensitive changes honor Better Auth session
 freshness and may require signing in again. Session tokens are never returned by
 these console functions. No new identity provider or service is required.
+
+## Storage inventory
+
+Storage in account navigation shows owner-scoped manifest byte totals and version
+counts across all retained deployments. Search site names, sort by bytes, versions,
+or name, and page through 25 sites at a time. CSV exports the displayed page, with
+safe spreadsheet cells; each row links to the site's cleanup review. Account totals
+remain visible while filtering. Counts include uploading/failed versions and can
+count shared files repeatedly, so this is a deployment inventory, not physical
+object-storage usage or billing. Pages may shift as deployments change.

@@ -37,6 +37,9 @@ export function DashboardHeader({
         >
           Workspaces
         </Link>
+        <Link to="/dashboard/storage" search={{ sort: 'bytes', page: 0 }}>
+          Storage
+        </Link>
         <Link to="/mascot" className="mascot-lab-link">
           Yeeetlings
         </Link>

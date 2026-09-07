@@ -312,3 +312,14 @@ export const endBrowserSession = createServerFn({ method: 'POST' })
     const { revokeBrowserSession } = await import('./session-manager')
     return revokeBrowserSession(getRequest(), data)
   })
+
+export const getStorageInventory = createServerFn({ method: 'GET' })
+  .validator((data: unknown) => data)
+  .handler(async ({ data }) => {
+    const actor = await requireActor(getRequest())
+    const { storageInventory } = await import('./storage-inventory')
+    return {
+      ...(await storageInventory(actor.userId, data)),
+      platform: publicPlatformConfig(),
+    }
+  })
