@@ -246,3 +246,12 @@ Current workspace members can edit their own feedback body and page path. Owners
 can still moderate by deleting comments, but cannot rewrite someone else's words.
 Save shows an edited timestamp; Cancel keeps the existing comment. A stale edit
 is rejected. Editing does not change the comment's resolved state or version.
+
+## Unsent feedback drafts
+
+Feedback text and its page path save immediately in this browser under your
+account, workspace and exact version. Reload or return within seven days to
+restore or discard the draft explicitly. Switching versions starts a separate
+composer. Successful posting clears the draft; failed posting preserves it.
+Storage failures are visible and do not prevent composing. Drafts do not sync to
+other browsers and are never sent until you choose Add feedback.

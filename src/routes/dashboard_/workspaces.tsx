@@ -1,3 +1,4 @@
+import { FeedbackComposer } from '#/components/feedback-composer'
 import { FeedbackEditor } from '#/components/feedback-editor'
 import { useState } from 'react'
 import {
@@ -46,8 +47,6 @@ function Workspaces() {
     description: string
     action: unknown
   } | null>(null)
-  const [body, setBody] = useState('')
-  const [path, setPath] = useState('/')
   const editor = selected && canEditWorkspace(selected.role)
   const owner = selected?.role === 'owner'
   const navigate = (next: typeof search) =>
@@ -355,7 +354,6 @@ function Workspaces() {
                       <select
                         value={selected.version?.id ?? ''}
                         onChange={(event) => {
-                          setBody('')
                           navigate({
                             workspace: selected.id,
                             site: selected.history!.site.slug,
@@ -550,53 +548,13 @@ function Workspaces() {
                             </button>
                           ) : null}
                         </nav>
-                        <form
-                          className="site-page-stack"
-                          onSubmit={(event) => {
-                            event.preventDefault()
-                            void mutation.run(async () => {
-                              await updateWorkspace({
-                                data: {
-                                  action: 'comment',
-                                  workspace: selected.id,
-                                  slug: selected.history!.site.slug,
-                                  version: selected.version!.id,
-                                  body,
-                                  path,
-                                },
-                              })
-                              setBody('')
-                            })
-                          }}
-                        >
-                          <label className="console-field">
-                            Page path
-                            <input
-                              value={path}
-                              onChange={(event) => setPath(event.target.value)}
-                              required
-                              maxLength={500}
-                              placeholder="/pricing"
-                            />
-                          </label>
-                          <label className="console-field">
-                            Feedback
-                            <textarea
-                              value={body}
-                              onChange={(event) => setBody(event.target.value)}
-                              required
-                              maxLength={4000}
-                              rows={3}
-                              placeholder="What should change in this build?"
-                            />
-                          </label>
-                          <button
-                            className="button button-paper"
-                            disabled={mutation.busy}
-                          >
-                            Add feedback
-                          </button>
-                        </form>
+                        <FeedbackComposer
+                          key={`${data.userId}:${selected.id}:${selected.version.id}`}
+                          userId={data.userId}
+                          workspace={selected.id}
+                          slug={selected.history.site.slug}
+                          version={selected.version.id}
+                        />
                         {selected.comments.map((comment) => (
                           <article className="console-item" key={comment.id}>
                             <b>
