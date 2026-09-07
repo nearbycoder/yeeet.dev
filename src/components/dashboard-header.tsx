@@ -1,3 +1,4 @@
+import { SiteSwitcher } from './site-switcher'
 import { SignOutButton } from '#/components/sign-out-button'
 import { NavigationMenu } from '#/components/navigation-menu'
 import { Link } from '@tanstack/react-router'
@@ -22,6 +23,7 @@ export function DashboardHeader({
     <header className="dashboard-header">
       <Brand />
       <NavigationMenu label="Account navigation">
+        <SiteSwitcher />
         <Link
           to="/dashboard"
           className="dashboard-home-link"

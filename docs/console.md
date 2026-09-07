@@ -199,3 +199,11 @@ Load replaces all four filters and starts at the first page; upload destination
 settings are preserved. Saving the same name updates it, and each view can be
 deleted. Views are account-scoped in this browser, not synced to other devices.
 Unavailable browser storage produces an error without changing saved records.
+
+## Switch sites
+
+Use Switch site in account navigation or Ctrl/⌘ K to open a modal search of your
+owned sites. Search matches names, domains, groups and tags; up to 20 results are
+shown, with a prompt to narrow larger result sets. Tab to a result and Enter to
+open it. Escape closes the dialog and returns focus. Failed searches offer Retry.
+Workspace-only shared sites remain accessible through Workspaces.
