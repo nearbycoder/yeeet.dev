@@ -467,6 +467,7 @@ export const deploymentFeedback = pgTable(
     path: text('path').default('/').notNull(),
     resolved: boolean('resolved').default(false).notNull(),
     createdAt: timestamp('created_at').defaultNow().notNull(),
+    editedAt: timestamp('edited_at'),
   },
   (table) => [
     index('deployment_feedback_page_idx').on(

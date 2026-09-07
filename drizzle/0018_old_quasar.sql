@@ -1,0 +1,1 @@
+ALTER TABLE "deployment_feedback" ADD COLUMN "edited_at" timestamp;

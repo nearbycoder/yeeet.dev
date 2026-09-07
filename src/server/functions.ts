@@ -283,3 +283,11 @@ export const updateRetentionPin = createServerFn({ method: 'POST' })
     const { setRetentionPin } = await import('./retention-pins')
     return setRetentionPin(actor.userId, data)
   })
+
+export const updateFeedback = createServerFn({ method: 'POST' })
+  .validator((data: unknown) => data)
+  .handler(async ({ data }) => {
+    const actor = await requireActor(getRequest())
+    const { editFeedback } = await import('./feedback-edit')
+    return editFeedback(actor.userId, data)
+  })
