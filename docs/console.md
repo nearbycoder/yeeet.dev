@@ -165,3 +165,11 @@ After choosing a comparison baseline in Inspect, download Markdown for a review
 or JSON for tooling. Reports identify both versions, list all four change classes,
 include byte totals and mark routing/header/redirect changes. Paths are escaped
 in Markdown; no storage credentials or share tokens are exported.
+
+## Asset budgets
+
+Open Asset budget review in Inspect to set per-file KiB and total MiB thresholds.
+The report shows over-budget counts, the exact total overage, bytes by type and
+the ten largest files. It measures stored uncompressed bytes, not network transfer
+or load time. Budgets are temporary review settings; Reset budgets restores
+512 KiB per file and 10 MiB total. They never block a deployment.
