@@ -173,3 +173,12 @@ The report shows over-budget counts, the exact total overage, bytes by type and
 the ten largest files. It measures stored uncompressed bytes, not network transfer
 or load time. Budgets are temporary review settings; Reset budgets restores
 512 KiB per file and 10 MiB total. They never block a deployment.
+
+## Edit an upload selection
+
+After selecting or dropping files, expand Edit upload selection to search paths,
+exclude individual files or all matches, and restore the original selection.
+The list renders 100 files per page and shows included/excluded counts and bytes.
+Selection changes invalidate the deployment review. Editing is disabled during
+hashing/upload/finalization; recovery records still require the original manifest
+unless you explicitly forget that saved attempt. Files remain only in memory.
