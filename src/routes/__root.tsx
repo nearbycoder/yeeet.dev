@@ -1,3 +1,4 @@
+import { ApplyReadingPreferences } from '#/components/reading-preferences'
 import {
   HeadContent,
   Scripts,
@@ -55,6 +56,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       </head>
       <body>
         {children}
+        <ApplyReadingPreferences />
         <ThemeToggle />
         <Scripts />
       </body>
