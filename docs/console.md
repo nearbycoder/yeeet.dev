@@ -12,6 +12,15 @@ production.
 and routing settings. Choose another version as the comparison baseline.
 **Versions** previews the changes before making a previous version live.
 
+Browser uploads hash files in a Web Worker, retry each missing file up to three
+times, and support pausing. An account-scoped recovery record stays in this browser
+for seven days. After a reload, restore the destination settings, reselect the
+original files, review, and resume. Successfully stored files are skipped and
+upload links are refreshed. Private builds require the same password again;
+passwords and file contents are never stored in recovery metadata. Forget the
+saved attempt to deploy a different build. If browser storage is unavailable,
+recovery works only while the current page remains open.
+
 ## Channels and sharing
 
 **Channels** creates, reassigns, removes, and promotes named aliases such as
