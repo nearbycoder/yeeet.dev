@@ -1,3 +1,4 @@
+import { AssetBudget } from '#/components/asset-budget'
 import { ComparisonReport } from '#/components/comparison-report'
 import { ManifestExport } from '#/components/manifest-export'
 import { FileExplorer } from '#/components/file-explorer'
@@ -141,6 +142,7 @@ function Inspector() {
               {JSON.stringify(JSON.parse(version.redirectRules), null, 2)}
             </pre>
           </details>
+          <AssetBudget files={version.files} />
           <ManifestExport slug={history.site.slug} version={version} />
           <FileExplorer key={version.id} files={version.files} />
           <Link
