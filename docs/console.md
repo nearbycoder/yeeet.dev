@@ -191,3 +191,11 @@ source maps, dependency folders and empty files. Findings are advisory and do no
 scan file contents. Exclude likely private files removes those paths from this
 selection and invalidates the old review; restore them through the selection
 editor if intentional. API/CLI uploads retain their normal server validation.
+
+## Saved fleet views
+
+Save up to 12 named combinations of fleet search/status/group/favorite filters.
+Load replaces all four filters and starts at the first page; upload destination
+settings are preserved. Saving the same name updates it, and each view can be
+deleted. Views are account-scoped in this browser, not synced to other devices.
+Unavailable browser storage produces an error without changing saved records.
