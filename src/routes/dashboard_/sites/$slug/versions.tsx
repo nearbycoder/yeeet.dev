@@ -222,7 +222,7 @@ function SiteVersions() {
             type="search"
             maxLength={200}
             defaultValue={search.q}
-            placeholder="Version ID, channel, or source…"
+            placeholder="Version ID, label, notes, channel, or source…"
           />
         </label>
         <label>
@@ -258,7 +258,7 @@ function SiteVersions() {
                 </div>
                 <div className="site-version-details">
                   <div>
-                    <h3>{version.id.slice(0, 8)}</h3>
+                    <h3>{version.releaseLabel || version.id.slice(0, 8)}</h3>
                     <span
                       className={`state-pill ${version.current ? 'live' : version.status === 'failed' ? 'blocked' : ''}`}
                     >
@@ -266,9 +266,13 @@ function SiteVersions() {
                     </span>
                   </div>
                   <p>
-                    {version.source} · {formatDate(version.createdAt)}
+                    {version.id.slice(0, 8)} · {version.source} ·{' '}
+                    {formatDate(version.createdAt)}
                     {version.channel ? ` · ${version.channel} channel` : ''}
                   </p>
+                  {version.releaseNotes ? (
+                    <p className="feedback-body">{version.releaseNotes}</p>
+                  ) : null}
                   <small>
                     {version.fileCount} files ·{' '}
                     {formatBytes(version.totalBytes)}

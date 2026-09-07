@@ -267,3 +267,11 @@ export const updateSiteNotes = createServerFn({ method: 'POST' })
     const { saveSiteNotes } = await import('./site-notes')
     return saveSiteNotes(actor.userId, data)
   })
+
+export const updateVersionNotes = createServerFn({ method: 'POST' })
+  .validator((data: unknown) => data)
+  .handler(async ({ data }) => {
+    const actor = await requireActor(getRequest())
+    const { saveVersionNotes } = await import('./version-notes')
+    return saveVersionNotes(actor.userId, data)
+  })

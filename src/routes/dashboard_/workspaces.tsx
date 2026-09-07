@@ -456,6 +456,14 @@ function Workspaces() {
                         {selected.comparison ? (
                           <ManifestDiff diff={selected.comparison} />
                         ) : null}
+                        {selected.version.releaseLabel ? (
+                          <h3>{selected.version.releaseLabel}</h3>
+                        ) : null}
+                        {selected.version.releaseNotes ? (
+                          <p className="feedback-body">
+                            {selected.version.releaseNotes}
+                          </p>
+                        ) : null}
                         <h3>Version feedback</h3>
                         <p role="status">
                           Showing {selected.comments.length} comments for{' '}

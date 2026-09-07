@@ -1,3 +1,4 @@
+import { VersionNotes } from '#/components/version-notes'
 import { AssetBudget } from '#/components/asset-budget'
 import { ComparisonReport } from '#/components/comparison-report'
 import { ManifestExport } from '#/components/manifest-export'
@@ -142,6 +143,11 @@ function Inspector() {
               {JSON.stringify(JSON.parse(version.redirectRules), null, 2)}
             </pre>
           </details>
+          <VersionNotes
+            key={`notes:${version.id}`}
+            slug={history.site.slug}
+            version={version}
+          />
           <AssetBudget files={version.files} />
           <ManifestExport slug={history.site.slug} version={version} />
           <FileExplorer key={version.id} files={version.files} />
