@@ -1,3 +1,4 @@
+import { RecentSites } from '#/components/recent-sites'
 import { SavedViews } from '#/components/saved-views'
 import { DeploymentPreflight } from '#/components/deployment-preflight'
 import { UploadSelection } from '#/components/upload-selection'
@@ -934,6 +935,7 @@ function Dashboard() {
               </div>
               <b>{data.totalCount}</b>
             </div>
+            <RecentSites key={user.id} userId={user.id} />
             <SavedViews
               userId={user.id}
               filters={filters}
