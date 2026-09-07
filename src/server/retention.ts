@@ -33,6 +33,7 @@ async function plan(
       status: deployments.status,
       createdAt: deployments.createdAt,
       totalBytes: deployments.totalBytes,
+      retentionPinned: deployments.retentionPinned,
     })
     .from(deployments)
     .where(eq(deployments.siteId, siteId))
@@ -55,6 +56,9 @@ async function plan(
   const protectedIds = new Set(
     [
       site.activeDeploymentId,
+      ...versions
+        .filter((version) => version.retentionPinned)
+        .map((version) => version.id),
       ...channels.map((row) => row.id),
       ...feedback.map((row) => row.id),
     ].filter((id): id is string => Boolean(id)),

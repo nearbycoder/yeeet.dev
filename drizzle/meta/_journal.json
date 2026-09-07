@@ -120,6 +120,13 @@
       "when": 1788814620158,
       "tag": "0016_parallel_scarlet_spider",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1788814928284,
+      "tag": "0017_chilly_blacklash",
+      "breakpoints": true
     }
   ]
 }

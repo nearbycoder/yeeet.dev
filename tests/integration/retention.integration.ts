@@ -1,3 +1,4 @@
+import { setRetentionPin } from '../../src/server/retention-pins'
 import { S3Client } from '@aws-sdk/client-s3'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
@@ -178,6 +179,50 @@ test(
             await unlock()
             assert.equal((await pending).ok, true)
           })
+        },
+      )
+      await t.test(
+        'a retention pin wins against waiting cleanup and unpin restores eligibility',
+        async () => {
+          const site = await fixture()
+          await gate(site.id, async (unlock, waiting) => {
+            const pin = observe(
+              setRetentionPin(owner, {
+                slug: site.slug,
+                version: site.old,
+                pinned: true,
+              }),
+            )
+            await waiting(1)
+            const cleanup = observe(clean(site))
+            await waiting(2)
+            await unlock()
+            assert.equal((await pin).ok, true)
+            assert.equal((await cleanup).ok, false)
+            assert.equal(
+              (await previewRetention(owner, { ...policy, slug: site.slug }))
+                .candidates.length,
+              0,
+            )
+          })
+          await assert.rejects(
+            setRetentionPin('other', {
+              slug: site.slug,
+              version: site.old,
+              pinned: false,
+            }),
+            /Site not found/,
+          )
+          await setRetentionPin(owner, {
+            slug: site.slug,
+            version: site.old,
+            pinned: false,
+          })
+          assert.equal(
+            (await previewRetention(owner, { ...policy, slug: site.slug }))
+              .candidates.length,
+            1,
+          )
         },
       )
       for (const action of [

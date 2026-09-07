@@ -31,8 +31,8 @@ function Cleanup() {
         <p>
           Keep recent versions and remove older builds you no longer need.
           Production, every channel target, uploads in progress, and versions
-          with unresolved feedback are always protected. Deleting a version
-          removes its links and feedback permanently.
+          with unresolved feedback or a retention pin are always protected.
+          Deleting a version removes its links and feedback permanently.
         </p>
         {mutation.error ? (
           <p className="form-error" role="alert">

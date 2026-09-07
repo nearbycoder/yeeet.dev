@@ -275,3 +275,11 @@ export const updateVersionNotes = createServerFn({ method: 'POST' })
     const { saveVersionNotes } = await import('./version-notes')
     return saveVersionNotes(actor.userId, data)
   })
+
+export const updateRetentionPin = createServerFn({ method: 'POST' })
+  .validator((data: unknown) => data)
+  .handler(async ({ data }) => {
+    const actor = await requireActor(getRequest())
+    const { setRetentionPin } = await import('./retention-pins')
+    return setRetentionPin(actor.userId, data)
+  })

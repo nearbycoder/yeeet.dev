@@ -7,6 +7,7 @@ import { Link, createFileRoute, useRouter } from '@tanstack/react-router'
 import { ConfirmDialog } from '#/components/confirm-dialog'
 import {
   getDeploymentInspection,
+  updateRetentionPin,
   getSiteVersionsData,
 } from '#/server/functions'
 
@@ -61,6 +62,25 @@ function SiteVersions() {
           .slice(currentIndex + 1)
           .find((version) => version.status === 'ready')
       : undefined
+
+  async function pinVersion(id: string, pinned: boolean) {
+    setBusy(id)
+    setError('')
+    try {
+      await updateRetentionPin({
+        data: { slug: data.site.slug, version: id, pinned },
+      })
+      await router.invalidate()
+    } catch (failure) {
+      setError(
+        failure instanceof Error
+          ? failure.message
+          : 'Could not update retention pin.',
+      )
+    } finally {
+      setBusy('')
+    }
+  }
 
   async function request(
     key: string,
@@ -284,6 +304,20 @@ function SiteVersions() {
                   </small>
                 </div>
                 <div className="site-version-actions">
+                  <button
+                    className="button button-paper"
+                    disabled={Boolean(busy)}
+                    onClick={() =>
+                      void pinVersion(version.id, !version.retentionPinned)
+                    }
+                  >
+                    {version.retentionPinned
+                      ? 'Unpin from cleanup'
+                      : 'Pin against cleanup'}
+                  </button>
+                  {version.retentionPinned ? (
+                    <span className="state-pill">Pinned for retention</span>
+                  ) : null}
                   <Link
                     className="button button-paper"
                     to="/dashboard/sites/$slug/inspect"

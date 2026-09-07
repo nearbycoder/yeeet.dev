@@ -230,3 +230,12 @@ notes (2,000 characters). They appear in version history and can be searched the
 Owners edit them; workspace reviewers can read them. Clearing and saving removes
 the annotation. Concurrent edits return a conflict instead of overwriting another
 save; reload before retrying. File contents and immutable version IDs stay intact.
+
+## Retention pins
+
+Pin a version from Versions to protect it from manual retention batches and
+automatic cleanup, even without a production/channel/feedback reference. Pins are
+owner-controlled and coordinate with cleanup using the same site lock. A pin that
+wins a race invalidates an already previewed cleanup plan. Unpin restores ordinary
+eligibility. Pins do not prevent an explicit Delete version action or preview
+expiry; they protect stored history from retention policies.

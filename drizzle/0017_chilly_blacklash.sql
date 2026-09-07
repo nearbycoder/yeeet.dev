@@ -1,0 +1,1 @@
+ALTER TABLE "deployments" ADD COLUMN "retention_pinned" boolean DEFAULT false NOT NULL;
