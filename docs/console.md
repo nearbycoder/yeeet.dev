@@ -112,3 +112,23 @@ No new third-party service is required. Health, retention, and storage-cleanup
 workers run in the application and claim due database work across replicas.
 Cleanup briefly serializes deployment metadata writes while it rechecks references
 and removes a bounded batch; it does not hold these locks during storage requests.
+
+## Search and history pages
+
+The fleet searches sites, domains, project groups, and tags on the server and
+returns 20 sites per page. Filters and continuation cursors live in the URL,
+so reload, bookmarks, and browser Back preserve your place. Search explicitly
+with the Search button; changing filters returns to the first page.
+
+Version history and workspace feedback return 25 entries per page with links
+to older entries. Version search accepts an ID, channel, or source; feedback
+search accepts comment text or page paths and can show open or resolved items.
+Old versions can still be inspected, shared, promoted, protected, and deleted
+by ID even when outside the latest 100 versions.
+
+`GET /api/v1/sites/:slug/versions` keeps its default 100-entry response and
+adds `nextCursor`. Pass that value as `cursor` to continue, and optionally
+pass `q` and `status=ready|uploading|failed`. Keep the same filters while
+following a cursor. Results sort by creation time and ID, newest first;
+new versions appear when you return to the first page. A cursor from another
+account or filter combination is rejected.

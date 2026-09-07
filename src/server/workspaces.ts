@@ -1,5 +1,14 @@
+import {
+  afterCursor,
+  cursorTime,
+  decodeCursor,
+  encodeCursor,
+  searchPattern,
+} from './pagination'
+import type { workspaceSearchSchema } from '#/lib/pagination'
+import type { z } from 'zod'
 import { randomUUID } from 'node:crypto'
-import { and, desc, eq, or } from 'drizzle-orm'
+import { and, desc, eq, or, ilike } from 'drizzle-orm'
 import { db } from '#/db'
 import {
   deploymentFeedback,
@@ -14,7 +23,7 @@ import { canEditWorkspace, workspaceActionSchema } from '#/lib/workspaces'
 import { HttpError } from './http'
 import {
   activateSiteVersion,
-  listSites,
+  findSiteVersion,
   listSiteVersions,
   normalizeSlug,
 } from './deployments'
@@ -124,7 +133,7 @@ export async function actorForWorkspaceDeployment(
 }
 export async function workspaceConsole(
   userId: string,
-  selection: { workspace?: string; site?: string; version?: string },
+  selection: z.infer<typeof workspaceSearchSchema>,
 ) {
   const rows = await db
     .select({
@@ -145,9 +154,7 @@ export async function workspaceConsole(
       or(eq(workspaces.ownerId, userId), eq(workspaceMembers.userId, userId)),
     )
     .orderBy(desc(workspaces.createdAt))
-  const ownedSites = await listSites(userId)
-  if (!selection.workspace)
-    return { workspaces: rows, ownedSites, selected: null }
+  if (!selection.workspace) return { workspaces: rows, selected: null }
   const workspace = await requireWorkspace(userId, selection.workspace)
   const [members, assignedSites] = await Promise.all([
     db
@@ -175,16 +182,30 @@ export async function workspaceConsole(
     ? await workspaceSite(workspace.id, workspace.ownerId, selection.site)
     : null
   const history = site
-    ? await listSiteVersions(workspace.ownerId, site.slug)
+    ? await listSiteVersions(workspace.ownerId, site.slug, 25, {
+        cursor: selection.versionCursor,
+      })
     : null
   const version =
-    history?.versions.find((item) => item.id === selection.version) ??
-    history?.versions[0] ??
-    null
+    site && selection.version
+      ? (await findSiteVersion(workspace.ownerId, site.slug, selection.version))
+          .version
+      : (history?.versions[0] ?? null)
+  const feedbackQuery = selection.feedbackQuery ?? ''
+  const feedbackScope = [
+    'feedback',
+    userId,
+    workspace.id,
+    version?.id,
+    feedbackQuery.toLowerCase(),
+    selection.feedbackStatus ?? 'all',
+  ]
+  const feedbackCursor = decodeCursor(selection.feedbackCursor, feedbackScope)
   const comments = version
     ? await db
         .select({
           id: deploymentFeedback.id,
+          cursorTime: cursorTime(deploymentFeedback.createdAt),
           authorId: deploymentFeedback.authorId,
           author: user.name,
           body: deploymentFeedback.body,
@@ -198,10 +219,30 @@ export async function workspaceConsole(
           and(
             eq(deploymentFeedback.workspaceId, workspace.id),
             eq(deploymentFeedback.deploymentId, version.id),
+            afterCursor(
+              deploymentFeedback.createdAt,
+              deploymentFeedback.id,
+              feedbackCursor,
+            ),
+            selection.feedbackStatus && selection.feedbackStatus !== 'all'
+              ? eq(
+                  deploymentFeedback.resolved,
+                  selection.feedbackStatus === 'resolved',
+                )
+              : undefined,
+            feedbackQuery
+              ? or(
+                  ilike(deploymentFeedback.body, searchPattern(feedbackQuery)),
+                  ilike(deploymentFeedback.path, searchPattern(feedbackQuery)),
+                )
+              : undefined,
           ),
         )
-        .orderBy(desc(deploymentFeedback.createdAt))
-        .limit(100)
+        .orderBy(
+          desc(deploymentFeedback.createdAt),
+          desc(deploymentFeedback.id),
+        )
+        .limit(26)
     : []
   const comparison =
     version && site
@@ -214,7 +255,6 @@ export async function workspaceConsole(
       : null
   return {
     workspaces: rows,
-    ownedSites,
     selected: {
       ...workspace,
       createdAt: workspace.createdAt.toISOString(),
@@ -223,10 +263,14 @@ export async function workspaceConsole(
       history,
       version,
       comparison,
-      comments: comments.map((comment) => ({
-        ...comment,
-        createdAt: comment.createdAt.toISOString(),
-      })),
+      feedbackNextCursor:
+        comments.length > 25 ? encodeCursor(comments[24], feedbackScope) : null,
+      comments: comments
+        .slice(0, 25)
+        .map(({ cursorTime: _cursorTime, ...comment }) => ({
+          ...comment,
+          createdAt: comment.createdAt.toISOString(),
+        })),
     },
   }
 }

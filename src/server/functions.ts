@@ -1,3 +1,10 @@
+import {
+  siteSearchSchema,
+  versionSearchSchema,
+  workspaceSearchSchema,
+} from '#/lib/pagination'
+import { z } from 'zod'
+import { searchSites } from './site-search'
 import { organizationSchema, emptyOrganization } from '#/lib/site-organization'
 import { listSitePreferences, saveSiteOrganization } from './site-organization'
 import { createServerFn } from '@tanstack/react-start'
@@ -6,8 +13,9 @@ import { auth } from '#/lib/auth'
 import { adminOverview } from './admin'
 import { requireActor, requireAdmin } from './actor'
 import { getSiteAnalytics } from './analytics'
-import { listCustomDomains, listUserCustomDomains } from './custom-domains'
+import { listCustomDomains } from './custom-domains'
 import {
+  findSiteVersion,
   listRecentDeployments,
   listSites,
   listSiteVersions,
@@ -20,36 +28,30 @@ export const getSession = createServerFn({ method: 'GET' }).handler(
   },
 )
 
-export const getDashboardData = createServerFn({ method: 'GET' }).handler(
-  async () => {
+export const getDashboardData = createServerFn({ method: 'GET' })
+  .validator((data: unknown) =>
+    siteSearchSchema.extend({ site: z.string().optional() }).parse(data ?? {}),
+  )
+  .handler(async ({ data }) => {
     const actor = await requireActor(getRequest())
-    const [siteRows, deploymentRows, domainRows, preferences] =
-      await Promise.all([
-        listSites(actor.userId),
-        listRecentDeployments(actor.userId),
-        listUserCustomDomains(actor.userId),
-        listSitePreferences(actor.userId),
-      ])
-    const preferencesBySite = new Map(
-      preferences.map((pref) => [pref.siteId, pref]),
-    )
-    const domainsBySite = new Map<string, typeof domainRows>()
-    for (const domain of domainRows) {
-      const current = domainsBySite.get(domain.siteId) ?? []
-      current.push(domain)
-      domainsBySite.set(domain.siteId, current)
-    }
+    const [page, recent, destination] = await Promise.all([
+      searchSites(actor.userId, data),
+      listRecentDeployments(actor.userId),
+      data.site ? listSites(actor.userId, data.site) : Promise.resolve([]),
+    ])
     return {
+      ...page,
+      deployments: recent,
+      destinationSite: destination.at(0) ?? null,
       platform: publicPlatformConfig(),
-      sites: siteRows.map((site) => ({
-        ...site,
-        organization: preferencesBySite.get(site.id) ?? emptyOrganization,
-        customDomains: domainsBySite.get(site.id) ?? [],
-      })),
-      deployments: deploymentRows,
     }
-  },
-)
+  })
+export const getSiteSearchPage = createServerFn({ method: 'GET' })
+  .validator((data: unknown) => siteSearchSchema.parse(data ?? {}))
+  .handler(async ({ data }) => {
+    const actor = await requireActor(getRequest())
+    return searchSites(actor.userId, data)
+  })
 
 export const getSiteWorkspaceData = createServerFn({ method: 'GET' })
   .validator((data: { slug: string }) => data)
@@ -77,10 +79,22 @@ export const getSiteWorkspaceData = createServerFn({ method: 'GET' })
   })
 
 export const getSiteVersionsData = createServerFn({ method: 'GET' })
-  .validator((data: { slug: string }) => data)
+  .validator((data: unknown) =>
+    versionSearchSchema
+      .extend({ slug: z.string(), version: z.string().optional() })
+      .parse(data),
+  )
   .handler(async ({ data }) => {
     const actor = await requireActor(getRequest())
-    return listSiteVersions(actor.userId, data.slug)
+    const result = await listSiteVersions(actor.userId, data.slug, 25, data)
+    if (
+      data.version &&
+      !result.versions.some((version) => version.id === data.version)
+    )
+      result.versions.unshift(
+        (await findSiteVersion(actor.userId, data.slug, data.version)).version,
+      )
+    return result
   })
 
 export const getSiteDomainsData = createServerFn({ method: 'GET' })
@@ -170,9 +184,7 @@ export const updateSiteOrganization = createServerFn({ method: 'POST' })
   })
 
 export const getWorkspaceConsole = createServerFn({ method: 'GET' })
-  .validator(
-    (data: { workspace?: string; site?: string; version?: string }) => data,
-  )
+  .validator((data: unknown) => workspaceSearchSchema.parse(data))
   .handler(async ({ data }) => {
     const actor = await requireActor(getRequest())
     const { workspaceConsole } = await import('./workspaces')

@@ -8,7 +8,9 @@ import { requestJson, useConsoleMutation } from '#/lib/console-request'
 
 export const Route = createFileRoute('/dashboard_/sites/$slug/sharing')({
   validateSearch: z.object({ version: z.string().optional() }),
-  loader: ({ params }) => getSiteVersionsData({ data: { slug: params.slug } }),
+  loaderDeps: ({ search }) => search,
+  loader: ({ params, deps }) =>
+    getSiteVersionsData({ data: { slug: params.slug, version: deps.version } }),
   component: Sharing,
 })
 function Sharing() {

@@ -14,7 +14,9 @@ export const Route = createFileRoute('/dashboard_/sites/$slug/inspect')({
   }),
   loaderDeps: ({ search }) => search,
   loader: async ({ params, deps }) => {
-    const history = await getSiteVersionsData({ data: { slug: params.slug } })
+    const history = await getSiteVersionsData({
+      data: { slug: params.slug, version: deps.version },
+    })
     const version = deps.version ?? history.versions[0]?.id
     return {
       history,
@@ -72,6 +74,10 @@ function Inspector() {
             }
           >
             <option value="">No comparison</option>
+            {search.base &&
+            !history.versions.some((v) => v.id === search.base) ? (
+              <option value={search.base}>{search.base.slice(0, 8)}</option>
+            ) : null}
             {history.versions.map((v) => (
               <option key={v.id} value={v.id}>
                 {v.id.slice(0, 8)}

@@ -27,9 +27,14 @@ test('sharing updates cannot change access on an inaccessible site', async (t) =
     return { rows: [] }
   })
   await assert.rejects(
-    updateSiteVersionAccess('outsider', 'comet', 'foreign-version', {
-      password: null,
-    }),
+    updateSiteVersionAccess(
+      'outsider',
+      'comet',
+      'aaaaaaaa-bbbb-cccc-dddd-000000000001',
+      {
+        password: null,
+      },
+    ),
     /Site not found/,
   )
   assert.equal(queries, 1)

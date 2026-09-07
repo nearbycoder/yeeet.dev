@@ -1,3 +1,4 @@
+import { versionSearchSchema } from '#/lib/pagination'
 import { ManifestDiff } from '#/components/manifest-diff'
 import type { ManifestDiffData } from '#/components/manifest-diff'
 import { CopyButton } from '#/components/copy-button'
@@ -10,7 +11,10 @@ import {
 } from '#/server/functions'
 
 export const Route = createFileRoute('/dashboard_/sites/$slug/versions')({
-  loader: ({ params }) => getSiteVersionsData({ data: { slug: params.slug } }),
+  validateSearch: versionSearchSchema,
+  loaderDeps: ({ search }) => search,
+  loader: ({ params, deps }) =>
+    getSiteVersionsData({ data: { slug: params.slug, ...deps } }),
   component: SiteVersions,
 })
 
@@ -42,6 +46,8 @@ function formatDate(value: string) {
 
 function SiteVersions() {
   const data = Route.useLoaderData()
+  const search = Route.useSearch()
+  const navigate = Route.useNavigate()
   const router = useRouter()
   const [busy, setBusy] = useState('')
   const [error, setError] = useState('')
@@ -167,7 +173,9 @@ function SiteVersions() {
             others.
           </p>
         </div>
-        {previous ? (
+        {previous &&
+        !search.q &&
+        (!search.status || search.status === 'all') ? (
           <button
             type="button"
             className="button button-ink"
@@ -192,15 +200,54 @@ function SiteVersions() {
         </p>
       ) : null}
 
+      <form
+        className="site-filters"
+        key={JSON.stringify(search)}
+        onSubmit={(event) => {
+          event.preventDefault()
+          const fields = new FormData(event.currentTarget)
+          void navigate({
+            search: {
+              q: String(fields.get('q') || '') || undefined,
+              status: String(fields.get('status')) as typeof search.status,
+            },
+            resetScroll: false,
+          })
+        }}
+      >
+        <label>
+          Search versions
+          <input
+            name="q"
+            type="search"
+            maxLength={200}
+            defaultValue={search.q}
+            placeholder="Version ID, channel, or source…"
+          />
+        </label>
+        <label>
+          Status
+          <select name="status" defaultValue={search.status ?? 'all'}>
+            <option value="all">All versions</option>
+            <option value="ready">Ready</option>
+            <option value="uploading">Uploading</option>
+            <option value="failed">Failed</option>
+          </select>
+        </label>
+        <button className="button button-paper">Search versions</button>
+      </form>
+      <p role="status">
+        Showing {data.versions.length} versions, newest first.
+      </p>
       {data.versions.length ? (
         <div className="site-version-list">
-          {data.versions.map((version, index) => (
+          {data.versions.map((version) => (
             <Fragment key={version.id}>
               <article
                 className={`site-version-card ${version.current ? 'is-current' : ''}`}
               >
                 <div className="site-version-index">
-                  <span>v{data.versions.length - index}</span>
+                  <span aria-hidden="true">↗</span>
                   <i className={`activity-status ${version.status}`}>
                     {version.status === 'ready'
                       ? '✓'
@@ -399,9 +446,31 @@ function SiteVersions() {
           ))}
         </div>
       ) : (
-        <div className="empty-state">Deploy again to create a new version.</div>
+        <div className="empty-state">No versions match these filters.</div>
       )}
 
+      <nav className="console-actions" aria-label="Version pages">
+        {search.cursor ? (
+          <Link
+            to="/dashboard/sites/$slug/versions"
+            params={{ slug: data.site.slug }}
+            search={{ ...search, cursor: undefined }}
+            resetScroll={false}
+          >
+            First page
+          </Link>
+        ) : null}
+        {data.nextCursor ? (
+          <Link
+            to="/dashboard/sites/$slug/versions"
+            params={{ slug: data.site.slug }}
+            search={{ ...search, cursor: data.nextCursor }}
+            resetScroll={false}
+          >
+            Older versions
+          </Link>
+        ) : null}
+      </nav>
       <p className="site-page-note">
         Live aliases revalidate at the edge within about 10 seconds. Immutable
         preview URLs never change and stay no-index.

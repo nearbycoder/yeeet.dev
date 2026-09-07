@@ -11,7 +11,7 @@ import { ManifestDiff } from '#/components/manifest-diff'
 import type { ManifestDiffData } from '#/components/manifest-diff'
 import { z } from 'zod'
 import { CopyButton } from '#/components/copy-button'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   Link,
   createFileRoute,
@@ -24,10 +24,10 @@ import { Yeeetling, getYeeetlingDesign } from '#/components/yeeetling'
 import type { YeeetlingPhase } from '#/components/yeeetling'
 import { authClient } from '#/lib/auth-client'
 import { getDashboardData, getSession } from '#/server/functions'
-import { filterSites } from '#/lib/site-search'
+import { siteSearchSchema } from '#/lib/pagination'
 
 export const Route = createFileRoute('/dashboard')({
-  validateSearch: z.object({
+  validateSearch: siteSearchSchema.extend({
     site: z.string().optional(),
     channel: z.string().optional(),
   }),
@@ -37,7 +37,8 @@ export const Route = createFileRoute('/dashboard')({
       throw redirect({ to: '/login', search: { redirect: '/dashboard' } })
     return { user: session.user }
   },
-  loader: () => getDashboardData(),
+  loaderDeps: ({ search }) => search,
+  loader: ({ deps }) => getDashboardData({ data: deps }),
   component: Dashboard,
 })
 
@@ -204,12 +205,10 @@ function Dashboard() {
   const [slug, setSlug] = useState(destination.site ?? '')
   const [channel, setChannel] = useState(destination.channel ?? '')
   const [spaFallback, setSpaFallback] = useState(
-    data.sites.find((site) => site.slug === destination.site)?.spaFallback ??
-      true,
+    data.destinationSite?.spaFallback ?? true,
   )
   const [privateDeploy, setPrivateDeploy] = useState(
-    data.sites.find((site) => site.slug === destination.site)?.protected ??
-      false,
+    data.destinationSite?.protected ?? false,
   )
   const [deployPassword, setDeployPassword] = useState('')
   const [dragging, setDragging] = useState(false)
@@ -226,29 +225,22 @@ function Dashboard() {
   const [keyBusy, setKeyBusy] = useState(false)
   const [keyError, setKeyError] = useState('')
   const [siteBusy, setSiteBusy] = useState('')
-  const [projectGroup, setProjectGroup] = useState('')
-  const [favoritesOnly, setFavoritesOnly] = useState(false)
-  const projectGroups = [
-    ...new Set(
-      data.sites.map((site) => site.organization.project).filter(Boolean),
-    ),
-  ].sort()
-  const [siteSearch, setSiteSearch] = useState('')
-  const [siteStatus, setSiteStatus] = useState<'all' | 'live' | 'inactive'>(
-    'all',
-  )
-  const [visibleSiteCount, setVisibleSiteCount] = useState(20)
-  const matchingSites = useMemo(
-    () =>
-      filterSites(
-        data.sites,
-        siteSearch,
-        siteStatus,
-        projectGroup,
-        favoritesOnly,
-      ),
-    [data.sites, siteSearch, siteStatus, projectGroup, favoritesOnly],
-  )
+  const filters = Route.useSearch()
+  const navigate = Route.useNavigate()
+  const projectGroup = filters.group ?? ''
+  const favoritesOnly = filters.favorites ?? false
+  const projectGroups = data.projectGroups
+  const [siteSearch, setSiteSearch] = useState(filters.q ?? '')
+  const siteStatus = filters.status ?? 'all'
+  const matchingSites = data.sites
+  useEffect(() => {
+    setSiteSearch(filters.q ?? '')
+  }, [filters.q])
+  const changeFilters = (next: Partial<typeof filters>) =>
+    void navigate({
+      search: { ...filters, ...next, cursor: undefined },
+      resetScroll: false,
+    })
   const [deleteTarget, setDeleteTarget] =
     useState<DashboardDeleteTarget | null>(null)
   const [review, setReview] = useState<{
@@ -903,10 +895,14 @@ function Dashboard() {
                 <span>YOUR FLEET</span>
                 <h2>Live sites</h2>
               </div>
-              <b>{data.sites.length}</b>
+              <b>{data.totalCount}</b>
             </div>
-            {data.sites.length ? (
-              <div
+            {data.totalCount ? (
+              <form
+                onSubmit={(event) => {
+                  event.preventDefault()
+                  changeFilters({ q: siteSearch || undefined })
+                }}
                 className="site-filters"
                 role="search"
                 aria-label="Find a site"
@@ -922,7 +918,6 @@ function Dashboard() {
                     value={siteSearch}
                     onChange={(event) => {
                       setSiteSearch(event.target.value)
-                      setVisibleSiteCount(20)
                     }}
                   />
                 </label>
@@ -931,8 +926,9 @@ function Dashboard() {
                   <select
                     value={siteStatus}
                     onChange={(event) => {
-                      setSiteStatus(event.target.value as typeof siteStatus)
-                      setVisibleSiteCount(20)
+                      changeFilters({
+                        status: event.target.value as typeof siteStatus,
+                      })
                     }}
                   >
                     <option value="all">All sites</option>
@@ -945,8 +941,7 @@ function Dashboard() {
                   <select
                     value={projectGroup}
                     onChange={(event) => {
-                      setProjectGroup(event.target.value)
-                      setVisibleSiteCount(20)
+                      changeFilters({ group: event.target.value || undefined })
                     }}
                   >
                     <option value="">All groups</option>
@@ -962,22 +957,25 @@ function Dashboard() {
                     type="checkbox"
                     checked={favoritesOnly}
                     onChange={(event) => {
-                      setFavoritesOnly(event.target.checked)
-                      setVisibleSiteCount(20)
+                      changeFilters({
+                        favorites: event.target.checked || undefined,
+                      })
                     }}
                   />
                   Favorites only
                 </label>
+                <button className="button button-paper" type="submit">
+                  Search sites
+                </button>
                 <p role="status">
-                  Showing {Math.min(visibleSiteCount, matchingSites.length)} of{' '}
-                  {matchingSites.length}{' '}
-                  {matchingSites.length === 1 ? 'site' : 'sites'}
+                  Showing {matchingSites.length} of {data.matchedCount} matching
+                  sites. Newest first.
                 </p>
-              </div>
+              </form>
             ) : null}
-            {data.sites.length ? (
+            {data.totalCount ? (
               <div className="site-list">
-                {matchingSites.slice(0, visibleSiteCount).map((site) => (
+                {matchingSites.map((site) => (
                   <div className="site-row" key={site.id}>
                     <span className="site-icon site-mascot">
                       <Yeeetling
@@ -1081,26 +1079,38 @@ function Dashboard() {
                       className="button button-paper"
                       onClick={() => {
                         setSiteSearch('')
-                        setSiteStatus('all')
-                        setProjectGroup('')
-                        setFavoritesOnly(false)
-                        setVisibleSiteCount(20)
+                        changeFilters({
+                          q: undefined,
+                          status: undefined,
+                          group: undefined,
+                          favorites: undefined,
+                        })
                       }}
                     >
                       Clear filters
                     </button>
                   </div>
                 ) : null}
-                {matchingSites.length > visibleSiteCount ? (
-                  <button
-                    type="button"
-                    className="button button-paper site-show-more"
-                    onClick={() => setVisibleSiteCount((count) => count + 20)}
-                  >
-                    Show {Math.min(20, matchingSites.length - visibleSiteCount)}{' '}
-                    more sites
-                  </button>
-                ) : null}
+                <nav className="console-actions" aria-label="Site pages">
+                  {filters.cursor ? (
+                    <Link
+                      to="/dashboard"
+                      search={{ ...filters, cursor: undefined }}
+                      resetScroll={false}
+                    >
+                      First page
+                    </Link>
+                  ) : null}
+                  {data.nextCursor ? (
+                    <Link
+                      to="/dashboard"
+                      search={{ ...filters, cursor: data.nextCursor }}
+                      resetScroll={false}
+                    >
+                      Next page
+                    </Link>
+                  ) : null}
+                </nav>
               </div>
             ) : (
               <div className="empty-state">Your first site will land here.</div>

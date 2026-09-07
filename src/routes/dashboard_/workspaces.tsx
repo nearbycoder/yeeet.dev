@@ -5,7 +5,8 @@ import {
   redirect,
   useRouter,
 } from '@tanstack/react-router'
-import { z } from 'zod'
+import { workspaceSearchSchema } from '#/lib/pagination'
+import { SitePicker } from '#/components/site-picker'
 import { DashboardHeader } from '#/components/dashboard-header'
 import { ConfirmDialog } from '#/components/confirm-dialog'
 import { ManifestDiff } from '#/components/manifest-diff'
@@ -18,11 +19,7 @@ import {
 } from '#/server/functions'
 
 export const Route = createFileRoute('/dashboard_/workspaces')({
-  validateSearch: z.object({
-    workspace: z.string().optional(),
-    site: z.string().optional(),
-    version: z.string().optional(),
-  }),
+  validateSearch: workspaceSearchSchema,
   beforeLoad: async () => {
     const session = await getSession()
     if (!session)
@@ -40,6 +37,7 @@ function Workspaces() {
   const data = Route.useLoaderData()
   const { user } = Route.useRouteContext()
   const router = useRouter()
+  const search = Route.useSearch()
   const selected = data.selected
   const mutation = useConsoleMutation()
   const [confirm, setConfirm] = useState<{
@@ -51,11 +49,12 @@ function Workspaces() {
   const [path, setPath] = useState('/')
   const editor = selected && canEditWorkspace(selected.role)
   const owner = selected?.role === 'owner'
-  const navigate = (search: {
-    workspace?: string
-    site?: string
-    version?: string
-  }) => void router.navigate({ to: '/dashboard/workspaces', search })
+  const navigate = (next: typeof search) =>
+    void router.navigate({
+      to: '/dashboard/workspaces',
+      search: next,
+      resetScroll: false,
+    })
   const act = (action: unknown) =>
     mutation.run(() => updateWorkspace({ data: action }))
   return (
@@ -286,19 +285,7 @@ function Workspaces() {
                       })
                     }}
                   >
-                    <label>
-                      Your site
-                      <select required name="slug" defaultValue="">
-                        <option value="" disabled>
-                          Choose a site
-                        </option>
-                        {data.ownedSites.map((site) => (
-                          <option value={site.slug} key={site.id}>
-                            {site.slug}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
+                    <SitePicker />
                     <button
                       className="button button-ink"
                       disabled={mutation.busy}
@@ -375,6 +362,14 @@ function Workspaces() {
                           })
                         }}
                       >
+                        {selected.version &&
+                        !selected.history.versions.some(
+                          (v) => v.id === selected.version?.id,
+                        ) ? (
+                          <option value={selected.version.id}>
+                            {selected.version.id.slice(0, 8)} · Selected
+                          </option>
+                        ) : null}
                         {selected.history.versions.map((version) => (
                           <option key={version.id} value={version.id}>
                             {version.id.slice(0, 8)} ·{' '}
@@ -384,6 +379,42 @@ function Workspaces() {
                         ))}
                       </select>
                     </label>
+                    <nav
+                      className="console-actions"
+                      aria-label="Workspace version pages"
+                    >
+                      {search.versionCursor ? (
+                        <button
+                          className="button button-paper"
+                          onClick={() =>
+                            navigate({
+                              ...search,
+                              version: undefined,
+                              versionCursor: undefined,
+                              feedbackCursor: undefined,
+                            })
+                          }
+                        >
+                          Newest versions
+                        </button>
+                      ) : null}
+                      {selected.history.nextCursor ? (
+                        <button
+                          className="button button-paper"
+                          onClick={() =>
+                            navigate({
+                              ...search,
+                              version: undefined,
+                              versionCursor:
+                                selected.history!.nextCursor ?? undefined,
+                              feedbackCursor: undefined,
+                            })
+                          }
+                        >
+                          Older versions
+                        </button>
+                      ) : null}
+                    </nav>
                     {selected.version ? (
                       <>
                         <div className="console-actions">
@@ -426,10 +457,90 @@ function Workspaces() {
                           <ManifestDiff diff={selected.comparison} />
                         ) : null}
                         <h3>Version feedback</h3>
-                        <p>
-                          Showing the latest 100 comments for{' '}
-                          {selected.version.id.slice(0, 8)}.
+                        <p role="status">
+                          Showing {selected.comments.length} comments for{' '}
+                          {selected.version.id.slice(0, 8)}, newest first.
                         </p>
+                        <form
+                          className="site-filters"
+                          key={JSON.stringify([
+                            search.feedbackQuery,
+                            search.feedbackStatus,
+                          ])}
+                          onSubmit={(event) => {
+                            event.preventDefault()
+                            const fields = new FormData(event.currentTarget)
+                            navigate({
+                              ...search,
+                              version: selected.version!.id,
+                              feedbackCursor: undefined,
+                              feedbackQuery:
+                                String(fields.get('q') || '') || undefined,
+                              feedbackStatus: String(
+                                fields.get('status'),
+                              ) as typeof search.feedbackStatus,
+                            })
+                          }}
+                        >
+                          <label>
+                            Search feedback
+                            <input
+                              type="search"
+                              name="q"
+                              maxLength={200}
+                              defaultValue={search.feedbackQuery}
+                              placeholder="Comment or page path…"
+                            />
+                          </label>
+                          <label>
+                            Feedback status
+                            <select
+                              name="status"
+                              defaultValue={search.feedbackStatus ?? 'all'}
+                            >
+                              <option value="all">All feedback</option>
+                              <option value="open">Open</option>
+                              <option value="resolved">Resolved</option>
+                            </select>
+                          </label>
+                          <button className="button button-paper">
+                            Search feedback
+                          </button>
+                        </form>
+                        <nav
+                          className="console-actions"
+                          aria-label="Feedback pages"
+                        >
+                          {search.feedbackCursor ? (
+                            <button
+                              className="button button-paper"
+                              onClick={() =>
+                                navigate({
+                                  ...search,
+                                  version: selected.version!.id,
+                                  feedbackCursor: undefined,
+                                })
+                              }
+                            >
+                              Newest feedback
+                            </button>
+                          ) : null}
+                          {selected.feedbackNextCursor ? (
+                            <button
+                              className="button button-paper"
+                              onClick={() =>
+                                navigate({
+                                  ...search,
+                                  version: selected.version!.id,
+                                  feedbackCursor:
+                                    selected.feedbackNextCursor ?? undefined,
+                                })
+                              }
+                            >
+                              Older feedback
+                            </button>
+                          ) : null}
+                        </nav>
                         <form
                           className="site-page-stack"
                           onSubmit={(event) => {
