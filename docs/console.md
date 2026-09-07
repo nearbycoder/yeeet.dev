@@ -284,3 +284,13 @@ safe spreadsheet cells; each row links to the site's cleanup review. Account tot
 remain visible while filtering. Counts include uploading/failed versions and can
 count shared files repeatedly, so this is a deployment inventory, not physical
 object-storage usage or billing. Pages may shift as deployments change.
+
+## Route simulator
+
+Inspect → Simulate a route evaluates a local path as a GET request accepting HTML
+against the selected version's recorded manifest. It reports redirect/rewrite
+matches, index-file resolution, SPA fallback, custom 404 pages, and matching custom
+header rules. It shares path/SPA resolution with the serving gateway and does not
+fetch redirect destinations. Platform response headers may override matched custom
+rules. Authentication, preview expiry, DNS/CDN, object availability, and generated
+social-image rendering are outside this metadata simulation.
