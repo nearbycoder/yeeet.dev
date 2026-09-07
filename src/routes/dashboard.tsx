@@ -1,3 +1,4 @@
+import { DeploymentPreflight } from '#/components/deployment-preflight'
 import { UploadSelection } from '#/components/upload-selection'
 import {
   hashUploadFiles,
@@ -813,6 +814,22 @@ function Dashboard() {
               disabled={phase !== 'idle' && phase !== 'done'}
               onChange={(next) => {
                 setFiles(next)
+                setReview(null)
+                setPhase('idle')
+                setError('')
+                setResultUrl('')
+                setResultShareUrl('')
+              }}
+            />
+          ) : null}
+          {files.length ? (
+            <DeploymentPreflight
+              files={files}
+              spa={spaFallback}
+              disabled={phase !== 'idle' && phase !== 'done'}
+              onExclude={(paths) => {
+                const excluded = new Set(paths)
+                setFiles(files.filter((item) => !excluded.has(item.path)))
                 setReview(null)
                 setPhase('idle')
                 setError('')

@@ -182,3 +182,12 @@ The list renders 100 files per page and shows included/excluded counts and bytes
 Selection changes invalidate the deployment review. Editing is disabled during
 hashing/upload/finalization; recovery records still require the original manifest
 unless you explicitly forget that saved attempt. Files remain only in memory.
+
+## Deployment preflight
+
+The launchpad checks selected paths and sizes for a missing root `index.html`,
+duplicate paths, likely private files (`.env`, Git/SSH data, private-key names),
+source maps, dependency folders and empty files. Findings are advisory and do not
+scan file contents. Exclude likely private files removes those paths from this
+selection and invalidates the old review; restore them through the selection
+editor if intentional. API/CLI uploads retain their normal server validation.
