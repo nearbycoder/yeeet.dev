@@ -1,8 +1,17 @@
+import {
+  hashUploadFiles,
+  parseRecovery,
+  recoveryStorageKey,
+  recoveryFingerprint,
+  retryUpload,
+  uploadPool,
+} from '#/lib/browser-upload'
+import type { UploadFile, UploadRecovery } from '#/lib/browser-upload'
 import { ManifestDiff } from '#/components/manifest-diff'
 import type { ManifestDiffData } from '#/components/manifest-diff'
 import { z } from 'zod'
 import { CopyButton } from '#/components/copy-button'
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Link,
   createFileRoute,
@@ -31,15 +40,6 @@ export const Route = createFileRoute('/dashboard')({
   loader: () => getDashboardData(),
   component: Dashboard,
 })
-
-type UploadFile = { file: File; path: string }
-
-async function sha256File(file: File) {
-  const digest = await crypto.subtle.digest('SHA-256', await file.arrayBuffer())
-  return Array.from(new Uint8Array(digest), (byte) =>
-    byte.toString(16).padStart(2, '0'),
-  ).join('')
-}
 
 type DashboardDeleteTarget = {
   siteSlug: string
@@ -159,21 +159,6 @@ async function filesFromDrop(dataTransfer: DataTransfer) {
   return stripCommonRoot(files.flat())
 }
 
-async function uploadInBatches<T>(
-  values: Array<T>,
-  size: number,
-  worker: (value: T) => Promise<void>,
-) {
-  let cursor = 0
-  async function run() {
-    while (cursor < values.length) {
-      const value = values[cursor++]
-      await worker(value)
-    }
-  }
-  await Promise.all(Array.from({ length: Math.min(size, values.length) }, run))
-}
-
 function Dashboard() {
   const { user } = Route.useRouteContext()
   const destination = Route.useSearch()
@@ -181,9 +166,40 @@ function Dashboard() {
   const router = useRouter()
   const fileInput = useRef<HTMLInputElement>(null)
   const folderInput = useRef<HTMLInputElement>(null)
-  const deploymentKey = useRef<{ fingerprint: string; key: string } | null>(
-    null,
-  )
+  const uploadController = useRef<AbortController | null>(null)
+  const hashedFiles = useRef<{
+    files: Array<UploadFile>
+    checksums: Map<string, string>
+  } | null>(null)
+  const recoveryRef = useRef<UploadRecovery | null>(null)
+  const [recovery, setRecovery] = useState<UploadRecovery | null>(null)
+  const [recoveryWarning, setRecoveryWarning] = useState('')
+  const [hashedCount, setHashedCount] = useState(0)
+  const storageKey = recoveryStorageKey(user.id)
+  useEffect(() => {
+    try {
+      const saved = parseRecovery(localStorage.getItem(storageKey))
+      recoveryRef.current = saved
+      setRecovery(saved)
+    } catch {
+      setRecoveryWarning(
+        'Recovery across reloads is unavailable. Keep this tab open while uploading.',
+      )
+    }
+    return () => uploadController.current?.abort()
+  }, [storageKey])
+  function saveRecovery(saved: UploadRecovery | null) {
+    recoveryRef.current = saved
+    setRecovery(saved)
+    try {
+      if (saved) localStorage.setItem(storageKey, JSON.stringify(saved))
+      else localStorage.removeItem(storageKey)
+    } catch {
+      setRecoveryWarning(
+        'Recovery across reloads is unavailable. Keep this tab open while uploading.',
+      )
+    }
+  }
   const [files, setFiles] = useState<Array<UploadFile>>([])
   const [slug, setSlug] = useState(destination.site ?? '')
   const [channel, setChannel] = useState(destination.channel ?? '')
@@ -262,7 +278,6 @@ function Dashboard() {
       })),
     )
     setFiles(next)
-    deploymentKey.current = null
     setError('')
     setResultUrl('')
     setResultShareUrl('')
@@ -284,28 +299,38 @@ function Dashboard() {
     setUploaded(0)
     setUploadTotal(0)
     setReused(0)
+    if (uploadController.current) return
+    const controller = new AbortController()
+    uploadController.current = controller
+    const signal = controller.signal
     setPhase('preparing')
+    setHashedCount(0)
     try {
-      const checksums = new Map<string, string>()
-      await uploadInBatches(files, 2, async (item) => {
-        checksums.set(item.path, await sha256File(item.file))
-      })
+      const checksums =
+        hashedFiles.current?.files === files
+          ? hashedFiles.current.checksums
+          : await hashUploadFiles(files, signal, setHashedCount)
+      hashedFiles.current = { files, checksums }
+      signal.throwIfAborted()
       const deploymentInput = {
         slug,
         channel: channel || undefined,
         spaFallback,
         password: privateDeploy ? deployPassword : undefined,
         source: 'web',
-        files: files.map((item) => ({
-          path: item.path,
-          size: item.file.size,
-          contentType: item.file.type || 'application/octet-stream',
-          checksum: checksums.get(item.path),
-        })),
+        files: files
+          .map((item) => ({
+            path: item.path,
+            size: item.file.size,
+            contentType: item.file.type || 'application/octet-stream',
+            checksum: checksums.get(item.path),
+          }))
+          .sort((a, b) => a.path.localeCompare(b.path)),
       }
       if (previewOnly) {
         const response = await fetch('/api/v1/deployments', {
           method: 'POST',
+          signal,
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({
             ...deploymentInput,
@@ -326,17 +351,37 @@ function Dashboard() {
         setPhase('idle')
         return
       }
-      const fingerprint = JSON.stringify(deploymentInput)
-      if (deploymentKey.current?.fingerprint !== fingerprint) {
-        deploymentKey.current = { fingerprint, key: crypto.randomUUID() }
+      const fingerprint = await recoveryFingerprint({
+        ...deploymentInput,
+        password: undefined,
+        privateDeploy,
+      })
+      if (
+        recoveryRef.current &&
+        recoveryRef.current.fingerprint !== fingerprint
+      )
+        throw new Error(
+          'This build differs from the saved attempt. Restore its files and settings, or forget the saved attempt to start a new deployment.',
+        )
+      const attempt = recoveryRef.current ?? {
+        version: 1 as const,
+        key: crypto.randomUUID(),
+        fingerprint,
+        createdAt: Date.now(),
+        slug,
+        channel,
+        spaFallback,
+        privateDeploy,
       }
+      saveRecovery(attempt)
       const response = await fetch('/api/v1/deployments', {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
-          'idempotency-key': deploymentKey.current.key,
+          'idempotency-key': attempt.key,
         },
-        body: fingerprint,
+        body: JSON.stringify(deploymentInput),
+        signal,
       })
       const deployment = await response.json()
       if (!response.ok)
@@ -348,28 +393,39 @@ function Dashboard() {
       setUploadTotal(deployment.uploadUrls.length)
       setReused(deployment.reusedFiles ?? 0)
       setPhase('uploading')
-      await uploadInBatches(
+      await uploadPool(
         deployment.uploadUrls,
         6,
+        signal,
         async (upload: {
           path: string
           url: string
           headers: Record<string, string>
         }) => {
-          const uploadResponse = await fetch(upload.url, {
-            method: 'PUT',
-            headers: upload.headers,
-            body: localFiles.get(upload.path),
-          })
-          if (!uploadResponse.ok)
-            throw new Error(`Upload failed for ${upload.path}.`)
+          const file = localFiles.get(upload.path)
+          if (!file)
+            throw new Error(`Select the original file: ${upload.path}.`)
+          await retryUpload(async () => {
+            const uploadResponse = await fetch(upload.url, {
+              method: 'PUT',
+              headers: upload.headers,
+              body: file,
+              signal: AbortSignal.any([signal, AbortSignal.timeout(60000)]),
+            })
+            if (!uploadResponse.ok)
+              throw new Error(
+                `Upload failed for ${upload.path}. Resume to refresh upload links and retry missing files.`,
+              )
+          }, signal)
           setUploaded((count) => count + 1)
         },
       )
 
+      signal.throwIfAborted()
       setPhase('finalizing')
       const completeResponse = await fetch(deployment.completeUrl, {
         method: 'POST',
+        signal,
       })
       const completed = await completeResponse.json()
       if (!completeResponse.ok)
@@ -381,17 +437,21 @@ function Dashboard() {
       setSlug(completed.site)
       setDeployPassword('')
       setPrivateDeploy(false)
-      deploymentKey.current = null
+      saveRecovery(null)
       setReview(null)
       setPhase('done')
       await router.invalidate()
     } catch (uploadError) {
       setPhase('idle')
       setError(
-        uploadError instanceof Error
-          ? uploadError.message
-          : 'Deployment failed.',
+        signal.aborted
+          ? 'Upload paused. Select Resume upload when you are ready.'
+          : uploadError instanceof Error
+            ? uploadError.message
+            : 'Deployment failed.',
       )
+    } finally {
+      uploadController.current = null
     }
   }
 
@@ -505,6 +565,41 @@ function Dashboard() {
           </div>
         </section>
 
+        {recovery ? (
+          <section className="panel site-page-panel" aria-label="Saved upload">
+            <h2>Saved upload attempt</h2>
+            <p>
+              {recovery.slug || 'Generated site'}
+              {recovery.channel ? ` · ${recovery.channel}` : ''}. Reselect the
+              original files to resume after a reload. Files and passwords are
+              never saved in the browser; private deployments need the same
+              password again.
+            </p>
+            <div className="console-actions">
+              <button
+                className="button button-paper"
+                disabled={phase !== 'idle'}
+                onClick={() => {
+                  setSlug(recovery.slug)
+                  setChannel(recovery.channel)
+                  setSpaFallback(recovery.spaFallback)
+                  setPrivateDeploy(recovery.privateDeploy)
+                  setReview(null)
+                }}
+              >
+                Restore destination settings
+              </button>
+              <button
+                className="button danger-link"
+                disabled={phase !== 'idle'}
+                onClick={() => saveRecovery(null)}
+              >
+                Forget saved attempt
+              </button>
+            </div>
+          </section>
+        ) : null}
+        {recoveryWarning ? <p role="status">{recoveryWarning}</p> : null}
         <section className="deploy-card">
           <div
             className={`dropzone ${dragging ? 'is-dragging' : ''} ${files.length ? 'has-files' : ''}`}
@@ -604,6 +699,7 @@ function Dashboard() {
               <div className="slug-input">
                 <input
                   name="site-slug"
+                  disabled={phase !== 'idle'}
                   value={slug}
                   onChange={(event) =>
                     setSlug(
@@ -624,6 +720,7 @@ function Dashboard() {
               <div className="slug-input">
                 <input
                   name="deployment-channel"
+                  disabled={phase !== 'idle'}
                   value={channel}
                   onChange={(event) =>
                     setChannel(
@@ -647,6 +744,7 @@ function Dashboard() {
             <label className="routing-toggle">
               <input
                 name="spa-fallback"
+                disabled={phase !== 'idle'}
                 type="checkbox"
                 checked={spaFallback}
                 onChange={(event) => setSpaFallback(event.target.checked)}
@@ -659,6 +757,7 @@ function Dashboard() {
             <label className="routing-toggle">
               <input
                 name="private-deploy"
+                disabled={phase !== 'idle'}
                 type="checkbox"
                 checked={privateDeploy}
                 onChange={(event) => {
@@ -738,9 +837,24 @@ function Dashboard() {
                 disabled={phase !== 'idle'}
                 onClick={() => void deploy(false)}
               >
-                Deploy this build ↗
+                {recovery ? 'Resume upload ↗' : 'Deploy this build ↗'}
               </button>
             </section>
+          ) : null}
+          {phase === 'preparing' || phase === 'uploading' ? (
+            <div className="console-actions">
+              <p role="status">
+                {phase === 'preparing'
+                  ? `Preparing files: ${hashedCount} / ${files.length}`
+                  : `Uploaded ${uploaded} / ${uploadTotal} missing files · ${reused} already stored`}
+              </p>
+              <button
+                className="button button-paper"
+                onClick={() => uploadController.current?.abort()}
+              >
+                Pause upload
+              </button>
+            </div>
           ) : null}
           {phase === 'uploading' || phase === 'finalizing' ? (
             <div className="upload-progress">
