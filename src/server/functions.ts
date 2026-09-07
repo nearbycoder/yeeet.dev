@@ -323,3 +323,11 @@ export const getStorageInventory = createServerFn({ method: 'GET' })
       platform: publicPlatformConfig(),
     }
   })
+
+export const getRouteSimulation = createServerFn({ method: 'GET' })
+  .validator((data: unknown) => data)
+  .handler(async ({ data }) => {
+    const actor = await requireActor(getRequest())
+    const { simulateOwnedRoute } = await import('./route-simulator')
+    return simulateOwnedRoute(actor.userId, data)
+  })

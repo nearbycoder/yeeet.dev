@@ -1,3 +1,4 @@
+import { RouteSimulator } from '#/components/route-simulator'
 import { VersionNotes } from '#/components/version-notes'
 import { AssetBudget } from '#/components/asset-budget'
 import { ComparisonReport } from '#/components/comparison-report'
@@ -143,6 +144,11 @@ function Inspector() {
               {JSON.stringify(JSON.parse(version.redirectRules), null, 2)}
             </pre>
           </details>
+          <RouteSimulator
+            key={`routing:${version.id}`}
+            slug={history.site.slug}
+            version={version.id}
+          />
           <VersionNotes
             key={`notes:${version.id}`}
             slug={history.site.slug}
