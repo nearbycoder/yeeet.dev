@@ -1,3 +1,4 @@
+import { withSiteLock } from './site-lock'
 import { and, eq, lte } from 'drizzle-orm'
 import { db } from '#/db'
 import { deployments, siteHealth, sites } from '#/db/schema'
@@ -46,17 +47,25 @@ export async function setPreviewExpiry(userId: string, input: unknown) {
   const expiresAt = data.hours
     ? new Date(Date.now() + data.hours * 3600000)
     : null
-  const rows = await db
-    .update(deployments)
-    .set({ expiresAt })
-    .where(
-      and(
-        eq(deployments.id, data.version),
-        eq(deployments.siteId, site.id),
-        eq(deployments.status, 'ready'),
-      ),
-    )
-    .returning({ id: deployments.id })
+  const rows = await withSiteLock(site.id, userId, async (tx, freshSite) => {
+    if (data.version === freshSite.activeDeploymentId)
+      throw new HttpError(
+        409,
+        'Production cannot expire. Choose a preview version.',
+        'production_protected',
+      )
+    return tx
+      .update(deployments)
+      .set({ expiresAt })
+      .where(
+        and(
+          eq(deployments.id, data.version),
+          eq(deployments.siteId, site.id),
+          eq(deployments.status, 'ready'),
+        ),
+      )
+      .returning({ id: deployments.id })
+  })
   if (!rows.length)
     throw new HttpError(404, 'Ready preview version not found.', 'not_found')
   return { expiresAt: expiresAt?.toISOString() ?? null }

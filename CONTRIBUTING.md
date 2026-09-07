@@ -61,3 +61,19 @@ To run them locally, point `DATABASE_URL` at an isolated database, apply
 migrations with `npm run db:migrate`, then run `npm run test:integration`.
 These tests create and clean up their own fixtures. Unit tests and the build
 remain independent of a running database.
+
+## Site mutation locking
+
+Use `withSiteLock(siteId, ownerId, callback)` for transactions that change
+retention eligibility or delete site/version metadata. Lock the parent site
+before any version, channel, feedback, or retention-policy row, and re-read
+targets after acquiring the lock. New-site creation uses `lockSite` within its
+existing transaction. Do not replace this protocol with a child-row lock or a
+process-local mutex: other app instances must coordinate too.
+
+Keep object-store requests and webhook emission outside these transactions.
+Metadata deletion and its durable storage-cleanup job must commit together.
+PostgreSQL releases the [row lock](https://www.postgresql.org/docs/current/explicit-locking.html#LOCKING-ROWS)
+when the transaction ends; unrelated sites can proceed independently.
+The integration suite exercises both orders of cleanup/reference races using
+separate PostgreSQL connections and observable lock waits.

@@ -1,3 +1,4 @@
+import { lockedVersion, withSiteLock } from './site-lock'
 import {
   afterCursor,
   cursorTime,
@@ -389,20 +390,16 @@ export async function mutateWorkspace(userId: string, input: unknown) {
         workspace.ownerId,
         data.slug,
       )
-      const version = await db.query.deployments.findFirst({
-        where: and(
-          eq(deployments.id, data.version),
-          eq(deployments.siteId, site.id),
-        ),
-      })
-      if (!version) throw new HttpError(404, 'Version not found.', 'not_found')
-      await db.insert(deploymentFeedback).values({
-        id: randomUUID(),
-        workspaceId: workspace.id,
-        deploymentId: version.id,
-        authorId: userId,
-        body: data.body,
-        path: data.path,
+      await withSiteLock(site.id, workspace.ownerId, async (tx) => {
+        const version = await lockedVersion(tx, site.id, data.version)
+        await tx.insert(deploymentFeedback).values({
+          id: randomUUID(),
+          workspaceId: workspace.id,
+          deploymentId: version.id,
+          authorId: userId,
+          body: data.body,
+          path: data.path,
+        })
       })
       break
     }
@@ -415,21 +412,32 @@ export async function mutateWorkspace(userId: string, input: unknown) {
         ),
       })
       if (!comment) throw new HttpError(404, 'Feedback not found.', 'not_found')
-      if (data.action === 'delete-comment') {
-        if (comment.authorId !== userId && workspace.role !== 'owner')
-          throw new HttpError(
-            403,
-            'Only the author or workspace owner can delete feedback.',
-            'forbidden',
-          )
-        await db
-          .delete(deploymentFeedback)
-          .where(eq(deploymentFeedback.id, comment.id))
-      } else
-        await db
-          .update(deploymentFeedback)
-          .set({ resolved: data.resolved })
-          .where(eq(deploymentFeedback.id, comment.id))
+      const version = await db.query.deployments.findFirst({
+        where: eq(deployments.id, comment.deploymentId),
+      })
+      if (!version) throw new HttpError(404, 'Version not found.', 'not_found')
+      await withSiteLock(version.siteId, workspace.ownerId, async (tx) => {
+        await lockedVersion(tx, version.siteId, version.id)
+        const fresh = await tx.query.deploymentFeedback.findFirst({
+          where: eq(deploymentFeedback.id, comment.id),
+        })
+        if (!fresh) throw new HttpError(404, 'Feedback not found.', 'not_found')
+        if (data.action === 'delete-comment') {
+          if (comment.authorId !== userId && workspace.role !== 'owner')
+            throw new HttpError(
+              403,
+              'Only the author or workspace owner can delete feedback.',
+              'forbidden',
+            )
+          await tx
+            .delete(deploymentFeedback)
+            .where(eq(deploymentFeedback.id, comment.id))
+        } else
+          await tx
+            .update(deploymentFeedback)
+            .set({ resolved: data.resolved })
+            .where(eq(deploymentFeedback.id, comment.id))
+      })
       break
     }
   }
