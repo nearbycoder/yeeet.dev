@@ -4686,3 +4686,12 @@ summary:focus-visible {
   display: grid;
   gap: 12px;
 }
+
+.storage-metrics {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+@media (max-width: 600px) {
+  .storage-metrics {
+    grid-template-columns: 1fr;
+  }
+}

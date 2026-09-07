@@ -17,6 +17,7 @@ import { Route as HealthRouteImport } from './routes/health'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as MascotRouteImport } from './routes/mascot'
 import { Route as DashboardSettingsRouteImport } from './routes/dashboard_/settings'
+import { Route as DashboardStorageRouteImport } from './routes/dashboard_/storage'
 import { Route as DashboardWorkspacesRouteImport } from './routes/dashboard_/workspaces'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ApiV1MeRouteImport } from './routes/api/v1/me'
@@ -95,6 +96,11 @@ const MascotRoute = MascotRouteImport.update({
 const DashboardSettingsRoute = DashboardSettingsRouteImport.update({
   id: '/dashboard_/settings',
   path: '/dashboard/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DashboardStorageRoute = DashboardStorageRouteImport.update({
+  id: '/dashboard_/storage',
+  path: '/dashboard/storage',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardWorkspacesRoute = DashboardWorkspacesRouteImport.update({
@@ -325,6 +331,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/mascot': typeof MascotRoute
   '/dashboard/settings': typeof DashboardSettingsRoute
+  '/dashboard/storage': typeof DashboardStorageRoute
   '/dashboard/workspaces': typeof DashboardWorkspacesRoute
   '/dashboard/sites/$slug': typeof DashboardSitesSlugRouteRouteWithChildren
   '/api/auth/$': typeof ApiAuthSplatRoute
@@ -374,6 +381,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/mascot': typeof MascotRoute
   '/dashboard/settings': typeof DashboardSettingsRoute
+  '/dashboard/storage': typeof DashboardStorageRoute
   '/dashboard/workspaces': typeof DashboardWorkspacesRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/v1/me': typeof ApiV1MeRoute
@@ -423,6 +431,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/mascot': typeof MascotRoute
   '/dashboard_/settings': typeof DashboardSettingsRoute
+  '/dashboard_/storage': typeof DashboardStorageRoute
   '/dashboard_/workspaces': typeof DashboardWorkspacesRoute
   '/dashboard_/sites/$slug': typeof DashboardSitesSlugRouteRouteWithChildren
   '/api/auth/$': typeof ApiAuthSplatRoute
@@ -474,6 +483,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/mascot'
     | '/dashboard/settings'
+    | '/dashboard/storage'
     | '/dashboard/workspaces'
     | '/dashboard/sites/$slug'
     | '/api/auth/$'
@@ -523,6 +533,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/mascot'
     | '/dashboard/settings'
+    | '/dashboard/storage'
     | '/dashboard/workspaces'
     | '/api/auth/$'
     | '/api/v1/me'
@@ -571,6 +582,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/mascot'
     | '/dashboard_/settings'
+    | '/dashboard_/storage'
     | '/dashboard_/workspaces'
     | '/dashboard_/sites/$slug'
     | '/api/auth/$'
@@ -621,6 +633,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   MascotRoute: typeof MascotRoute
   DashboardSettingsRoute: typeof DashboardSettingsRoute
+  DashboardStorageRoute: typeof DashboardStorageRoute
   DashboardWorkspacesRoute: typeof DashboardWorkspacesRoute
   DashboardSitesSlugRouteRoute: typeof DashboardSitesSlugRouteRouteWithChildren
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
@@ -695,6 +708,13 @@ declare module '@tanstack/react-router' {
       path: '/dashboard/settings'
       fullPath: '/dashboard/settings'
       preLoaderRoute: typeof DashboardSettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dashboard_/storage': {
+      id: '/dashboard_/storage'
+      path: '/dashboard/storage'
+      fullPath: '/dashboard/storage'
+      preLoaderRoute: typeof DashboardStorageRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dashboard_/workspaces': {
@@ -1124,6 +1144,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   MascotRoute: MascotRoute,
   DashboardSettingsRoute: DashboardSettingsRoute,
+  DashboardStorageRoute: DashboardStorageRoute,
   DashboardWorkspacesRoute: DashboardWorkspacesRoute,
   DashboardSitesSlugRouteRoute: DashboardSitesSlugRouteRouteWithChildren,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
