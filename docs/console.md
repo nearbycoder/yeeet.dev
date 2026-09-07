@@ -151,3 +151,10 @@ In Inspect, combine path search with a file-type family and path/size sorting.
 Counts and byte totals describe every matching file; the table renders 100 rows
 at a time. Previous/Next file controls keep large manifests usable. Filters reset
 when you choose another version. Clear file filters restores a no-results view.
+
+## Manifest downloads
+
+Inspect can download the complete selected version's manifest as JSON or CSV,
+regardless of file-explorer filters. Exports include site/version identity, paths,
+byte sizes, content types and recorded checksums. They exclude storage keys,
+passwords and private share tokens. CSV cells escape formulas and multiline paths.

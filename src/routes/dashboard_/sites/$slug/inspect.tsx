@@ -1,3 +1,4 @@
+import { ManifestExport } from '#/components/manifest-export'
 import { FileExplorer } from '#/components/file-explorer'
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
@@ -135,6 +136,7 @@ function Inspector() {
               {JSON.stringify(JSON.parse(version.redirectRules), null, 2)}
             </pre>
           </details>
+          <ManifestExport slug={history.site.slug} version={version} />
           <FileExplorer key={version.id} files={version.files} />
           <Link
             className="button button-paper"
