@@ -4671,3 +4671,18 @@ summary:focus-visible {
   height: 18px;
   accent-color: var(--coral);
 }
+
+.site-switcher-dialog {
+  width: min(560px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  overflow: auto;
+  margin: auto;
+  color: var(--ink);
+}
+.site-switcher-dialog::backdrop {
+  background: rgb(0 0 0 / 60%);
+}
+.site-switcher-dialog ul {
+  display: grid;
+  gap: 12px;
+}
