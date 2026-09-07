@@ -65,8 +65,8 @@ membership. Removing a member prevents further workspace access, but copied
 private share links should be rotated separately if access must be recalled.
 
 Feedback belongs to a specific version and page path. Editors can resolve or
-reopen comments; authors and workspace owners can delete them. The latest 100
-comments for the selected version are displayed. Deleting a workspace removes its
+reopen comments; authors and workspace owners can delete them. Comments for the selected version are displayed in pages of 25, with server-side
+text/status filters and a bounded CSV export. Deleting a workspace removes its
 membership and feedback, while preserving the owner's sites and versions.
 
 ## Preview expiry and health
@@ -255,3 +255,12 @@ restore or discard the draft explicitly. Switching versions starts a separate
 composer. Successful posting clears the draft; failed posting preserves it.
 Storage failures are visible and do not prevent composing. Drafts do not sync to
 other browsers and are never sent until you choose Add feedback.
+
+## Feedback export
+
+Export filtered feedback CSV includes comments beyond the current page, with
+version identity, author name, path, status, timestamps and plain-text body.
+The server rechecks workspace membership and site assignment and returns at most
+the newest 1,000 matches. A completion notice explicitly identifies truncation;
+narrow text/status filters for a smaller export. CSV formula characters and
+multiline bodies are escaped. No new service or stored export copy is required.
