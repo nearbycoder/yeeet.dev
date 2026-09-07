@@ -13,6 +13,8 @@ export function SiteSwitcher() {
     [error, setError] = useState('')
   const dialog = useRef<HTMLDialogElement>(null),
     input = useRef<HTMLInputElement>(null)
+  const trigger = useRef<HTMLButtonElement>(null)
+  const previousFocus = useRef<HTMLElement | null>(null)
   const title = useId()
   useEffect(() => {
     function shortcut(event: KeyboardEvent) {
@@ -26,9 +28,17 @@ export function SiteSwitcher() {
   }, [])
   useEffect(() => {
     if (open) {
+      previousFocus.current =
+        document.activeElement instanceof HTMLElement &&
+        document.activeElement !== document.body
+          ? document.activeElement
+          : trigger.current
       dialog.current?.showModal()
       input.current?.focus()
-    } else dialog.current?.close()
+    } else if (dialog.current?.open) {
+      dialog.current.close()
+      previousFocus.current?.focus()
+    }
   }, [open])
   useEffect(() => {
     if (!open) return
@@ -60,6 +70,7 @@ export function SiteSwitcher() {
       <button
         className="button button-paper"
         onClick={() => setOpen(true)}
+        ref={trigger}
         aria-keyshortcuts="Control+k Meta+k"
       >
         Switch site
@@ -69,6 +80,17 @@ export function SiteSwitcher() {
         ref={dialog}
         aria-labelledby={title}
         onClose={() => setOpen(false)}
+        onCancel={(event) => {
+          event.preventDefault()
+          setOpen(false)
+        }}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') {
+            event.preventDefault()
+            event.stopPropagation()
+            setOpen(false)
+          }
+        }}
       >
         <div className="console-actions">
           <h2 id={title}>Switch site</h2>
