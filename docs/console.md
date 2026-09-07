@@ -239,3 +239,10 @@ owner-controlled and coordinate with cleanup using the same site lock. A pin tha
 wins a race invalidates an already previewed cleanup plan. Unpin restores ordinary
 eligibility. Pins do not prevent an explicit Delete version action or preview
 expiry; they protect stored history from retention policies.
+
+## Edit feedback
+
+Current workspace members can edit their own feedback body and page path. Owners
+can still moderate by deleting comments, but cannot rewrite someone else's words.
+Save shows an edited timestamp; Cancel keeps the existing comment. A stale edit
+is rejected. Editing does not change the comment's resolved state or version.

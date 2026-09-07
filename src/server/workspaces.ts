@@ -213,6 +213,7 @@ export async function workspaceConsole(
           path: deploymentFeedback.path,
           resolved: deploymentFeedback.resolved,
           createdAt: deploymentFeedback.createdAt,
+          editedAt: deploymentFeedback.editedAt,
         })
         .from(deploymentFeedback)
         .leftJoin(user, eq(user.id, deploymentFeedback.authorId))
@@ -271,6 +272,7 @@ export async function workspaceConsole(
         .map(({ cursorTime: _cursorTime, ...comment }) => ({
           ...comment,
           createdAt: comment.createdAt.toISOString(),
+          editedAt: comment.editedAt?.toISOString() ?? null,
         })),
     },
   }

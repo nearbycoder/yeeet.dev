@@ -127,6 +127,13 @@
       "when": 1788814928284,
       "tag": "0017_chilly_blacklash",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1788815175600,
+      "tag": "0018_old_quasar",
+      "breakpoints": true
     }
   ]
 }

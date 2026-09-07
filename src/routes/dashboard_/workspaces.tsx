@@ -1,3 +1,4 @@
+import { FeedbackEditor } from '#/components/feedback-editor'
 import { useState } from 'react'
 import {
   createFileRoute,
@@ -609,6 +610,18 @@ function Workspaces() {
                               ).toLocaleString()} · {comment.path}
                             </small>
                             <p className="feedback-body">{comment.body}</p>
+                            {comment.editedAt ? (
+                              <small>
+                                Edited{' '}
+                                {new Date(comment.editedAt).toLocaleString()}
+                              </small>
+                            ) : null}
+                            {comment.authorId === data.userId ? (
+                              <FeedbackEditor
+                                workspace={selected.id}
+                                comment={comment}
+                              />
+                            ) : null}
                             <div className="console-actions">
                               {editor ? (
                                 <button
