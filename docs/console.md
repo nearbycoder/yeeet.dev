@@ -144,3 +144,10 @@ one transaction. The API additionally returns `cleanupPending: true` if the
 immediate object-store attempt fails; the worker retries the durable job.
 Deleted versions stay unavailable during retries. Keep the app running to
 process queued object cleanup.
+
+## File explorer
+
+In Inspect, combine path search with a file-type family and path/size sorting.
+Counts and byte totals describe every matching file; the table renders 100 rows
+at a time. Previous/Next file controls keep large manifests usable. Filters reset
+when you choose another version. Clear file filters restores a no-results view.

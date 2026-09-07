@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { FileExplorer } from '#/components/file-explorer'
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
 import {
@@ -34,7 +34,6 @@ function Inspector() {
   const { history, detail } = Route.useLoaderData()
   const search = Route.useSearch()
   const navigate = Route.useNavigate()
-  const [query, setQuery] = useState('')
   const version = detail?.version
   return (
     <section className="panel site-page-panel">
@@ -136,45 +135,7 @@ function Inspector() {
               {JSON.stringify(JSON.parse(version.redirectRules), null, 2)}
             </pre>
           </details>
-          <label className="console-search">
-            Find a file
-            <input
-              type="search"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="File path…"
-            />
-          </label>
-          <div className="console-table-scroll">
-            <table className="console-table">
-              <thead>
-                <tr>
-                  <th>Path</th>
-                  <th>Size</th>
-                  <th>Type</th>
-                  <th>SHA-256</th>
-                </tr>
-              </thead>
-              <tbody>
-                {version.files
-                  .filter((file) =>
-                    file.path.toLowerCase().includes(query.toLowerCase()),
-                  )
-                  .map((file) => (
-                    <tr key={file.path}>
-                      <td>
-                        <code>{file.path}</code>
-                      </td>
-                      <td>{file.size} B</td>
-                      <td>{file.contentType}</td>
-                      <td>
-                        <code>{file.checksum ?? 'Not recorded'}</code>
-                      </td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
-          </div>
+          <FileExplorer key={version.id} files={version.files} />
           <Link
             className="button button-paper"
             to="/dashboard/sites/$slug/versions"
