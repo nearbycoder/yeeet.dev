@@ -302,3 +302,15 @@ reduced animation across the app. Changes apply immediately and persist in this
 browser, with a reset action and cross-tab updates. System reduced-motion settings
 continue to apply even when the app option is off. If storage is unavailable,
 changes still apply for the current page and a notice explains the limitation.
+
+## Launch checklist
+
+Site Overview guides readiness using the actual active version and its recorded
+root routing, then links to access, rollback history/pins, domains, and origin
+checks. The two deployment checks are separate from recommended review, so an
+optional custom domain does not block a launch. Origin success only counts for
+the current version and a check within 15 minutes. Rollback counts exclude expired
+previews. Access mode is reported for
+review, never inferred as user approval. Root routing uses the route simulator
+and a bounded manifest query. Open the live site for actual visual/network checks;
+metadata cannot guarantee DNS/CDN propagation or present object availability.

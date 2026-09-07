@@ -4715,3 +4715,17 @@ html[data-reduce-motion='true'] *::after {
   transition-duration: 0.01ms !important;
   scroll-behavior: auto !important;
 }
+
+.launch-checklist {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr));
+  gap: 20px;
+  padding: 0;
+  list-style: none;
+}
+.launch-checklist li {
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow-wrap: anywhere;
+}

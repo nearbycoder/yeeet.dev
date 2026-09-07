@@ -331,3 +331,13 @@ export const getRouteSimulation = createServerFn({ method: 'GET' })
     const { simulateOwnedRoute } = await import('./route-simulator')
     return simulateOwnedRoute(actor.userId, data)
   })
+
+export const getLaunchChecklist = createServerFn({ method: 'GET' })
+  .validator((data: unknown) =>
+    z.object({ slug: z.string().min(1).max(63) }).parse(data),
+  )
+  .handler(async ({ data }) => {
+    const actor = await requireActor(getRequest())
+    const { launchChecklist } = await import('./launch-checklist')
+    return launchChecklist(actor.userId, data.slug)
+  })
