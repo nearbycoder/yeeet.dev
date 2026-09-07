@@ -1,3 +1,4 @@
+import { SavedViews } from '#/components/saved-views'
 import { DeploymentPreflight } from '#/components/deployment-preflight'
 import { UploadSelection } from '#/components/upload-selection'
 import {
@@ -933,6 +934,19 @@ function Dashboard() {
               </div>
               <b>{data.totalCount}</b>
             </div>
+            <SavedViews
+              userId={user.id}
+              filters={filters}
+              onLoad={(saved) =>
+                changeFilters({
+                  q: undefined,
+                  status: undefined,
+                  group: undefined,
+                  favorites: undefined,
+                  ...saved,
+                })
+              }
+            />
             {data.totalCount ? (
               <form
                 onSubmit={(event) => {
