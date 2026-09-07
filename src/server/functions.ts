@@ -299,3 +299,16 @@ export const getFeedbackExport = createServerFn({ method: 'GET' })
     const { exportFeedback } = await import('./feedback-export')
     return exportFeedback(actor.userId, data)
   })
+
+export const getBrowserSessions = createServerFn({ method: 'GET' }).handler(
+  async () => {
+    const { listBrowserSessions } = await import('./session-manager')
+    return listBrowserSessions(getRequest())
+  },
+)
+export const endBrowserSession = createServerFn({ method: 'POST' })
+  .validator((data: unknown) => data)
+  .handler(async ({ data }) => {
+    const { revokeBrowserSession } = await import('./session-manager')
+    return revokeBrowserSession(getRequest(), data)
+  })

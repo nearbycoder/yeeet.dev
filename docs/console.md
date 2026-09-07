@@ -264,3 +264,13 @@ The server rechecks workspace membership and site assignment and returns at most
 the newest 1,000 matches. A completion notice explicitly identifies truncation;
 narrow text/status filters for a smaller export. CSV formula characters and
 multiline bodies are escaped. No new service or stored export copy is required.
+
+## Browser sessions
+
+Integrations lists up to 50 active browser sign-ins, with the current browser first,
+creation/expiry times, and available browser/IP metadata. Refresh, sign out another
+session, or confirm signing out all others. The current browser remains signed in;
+use Sign out for that session. API keys are managed separately. Only a valid browser
+cookie session can use this panel; sensitive changes honor Better Auth session
+freshness and may require signing in again. Session tokens are never returned by
+these console functions. No new identity provider or service is required.
