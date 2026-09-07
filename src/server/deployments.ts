@@ -913,6 +913,7 @@ export async function listSiteVersions(
       source: deployments.source,
       releaseLabel: deployments.releaseLabel,
       releaseNotes: deployments.releaseNotes,
+      retentionPinned: deployments.retentionPinned,
       fileCount: deployments.fileCount,
       totalBytes: deployments.totalBytes,
       createdAt: deployments.createdAt,
