@@ -1,4 +1,5 @@
-import { and, desc, eq, inArray, lte, sql } from 'drizzle-orm'
+import { withSiteLock } from './site-lock'
+import { and, desc, eq, inArray, lte } from 'drizzle-orm'
 import { db } from '#/db'
 import {
   deploymentFeedback,
@@ -124,10 +125,12 @@ export async function saveRetention(userId: string, input: unknown) {
     nextRunAt: new Date(Date.now() + 86400000),
     error: null,
   }
-  await db
-    .insert(siteRetention)
-    .values({ siteId: site.id, userId, ...values })
-    .onConflictDoUpdate({ target: siteRetention.siteId, set: values })
+  await withSiteLock(site.id, userId, async (tx) =>
+    tx
+      .insert(siteRetention)
+      .values({ siteId: site.id, userId, ...values })
+      .onConflictDoUpdate({ target: siteRetention.siteId, set: values }),
+  )
   return { saved: true }
 }
 async function retireVersions(
@@ -137,16 +140,9 @@ async function retireVersions(
   expectedIds?: Array<string>,
   automatic = false,
 ) {
-  return db.transaction(async (tx) => {
-    // A short metadata-only transaction serializes pointer/feedback writes with
-    // eligibility and deletion. Storage work runs from a durable queue afterward.
-    await tx.execute(
-      sql`lock table sites, site_channels, deployments, deployment_feedback, site_retention in share row exclusive mode`,
-    )
-    const current = await tx.query.sites.findFirst({
-      where: and(eq(sites.id, siteId), eq(sites.userId, userId)),
-    })
-    if (!current) throw new HttpError(404, 'Site not found.', 'not_found')
+  return withSiteLock(siteId, userId, async (tx) => {
+    // Eligibility and deletion share this site's lock. Unrelated sites remain
+    // writable; object deletion runs from the durable queue after commit.
     if (automatic) {
       const saved = await tx.query.siteRetention.findFirst({
         where: eq(siteRetention.siteId, siteId),

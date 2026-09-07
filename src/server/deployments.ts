@@ -1,3 +1,5 @@
+import { lockSite, lockedVersion, withSiteLock } from './site-lock'
+import { attemptStorageCleanup } from './storage-cleanup'
 import {
   afterCursor,
   cursorTime,
@@ -18,6 +20,7 @@ import {
   deploymentFiles,
   deployments,
   siteChannels,
+  storageCleanupJobs,
   sites,
 } from '#/db/schema'
 import type { Actor } from './actor'
@@ -33,7 +36,6 @@ import { siteUrl } from './platform-config'
 import {
   copyStoredObject,
   createUploadUrl,
-  deleteStoredPrefix,
   getStoredObject,
   headStoredObject,
 } from './storage'
@@ -593,6 +595,7 @@ export async function createDeployment(input: {
           .insert(sites)
           .values({ id: siteId, slug, userId: input.actor.userId })
       }
+      await lockSite(tx, siteId, input.actor.userId)
       await tx.insert(deployments).values({
         id: deploymentId,
         siteId,
@@ -688,7 +691,12 @@ export async function createDeployment(input: {
     await db
       .update(deployments)
       .set({ status: 'failed', error: 'Could not create upload URLs.' })
-      .where(eq(deployments.id, deploymentId))
+      .where(
+        and(
+          eq(deployments.id, deploymentId),
+          eq(deployments.status, 'uploading'),
+        ),
+      )
     throw error
   }
 }
@@ -756,85 +764,99 @@ export async function completeDeployment(actor: Actor, deploymentId: string) {
     readRuleFile(REDIRECTS_FILE).then(parseRedirectRules),
   ])
 
-  await db.transaction(async (tx) => {
-    for (const check of checks) {
-      if (check.etag) {
-        await tx
-          .update(deploymentFiles)
-          .set({ etag: check.etag })
-          .where(eq(deploymentFiles.id, check.file.id))
+  const completed = await withSiteLock(
+    deployment.siteId,
+    actor.userId,
+    async (tx) => {
+      const fresh = await lockedVersion(tx, deployment.siteId, deployment.id)
+      if (fresh.status === 'ready') return { fresh, changed: false }
+      if (fresh.status === 'failed')
+        throw new HttpError(
+          409,
+          'This deployment has failed.',
+          'deployment_failed',
+        )
+      for (const check of checks) {
+        if (check.etag) {
+          await tx
+            .update(deploymentFiles)
+            .set({ etag: check.etag })
+            .where(eq(deploymentFiles.id, check.file.id))
+        }
       }
-    }
-    await tx
-      .update(deployments)
-      .set({
-        status: 'ready',
-        completedAt: new Date(),
-        activatedAt: new Date(),
-        error: null,
-        headerRules: JSON.stringify(headerRules),
-        redirectRules: JSON.stringify(redirectRules),
-      })
-      .where(eq(deployments.id, deployment.id))
-    const activatedAt = new Date()
-    if (deployment.channel) {
       await tx
-        .insert(siteChannels)
-        .values({
-          id: randomUUID(),
-          siteId: deployment.siteId,
-          userId: deployment.userId,
-          name: deployment.channel,
-          hostnameLabel: channelHostnameLabel(
-            deployment.site.slug,
-            deployment.channel,
-          ),
-          deploymentId: deployment.id,
-          updatedAt: activatedAt,
+        .update(deployments)
+        .set({
+          status: 'ready',
+          completedAt: new Date(),
+          activatedAt: new Date(),
+          error: null,
+          headerRules: JSON.stringify(headerRules),
+          redirectRules: JSON.stringify(redirectRules),
         })
-        .onConflictDoUpdate({
-          target: [siteChannels.siteId, siteChannels.name],
-          set: {
+        .where(eq(deployments.id, deployment.id))
+      const activatedAt = new Date()
+      if (deployment.channel) {
+        await tx
+          .insert(siteChannels)
+          .values({
+            id: randomUUID(),
+            siteId: deployment.siteId,
+            userId: deployment.userId,
+            name: deployment.channel,
+            hostnameLabel: channelHostnameLabel(
+              deployment.site.slug,
+              deployment.channel,
+            ),
             deploymentId: deployment.id,
             updatedAt: activatedAt,
-          },
-        })
-      await tx
-        .update(sites)
-        .set({ updatedAt: activatedAt })
-        .where(eq(sites.id, deployment.siteId))
-    } else {
-      await tx
-        .update(sites)
-        .set({ activeDeploymentId: deployment.id, updatedAt: activatedAt })
-        .where(eq(sites.id, deployment.siteId))
-    }
-  })
-
-  await emitDeploymentEvent(
-    deployment.userId,
-    'deployment.ready',
-    {
-      deploymentId: deployment.id,
-      site: deployment.site.slug,
-      channel: deployment.channel,
-      url: deployment.channel
-        ? channelUrl(deployment.site.slug, deployment.channel)
-        : siteUrl(deployment.site.slug),
-      versionUrl: versionUrl(deployment.id),
-      source: deployment.source,
-      fileCount: deployment.fileCount,
-      totalBytes: deployment.totalBytes,
+          })
+          .onConflictDoUpdate({
+            target: [siteChannels.siteId, siteChannels.name],
+            set: {
+              deploymentId: deployment.id,
+              updatedAt: activatedAt,
+            },
+          })
+        await tx
+          .update(sites)
+          .set({ updatedAt: activatedAt })
+          .where(eq(sites.id, deployment.siteId))
+      } else {
+        await tx
+          .update(sites)
+          .set({ activeDeploymentId: deployment.id, updatedAt: activatedAt })
+          .where(eq(sites.id, deployment.siteId))
+      }
+      return { fresh, changed: true }
     },
-    `deployment.ready:${deployment.id}`,
   )
+
+  if (completed.changed)
+    await emitDeploymentEvent(
+      deployment.userId,
+      'deployment.ready',
+      {
+        deploymentId: deployment.id,
+        site: deployment.site.slug,
+        channel: deployment.channel,
+        url: deployment.channel
+          ? channelUrl(deployment.site.slug, deployment.channel)
+          : siteUrl(deployment.site.slug),
+        versionUrl: versionUrl(deployment.id),
+        source: deployment.source,
+        fileCount: deployment.fileCount,
+        totalBytes: deployment.totalBytes,
+      },
+      `deployment.ready:${deployment.id}`,
+    )
 
   return deploymentResult(
     deployment.site.slug,
     deployment.id,
     deployment.spaFallback,
-    deployment.passwordHash,
-    deployment.shareNonce,
+    completed.fresh.passwordHash,
+    completed.fresh.shareNonce,
     deployment.channel,
   )
 }
@@ -1009,22 +1031,25 @@ export async function setSiteChannel(
 
   const updatedAt = new Date()
   const hostnameLabel = channelHostnameLabel(history.site.slug, channel)
-  const rows = await db
-    .insert(siteChannels)
-    .values({
-      id: randomUUID(),
-      siteId: history.site.id,
-      userId,
-      name: channel,
-      hostnameLabel,
-      deploymentId: version.id,
-      updatedAt,
-    })
-    .onConflictDoUpdate({
-      target: [siteChannels.siteId, siteChannels.name],
-      set: { deploymentId: version.id, updatedAt },
-    })
-    .returning({ id: siteChannels.id })
+  const rows = await withSiteLock(history.site.id, userId, async (tx) => {
+    await lockedVersion(tx, history.site.id, version.id, true)
+    return tx
+      .insert(siteChannels)
+      .values({
+        id: randomUUID(),
+        siteId: history.site.id,
+        userId,
+        name: channel,
+        hostnameLabel,
+        deploymentId: version.id,
+        updatedAt,
+      })
+      .onConflictDoUpdate({
+        target: [siteChannels.siteId, siteChannels.name],
+        set: { deploymentId: version.id, updatedAt },
+      })
+      .returning({ id: siteChannels.id })
+  })
 
   await emitDeploymentEvent(userId, 'channel.updated', {
     deploymentId: version.id,
@@ -1056,16 +1081,21 @@ export async function deleteSiteChannel(
     where: and(eq(sites.slug, slug), eq(sites.userId, userId)),
   })
   if (!site) throw new HttpError(404, 'Site not found.', 'not_found')
-  const rows = await db
-    .delete(siteChannels)
-    .where(
-      and(
-        eq(siteChannels.userId, userId),
-        eq(siteChannels.name, channel),
-        eq(siteChannels.siteId, site.id),
-      ),
-    )
-    .returning({ id: siteChannels.id, deploymentId: siteChannels.deploymentId })
+  const rows = await withSiteLock(site.id, userId, async (tx) =>
+    tx
+      .delete(siteChannels)
+      .where(
+        and(
+          eq(siteChannels.userId, userId),
+          eq(siteChannels.name, channel),
+          eq(siteChannels.siteId, site.id),
+        ),
+      )
+      .returning({
+        id: siteChannels.id,
+        deploymentId: siteChannels.deploymentId,
+      }),
+  )
   const removed = rows.at(0)
   if (!removed) throw new HttpError(404, 'Channel not found.', 'not_found')
   await emitDeploymentEvent(userId, 'channel.deleted', {
@@ -1097,7 +1127,7 @@ export async function activateSiteVersion(
       'preview_expired',
     )
   const activatedAt = new Date()
-  await db.transaction(async (tx) => {
+  await withSiteLock(history.site.id, userId, async (tx, currentSite) => {
     const fresh = await tx
       .select({ id: deployments.id, expiresAt: deployments.expiresAt })
       .from(deployments)
@@ -1116,7 +1146,12 @@ export async function activateSiteVersion(
         'This version is no longer available.',
         'version_unavailable',
       )
-    if (previewHasExpired(target.expiresAt, version.current))
+    if (
+      previewHasExpired(
+        target.expiresAt,
+        currentSite.activeDeploymentId === target.id,
+      )
+    )
       throw new HttpError(
         409,
         'Extend this preview’s expiry before promoting it.',
@@ -1224,16 +1259,20 @@ export async function updateSiteVersionAccess(
   }
   if (input.rotateShareLink) changes.shareNonce = generateShareNonce()
 
-  const updatedRows = await db
-    .update(deployments)
-    .set(changes)
-    .where(and(eq(deployments.id, version.id), eq(deployments.userId, userId)))
-    .returning({
-      id: deployments.id,
-      status: deployments.status,
-      passwordHash: deployments.passwordHash,
-      shareNonce: deployments.shareNonce,
-    })
+  const updatedRows = await withSiteLock(history.site.id, userId, async (tx) =>
+    tx
+      .update(deployments)
+      .set(changes)
+      .where(
+        and(eq(deployments.id, version.id), eq(deployments.userId, userId)),
+      )
+      .returning({
+        id: deployments.id,
+        status: deployments.status,
+        passwordHash: deployments.passwordHash,
+        shareNonce: deployments.shareNonce,
+      }),
+  )
   const updated = updatedRows.at(0)
   if (!updated) throw new HttpError(404, 'Version not found.', 'not_found')
 
@@ -1254,74 +1293,64 @@ export async function deleteSiteVersion(
   selector: string,
 ) {
   const { history, version } = await findSiteVersion(userId, value, selector)
-  const wasActive = version.id === history.site.activeDeploymentId
-  let replacement = wasActive
-    ? (
-        await listSiteVersions(userId, value, 1, {
-          status: 'ready',
-          exclude: version.id,
-        })
-      ).versions[0]
-    : undefined
-
-  const deletedObjects = await deleteStoredPrefix(
-    `sites/${history.site.id}/deployments/${version.id}/`,
-  )
-  const changedAt = new Date()
-  await db.transaction(async (tx) => {
-    if (wasActive) {
-      if (replacement) {
-        const available = await tx
+  const prefix = `sites/${history.site.id}/deployments/${version.id}/`
+  const outcome = await withSiteLock(
+    history.site.id,
+    userId,
+    async (tx, site) => {
+      await lockedVersion(tx, site.id, version.id)
+      const wasActive = version.id === site.activeDeploymentId
+      let activeDeploymentId = site.activeDeploymentId
+      if (wasActive) {
+        const replacements = await tx
           .select({ id: deployments.id })
           .from(deployments)
           .where(
             and(
-              eq(deployments.id, replacement.id),
-              eq(deployments.siteId, history.site.id),
+              eq(deployments.siteId, site.id),
+              ne(deployments.id, version.id),
               eq(deployments.status, 'ready'),
             ),
           )
-          .for('update')
-        if (!available.length) replacement = undefined
+          .orderBy(desc(deployments.createdAt), desc(deployments.id))
+          .limit(1)
+        const replacement = replacements.at(0)
+        activeDeploymentId = replacement?.id ?? null
+        const changedAt = new Date()
+        await tx
+          .update(sites)
+          .set({ activeDeploymentId, updatedAt: changedAt })
+          .where(eq(sites.id, site.id))
+        if (replacement)
+          await tx
+            .update(deployments)
+            .set({ activatedAt: changedAt, expiresAt: null })
+            .where(eq(deployments.id, replacement.id))
       }
       await tx
-        .update(sites)
-        .set({
-          activeDeploymentId: replacement?.id ?? null,
-          updatedAt: changedAt,
-        })
-        .where(and(eq(sites.id, history.site.id), eq(sites.userId, userId)))
-      if (replacement) {
-        await tx
-          .update(deployments)
-          .set({ activatedAt: changedAt })
-          .where(eq(deployments.id, replacement.id))
-      }
-    }
-    await tx
-      .delete(deployments)
-      .where(
-        and(eq(deployments.id, version.id), eq(deployments.userId, userId)),
-      )
-  })
+        .insert(storageCleanupJobs)
+        .values({ id: version.id, userId, siteId: site.id, prefix })
+        .onConflictDoNothing()
+      await tx.delete(deployments).where(eq(deployments.id, version.id))
+      return { wasActive, activeDeploymentId }
+    },
+  )
+  const { wasActive, activeDeploymentId } = outcome
+  const cleanup = await attemptStorageCleanup(version.id, prefix)
 
   await emitDeploymentEvent(userId, 'deployment.deleted', {
     deploymentId: version.id,
     site: history.site.slug,
     wasActive,
-    activeDeploymentId: wasActive
-      ? (replacement?.id ?? null)
-      : history.site.activeDeploymentId,
+    activeDeploymentId,
   })
 
   return {
     id: version.id,
     site: history.site.slug,
     wasActive,
-    activeDeploymentId: wasActive
-      ? (replacement?.id ?? null)
-      : history.site.activeDeploymentId,
-    deletedObjects,
+    activeDeploymentId,
+    ...cleanup,
   }
 }
 
@@ -1338,22 +1367,27 @@ export async function deleteOwnedSite(userId: string, value: string) {
   await Promise.all(
     domains.map((domain) => removeRailwayCustomDomain(domain.railwayDomainId)),
   )
-  const deletedObjects = await deleteStoredPrefix(`sites/${site.id}/`)
-  await db
-    .delete(sites)
-    .where(and(eq(sites.id, site.id), eq(sites.userId, userId)))
+  const prefix = `sites/${site.id}/`
+  await withSiteLock(site.id, userId, async (tx) => {
+    await tx
+      .insert(storageCleanupJobs)
+      .values({ id: site.id, userId, siteId: site.id, prefix })
+      .onConflictDoNothing()
+    await tx.delete(sites).where(eq(sites.id, site.id))
+  })
+  const cleanup = await attemptStorageCleanup(site.id, prefix)
 
   await emitDeploymentEvent(userId, 'site.deleted', {
     siteId: site.id,
     site: site.slug,
-    deletedObjects,
+    ...cleanup,
     customDomains: domains.map((domain) => domain.hostname),
   })
 
   return {
     id: site.id,
     slug: site.slug,
-    deletedObjects,
+    ...cleanup,
     customDomains: domains.map((domain) => domain.hostname),
   }
 }

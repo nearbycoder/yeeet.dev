@@ -132,3 +132,15 @@ pass `q` and `status=ready|uploading|failed`. Keep the same filters while
 following a cursor. Results sort by creation time and ID, newest first;
 new versions appear when you return to the first page. A cursor from another
 account or filter combination is rejected.
+
+Cleanup coordinates with other changes to the same site, while other sites
+remain writable. A promotion, channel assignment, or new/reopened feedback
+that wins the race protects its version; a stale manual cleanup plan asks you
+to preview again. If cleanup wins first, waiting actions report that the
+version is unavailable.
+
+Manual site/version deletion removes metadata and queues object cleanup in
+one transaction. The API additionally returns `cleanupPending: true` if the
+immediate object-store attempt fails; the worker retries the durable job.
+Deleted versions stay unavailable during retries. Keep the app running to
+process queued object cleanup.
