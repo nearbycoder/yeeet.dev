@@ -1,9 +1,12 @@
+import { LaunchChecklist } from '#/components/launch-checklist'
+import { getLaunchChecklist } from '#/server/functions'
 import { SiteNotes } from '#/components/site-notes'
 import { SiteOrganization } from '#/components/site-organization'
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { Route as SiteRoute } from './route'
 
 export const Route = createFileRoute('/dashboard_/sites/$slug/')({
+  loader: ({ params }) => getLaunchChecklist({ data: { slug: params.slug } }),
   component: SiteOverview,
 })
 
@@ -27,15 +30,21 @@ function formatDate(value: string) {
 
 function SiteOverview() {
   const { site, latestVersions } = SiteRoute.useLoaderData()
+  const checklist = Route.useLoaderData()
 
   return (
     <div className="site-page-stack">
+      <LaunchChecklist slug={site.slug} data={checklist} />
       <SiteOrganization
         key={site.slug}
         slug={site.slug}
         organization={site.organization}
       />
-      <SiteNotes key={site.slug} slug={site.slug} notes={site.notes} />
+      <SiteNotes
+        key={`notes:${site.slug}`}
+        slug={site.slug}
+        notes={site.notes}
+      />
       <section className="site-metrics" aria-label="Site summary">
         <article>
           <span>Active payload</span>
