@@ -158,3 +158,10 @@ Inspect can download the complete selected version's manifest as JSON or CSV,
 regardless of file-explorer filters. Exports include site/version identity, paths,
 byte sizes, content types and recorded checksums. They exclude storage keys,
 passwords and private share tokens. CSV cells escape formulas and multiline paths.
+
+## Comparison reports
+
+After choosing a comparison baseline in Inspect, download Markdown for a review
+or JSON for tooling. Reports identify both versions, list all four change classes,
+include byte totals and mark routing/header/redirect changes. Paths are escaped
+in Markdown; no storage credentials or share tokens are exported.

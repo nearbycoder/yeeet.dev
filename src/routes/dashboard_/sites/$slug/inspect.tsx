@@ -1,3 +1,4 @@
+import { ComparisonReport } from '#/components/comparison-report'
 import { ManifestExport } from '#/components/manifest-export'
 import { FileExplorer } from '#/components/file-explorer'
 import { Link, createFileRoute } from '@tanstack/react-router'
@@ -109,6 +110,10 @@ function Inspector() {
             <>
               <h3>Changes from the comparison version</h3>
               <ManifestDiff diff={detail.comparison} />
+              <ComparisonReport
+                site={history.site.slug}
+                diff={detail.comparison}
+              />
               <p>
                 {detail.comparison.routingChanged
                   ? 'SPA routing changes. '
