@@ -1,10 +1,17 @@
+import {
+  afterCursor,
+  cursorTime,
+  decodeCursor,
+  encodeCursor,
+  searchPattern,
+} from './pagination'
 import { previewHasExpired } from '#/lib/lifecycle'
 import {
   actorForWorkspaceSite,
   actorForWorkspaceDeployment,
 } from './workspaces'
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
-import { and, desc, eq, inArray } from 'drizzle-orm'
+import { and, desc, eq, ilike, inArray, ne, or } from 'drizzle-orm'
 import { db } from '#/db'
 import {
   customDomains,
@@ -858,6 +865,13 @@ export async function listSiteVersions(
   userId: string,
   value: string,
   limit = 100,
+  options: {
+    cursor?: string
+    q?: string
+    status?: 'all' | 'ready' | 'uploading' | 'failed'
+    selector?: string
+    exclude?: string
+  } = {},
 ) {
   const slug = normalizeSlug(value)
   const site = await db.query.sites.findFirst({
@@ -865,9 +879,14 @@ export async function listSiteVersions(
   })
   if (!site) throw new HttpError(404, 'Site not found.', 'not_found')
 
+  const q = options.q?.trim().toLowerCase() ?? ''
+  const scope = ['versions', userId, site.id, q, options.status ?? 'all']
+  const cursor = decodeCursor(options.cursor, scope)
+  const pageSize = Math.max(1, Math.min(100, limit))
   const rows = await db
     .select({
       id: deployments.id,
+      cursorTime: cursorTime(deployments.createdAt),
       status: deployments.status,
       source: deployments.source,
       fileCount: deployments.fileCount,
@@ -883,31 +902,60 @@ export async function listSiteVersions(
       shareNonce: deployments.shareNonce,
     })
     .from(deployments)
-    .where(eq(deployments.siteId, site.id))
-    .orderBy(desc(deployments.createdAt))
-    .limit(limit)
+    .where(
+      and(
+        eq(deployments.siteId, site.id),
+        afterCursor(deployments.createdAt, deployments.id, cursor),
+        options.status && options.status !== 'all'
+          ? eq(deployments.status, options.status)
+          : undefined,
+        options.selector
+          ? ilike(
+              deployments.id,
+              options.selector.replace(/[\\%_]/g, '\\$&') + '%',
+            )
+          : undefined,
+        options.exclude ? ne(deployments.id, options.exclude) : undefined,
+        q
+          ? or(
+              ilike(deployments.id, searchPattern(q)),
+              ilike(deployments.channel, searchPattern(q)),
+              ilike(deployments.source, searchPattern(q)),
+            )
+          : undefined,
+      ),
+    )
+    .orderBy(desc(deployments.createdAt), desc(deployments.id))
+    .limit(pageSize + 1)
 
+  const page = rows.slice(0, pageSize)
   return {
+    nextCursor:
+      rows.length > pageSize
+        ? encodeCursor(page[page.length - 1], scope)
+        : null,
     site: {
       id: site.id,
       slug,
       url: siteUrl(slug),
       activeDeploymentId: site.activeDeploymentId,
     },
-    versions: rows.map(({ passwordHash, shareNonce, ...row }) => ({
-      ...row,
-      current: row.id === site.activeDeploymentId,
-      expiresAt: row.expiresAt?.toISOString() ?? null,
-      previewUrl: row.status === 'ready' ? versionUrl(row.id) : null,
-      protected: Boolean(passwordHash),
-      shareUrl:
-        row.status === 'ready' && passwordHash
-          ? shareUrl(row.id, shareNonce)
-          : null,
-      createdAt: row.createdAt.toISOString(),
-      completedAt: row.completedAt?.toISOString() ?? null,
-      activatedAt: row.activatedAt?.toISOString() ?? null,
-    })),
+    versions: page.map(
+      ({ passwordHash, shareNonce, cursorTime: _cursorTime, ...row }) => ({
+        ...row,
+        current: row.id === site.activeDeploymentId,
+        expiresAt: row.expiresAt?.toISOString() ?? null,
+        previewUrl: row.status === 'ready' ? versionUrl(row.id) : null,
+        protected: Boolean(passwordHash),
+        shareUrl:
+          row.status === 'ready' && passwordHash
+            ? shareUrl(row.id, shareNonce)
+            : null,
+        createdAt: row.createdAt.toISOString(),
+        completedAt: row.completedAt?.toISOString() ?? null,
+        activatedAt: row.activatedAt?.toISOString() ?? null,
+      }),
+    ),
   }
 }
 
@@ -950,8 +998,7 @@ export async function setSiteChannel(
   selector: string,
 ) {
   const channel = normalizeChannelName(channelValue)
-  const history = await listSiteVersions(userId, value)
-  const version = resolveSiteVersion(history.versions, selector)
+  const { history, version } = await findSiteVersion(userId, value, selector)
   if (version.status !== 'ready') {
     throw new HttpError(
       409,
@@ -1034,8 +1081,7 @@ export async function activateSiteVersion(
   value: string,
   selector: string,
 ) {
-  const history = await listSiteVersions(userId, value)
-  const version = resolveSiteVersion(history.versions, selector)
+  const { history, version } = await findSiteVersion(userId, value, selector)
   if (version.status !== 'ready') {
     throw new HttpError(
       409,
@@ -1104,6 +1150,24 @@ export async function activateSiteVersion(
   }
 }
 
+export async function findSiteVersion(
+  userId: string,
+  value: string,
+  selector: string,
+) {
+  selector = selector.trim().toLowerCase()
+  if (!/^[a-f0-9-]{8,36}$/i.test(selector))
+    throw new HttpError(
+      400,
+      'Use at least 8 characters of the version ID.',
+      'invalid_version',
+    )
+  const history = await listSiteVersions(userId, value, 2, {
+    selector: selector.toLowerCase(),
+  })
+  return { history, version: resolveSiteVersion(history.versions, selector) }
+}
+
 function resolveSiteVersion<TVersion extends { id: string }>(
   versions: Array<TVersion>,
   selector: string,
@@ -1146,8 +1210,7 @@ export async function updateSiteVersionAccess(
       'invalid_access_update',
     )
   }
-  const history = await listSiteVersions(userId, value)
-  const version = resolveSiteVersion(history.versions, selector)
+  const { history, version } = await findSiteVersion(userId, value, selector)
   const changes: {
     passwordHash?: string | null
     shareNonce?: string
@@ -1190,14 +1253,15 @@ export async function deleteSiteVersion(
   value: string,
   selector: string,
 ) {
-  const history = await listSiteVersions(userId, value)
-  const version = resolveSiteVersion(history.versions, selector)
+  const { history, version } = await findSiteVersion(userId, value, selector)
   const wasActive = version.id === history.site.activeDeploymentId
   let replacement = wasActive
-    ? history.versions.find(
-        (candidate) =>
-          candidate.id !== version.id && candidate.status === 'ready',
-      )
+    ? (
+        await listSiteVersions(userId, value, 1, {
+          status: 'ready',
+          exclude: version.id,
+        })
+      ).versions[0]
     : undefined
 
   const deletedObjects = await deleteStoredPrefix(

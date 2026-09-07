@@ -35,6 +35,7 @@ export const sites = pgTable(
   (table) => [
     uniqueIndex('sites_slug_idx').on(table.slug),
     index('sites_user_id_idx').on(table.userId),
+    index('sites_owner_page_idx').on(table.userId, table.createdAt, table.id),
   ],
 )
 
@@ -68,6 +69,11 @@ export const deployments = pgTable(
   },
   (table) => [
     index('deployments_site_id_idx').on(table.siteId),
+    index('deployments_site_page_idx').on(
+      table.siteId,
+      table.createdAt,
+      table.id,
+    ),
     index('deployments_user_id_idx').on(table.userId),
     index('deployments_created_at_idx').on(table.createdAt),
     uniqueIndex('deployments_user_idempotency_idx').on(
@@ -459,6 +465,12 @@ export const deploymentFeedback = pgTable(
     createdAt: timestamp('created_at').defaultNow().notNull(),
   },
   (table) => [
+    index('deployment_feedback_page_idx').on(
+      table.workspaceId,
+      table.deploymentId,
+      table.createdAt,
+      table.id,
+    ),
     index('deployment_feedback_version_idx').on(
       table.workspaceId,
       table.deploymentId,

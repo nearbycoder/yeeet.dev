@@ -23,7 +23,7 @@ test('workspace site lookup scopes the SQL to both owner and normalized slug', a
   assert.deepEqual(queries[1].values, ['owner-1'])
 })
 
-test('workspace history limits rows in SQL while the full history keeps 100', async (t) => {
+test('history fetches one extra row for continuation, with 100 results by default', async (t) => {
   const queries: Array<{ text: string; values: Array<unknown> }> = []
   t.mock.method(
     db.$client,
@@ -43,9 +43,9 @@ test('workspace history limits rows in SQL while the full history keeps 100', as
     queries[1].text,
     /where "deployments"\."site_id" = \$1 order by .* desc limit \$2/,
   )
-  assert.deepEqual(queries[1].values, ['site-1', 3])
+  assert.deepEqual(queries[1].values, ['site-1', 4])
   await listSiteVersions('owner-1', 'comet')
-  assert.deepEqual(queries[3].values, ['site-1', 100])
+  assert.deepEqual(queries[3].values, ['site-1', 101])
 })
 
 test('workspace history rejects a site the actor does not own', async (t) => {

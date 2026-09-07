@@ -56,5 +56,8 @@ npm run test:browser -- http://localhost:3000
 ```
 
 These checks simulate clipboard rejection and abort authentication requests;
-they do not create accounts or sign in. The normal CI checks remain independent
-of a running browser or database.
+they do not create accounts or sign in. CI runs database integration tests against a disposable PostgreSQL service.
+To run them locally, point `DATABASE_URL` at an isolated database, apply
+migrations with `npm run db:migrate`, then run `npm run test:integration`.
+These tests create and clean up their own fixtures. Unit tests and the build
+remain independent of a running database.
