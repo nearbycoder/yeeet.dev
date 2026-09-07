@@ -31,6 +31,7 @@ export const sites = pgTable(
     activeDeploymentId: text('active_deployment_id'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
+    notes: text('notes').default('').notNull(),
   },
   (table) => [
     uniqueIndex('sites_slug_idx').on(table.slug),

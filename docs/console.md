@@ -214,3 +214,11 @@ The fleet keeps the eight most recently visited site workspaces for this account
 in browser storage. Revisits move a site to the front. Open Recently visited sites
 to return, remove stale entries, or clear the list. History is not synced between
 devices, and a history link never grants access to a deleted or inaccessible site.
+
+## Site notes
+
+Site owners can keep up to 4,000 characters of plain-text notes in Overview.
+Notes persist across browsers and are not served with the public site. Save shows
+confirmation; Reset restores the latest loaded copy. Concurrent edits are rejected
+instead of silently overwriting another save. Reload after a conflict to obtain
+the latest notes. Clearing the field and saving deletes its contents.

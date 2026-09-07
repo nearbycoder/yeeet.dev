@@ -1,3 +1,4 @@
+import { SiteNotes } from '#/components/site-notes'
 import { SiteOrganization } from '#/components/site-organization'
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { Route as SiteRoute } from './route'
@@ -34,6 +35,7 @@ function SiteOverview() {
         slug={site.slug}
         organization={site.organization}
       />
+      <SiteNotes key={site.slug} slug={site.slug} notes={site.notes} />
       <section className="site-metrics" aria-label="Site summary">
         <article>
           <span>Active payload</span>

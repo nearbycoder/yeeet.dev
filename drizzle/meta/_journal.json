@@ -106,6 +106,13 @@
       "when": 1788745321410,
       "tag": "0014_greedy_tigra",
       "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1788814054022,
+      "tag": "0015_perpetual_elektra",
+      "breakpoints": true
     }
   ]
 }

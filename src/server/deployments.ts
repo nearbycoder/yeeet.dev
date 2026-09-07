@@ -1397,6 +1397,7 @@ export async function listSites(userId: string, value?: string) {
     .select({
       id: sites.id,
       slug: sites.slug,
+      notes: sites.notes,
       activeDeploymentId: sites.activeDeploymentId,
       updatedAt: sites.updatedAt,
       fileCount: deployments.fileCount,

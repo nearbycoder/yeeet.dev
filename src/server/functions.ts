@@ -259,3 +259,11 @@ export const cleanRetainedVersions = createServerFn({ method: 'POST' })
     const { executeRetention } = await import('./retention')
     return executeRetention(actor.userId, data)
   })
+
+export const updateSiteNotes = createServerFn({ method: 'POST' })
+  .validator((data: unknown) => data)
+  .handler(async ({ data }) => {
+    const actor = await requireActor(getRequest())
+    const { saveSiteNotes } = await import('./site-notes')
+    return saveSiteNotes(actor.userId, data)
+  })
