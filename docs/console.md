@@ -222,3 +222,11 @@ Notes persist across browsers and are not served with the public site. Save show
 confirmation; Reset restores the latest loaded copy. Concurrent edits are rejected
 instead of silently overwriting another save. Reload after a conflict to obtain
 the latest notes. Clearing the field and saving deletes its contents.
+
+## Release labels and notes
+
+In Inspect, give an exact version a label (60 characters) and plain-text release
+notes (2,000 characters). They appear in version history and can be searched there.
+Owners edit them; workspace reviewers can read them. Clearing and saving removes
+the annotation. Concurrent edits return a conflict instead of overwriting another
+save; reload before retrying. File contents and immutable version IDs stay intact.

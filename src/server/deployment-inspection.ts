@@ -19,6 +19,8 @@ export async function inspectDeployment(
       id: true,
       status: true,
       source: true,
+      releaseLabel: true,
+      releaseNotes: true,
       error: true,
       createdAt: true,
       completedAt: true,

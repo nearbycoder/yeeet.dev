@@ -67,6 +67,8 @@ export const deployments = pgTable(
     completedAt: timestamp('completed_at'),
     activatedAt: timestamp('activated_at'),
     expiresAt: timestamp('expires_at'),
+    releaseLabel: text('release_label').default('').notNull(),
+    releaseNotes: text('release_notes').default('').notNull(),
   },
   (table) => [
     index('deployments_site_id_idx').on(table.siteId),

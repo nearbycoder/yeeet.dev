@@ -911,6 +911,8 @@ export async function listSiteVersions(
       cursorTime: cursorTime(deployments.createdAt),
       status: deployments.status,
       source: deployments.source,
+      releaseLabel: deployments.releaseLabel,
+      releaseNotes: deployments.releaseNotes,
       fileCount: deployments.fileCount,
       totalBytes: deployments.totalBytes,
       createdAt: deployments.createdAt,
@@ -943,6 +945,8 @@ export async function listSiteVersions(
               ilike(deployments.id, searchPattern(q)),
               ilike(deployments.channel, searchPattern(q)),
               ilike(deployments.source, searchPattern(q)),
+              ilike(deployments.releaseLabel, searchPattern(q)),
+              ilike(deployments.releaseNotes, searchPattern(q)),
             )
           : undefined,
       ),
