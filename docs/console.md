@@ -294,3 +294,11 @@ header rules. It shares path/SPA resolution with the serving gateway and does no
 fetch redirect destinations. Platform response headers may override matched custom
 rules. Authentication, preview expiry, DNS/CDN, object availability, and generated
 social-image rendering are outside this metadata simulation.
+
+## Reading preferences
+
+Integrations → Reading preferences offers larger console body/form/table text and
+reduced animation across the app. Changes apply immediately and persist in this
+browser, with a reset action and cross-tab updates. System reduced-motion settings
+continue to apply even when the app option is off. If storage is unavailable,
+changes still apply for the current page and a notice explains the limitation.

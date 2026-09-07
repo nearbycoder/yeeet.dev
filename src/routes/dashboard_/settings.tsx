@@ -1,3 +1,4 @@
+import { ReadingPreferences } from '#/components/reading-preferences'
 import { SessionManager } from '#/components/session-manager'
 import { createFileRoute, redirect } from '@tanstack/react-router'
 import { DashboardHeader } from '#/components/dashboard-header'
@@ -35,11 +36,13 @@ function AccountSettings() {
           </div>
         </div>
         <nav className="console-actions" aria-label="Integration sections">
+          <a href="#reading">Reading preferences</a>
           <a href="#sessions">Browser sessions</a>
           <a href="#api-keys">API keys</a>
           <a href="#webhooks">Webhooks</a>
         </nav>
         <div className="site-page-stack">
+          <ReadingPreferences />
           <SessionManager />
           <ApiKeyManager keys={data.keys} />
           <WebhookManager

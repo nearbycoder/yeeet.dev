@@ -4695,3 +4695,23 @@ summary:focus-visible {
     grid-template-columns: 1fr;
   }
 }
+
+html[data-large-text='true']
+  .dashboard-shell
+  :is(p, label, input, select, textarea, button, li, td, th, small) {
+  font-size: max(1rem, 18px);
+  line-height: 1.6;
+}
+html[data-large-text='true'] .dashboard-shell :is(input, select, textarea) {
+  min-width: 0;
+  max-width: 100%;
+}
+html[data-reduce-motion='true'],
+html[data-reduce-motion='true'] *,
+html[data-reduce-motion='true'] *::before,
+html[data-reduce-motion='true'] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
