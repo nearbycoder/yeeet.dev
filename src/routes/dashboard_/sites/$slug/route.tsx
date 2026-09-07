@@ -1,3 +1,4 @@
+import { RecordRecentSite } from '#/components/recent-sites'
 import { Link, Outlet, createFileRoute, redirect } from '@tanstack/react-router'
 import { DashboardHeader } from '#/components/dashboard-header'
 import { Yeeetling, getYeeetlingDesign } from '#/components/yeeetling'
@@ -28,6 +29,7 @@ function SiteLayout() {
       <a className="skip-link" href="#site-content">
         Skip to site content
       </a>
+      <RecordRecentSite userId={user.id} slug={site.slug} />
       <DashboardHeader user={user} docsUrl={platform.docsUrl} />
       <main className="site-workspace" id="site-content" tabIndex={-1}>
         <Link className="site-back-link" to="/dashboard">

@@ -207,3 +207,10 @@ owned sites. Search matches names, domains, groups and tags; up to 20 results ar
 shown, with a prompt to narrow larger result sets. Tab to a result and Enter to
 open it. Escape closes the dialog and returns focus. Failed searches offer Retry.
 Workspace-only shared sites remain accessible through Workspaces.
+
+## Recent sites
+
+The fleet keeps the eight most recently visited site workspaces for this account
+in browser storage. Revisits move a site to the front. Open Recently visited sites
+to return, remove stale entries, or clear the list. History is not synced between
+devices, and a history link never grants access to a deleted or inaccessible site.
