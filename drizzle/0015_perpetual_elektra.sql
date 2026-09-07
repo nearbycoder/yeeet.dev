@@ -1,0 +1,1 @@
+ALTER TABLE "sites" ADD COLUMN "notes" text DEFAULT '' NOT NULL;
