@@ -1,3 +1,4 @@
+import { UploadSelection } from '#/components/upload-selection'
 import {
   hashUploadFiles,
   parseRecovery,
@@ -202,6 +203,7 @@ function Dashboard() {
     }
   }
   const [files, setFiles] = useState<Array<UploadFile>>([])
+  const [originalFiles, setOriginalFiles] = useState<Array<UploadFile>>([])
   const [slug, setSlug] = useState(destination.site ?? '')
   const [channel, setChannel] = useState(destination.channel ?? '')
   const [spaFallback, setSpaFallback] = useState(
@@ -269,6 +271,7 @@ function Dashboard() {
         path: file.webkitRelativePath || file.name,
       })),
     )
+    setOriginalFiles(next)
     setFiles(next)
     setError('')
     setResultUrl('')
@@ -608,6 +611,7 @@ function Dashboard() {
               setDragging(false)
               if (phase !== 'idle') return
               const dropped = await filesFromDrop(event.dataTransfer)
+              setOriginalFiles(dropped)
               setFiles(dropped)
               setError('')
               setResultUrl('')
@@ -802,6 +806,21 @@ function Dashboard() {
               </label>
             ) : null}
           </div>
+          {originalFiles.length ? (
+            <UploadSelection
+              original={originalFiles}
+              files={files}
+              disabled={phase !== 'idle' && phase !== 'done'}
+              onChange={(next) => {
+                setFiles(next)
+                setReview(null)
+                setPhase('idle')
+                setError('')
+                setResultUrl('')
+                setResultShareUrl('')
+              }}
+            />
+          ) : null}
           {reviewIsCurrent ? (
             <section
               className="deployment-review"
