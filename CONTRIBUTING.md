@@ -77,3 +77,14 @@ PostgreSQL releases the [row lock](https://www.postgresql.org/docs/current/expli
 when the transaction ends; unrelated sites can proceed independently.
 The integration suite exercises both orders of cleanup/reference races using
 separate PostgreSQL connections and observable lock waits.
+
+To verify the quick-deploy flow against a disposable local app and S3-compatible
+bucket, create a local test account and run:
+
+```sh
+YEEET_TEST_EMAIL=review@example.com YEEET_TEST_PASSWORD=local-test-password \
+  node tests/browser/quick-deploy.mjs http://localhost:3000
+```
+
+This optional browser test creates public and private deployments in that local
+account and verifies the served content. Never point it at production resources.

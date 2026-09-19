@@ -4729,3 +4729,74 @@ html[data-reduce-motion='true'] *::after {
   border-radius: 8px;
   overflow-wrap: anywhere;
 }
+
+.quick-deploy-controls {
+  align-content: center;
+}
+.deploy-destination,
+.quick-deploy-hint,
+.quick-deploy-warning {
+  grid-column: 1 / -1;
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.deploy-destination strong,
+.deploy-destination span {
+  display: block;
+}
+.deploy-destination span,
+.quick-deploy-hint {
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.quick-deploy-warning button {
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 4px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.deploy-advanced {
+  grid-column: 1 / -1;
+  min-width: 0;
+  border-top: 1px solid var(--line);
+}
+.deploy-advanced > summary {
+  padding: 16px 4px;
+  cursor: pointer;
+  font-weight: 700;
+}
+.deploy-advanced > summary span {
+  display: block;
+  margin-top: 4px;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--muted);
+}
+.deploy-advanced-content {
+  display: grid;
+  gap: 16px;
+}
+.quick-deploy-card .dropzone {
+  min-height: 320px;
+  padding: 24px;
+}
+.quick-deploy-card .dropzone .yeeetling {
+  width: 96px;
+  height: 96px;
+}
+
+@media (max-width: 600px) {
+  .quick-deploy-card .dropzone {
+    min-height: 180px;
+    padding: 20px 16px;
+  }
+  .quick-deploy-card .mascot-console,
+  .quick-deploy-controls .deploy-controls-heading {
+    display: none;
+  }
+}

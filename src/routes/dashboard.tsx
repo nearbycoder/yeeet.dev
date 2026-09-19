@@ -1,5 +1,6 @@
 import { RecentSites } from '#/components/recent-sites'
 import { SavedViews } from '#/components/saved-views'
+import { deploymentPreflight } from '#/lib/deployment-preflight'
 import { DeploymentPreflight } from '#/components/deployment-preflight'
 import { UploadSelection } from '#/components/upload-selection'
 import {
@@ -15,7 +16,7 @@ import { ManifestDiff } from '#/components/manifest-diff'
 import type { ManifestDiffData } from '#/components/manifest-diff'
 import { z } from 'zod'
 import { CopyButton } from '#/components/copy-button'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Link,
   createFileRoute,
@@ -216,6 +217,8 @@ function Dashboard() {
     data.destinationSite?.protected ?? false,
   )
   const [deployPassword, setDeployPassword] = useState('')
+  const [advanced, setAdvanced] = useState(false)
+  const advancedOptions = useRef<HTMLDetailsElement>(null)
   const [dragging, setDragging] = useState(false)
   const [phase, setPhase] = useState<
     'idle' | 'preparing' | 'uploading' | 'finalizing' | 'done'
@@ -264,6 +267,19 @@ function Dashboard() {
   })
   const reviewIsCurrent =
     review?.files === files && review.options === reviewOptions
+  const busy = phase !== 'idle' && phase !== 'done'
+  const preflight = useMemo(
+    () =>
+      deploymentPreflight(
+        files.map((item) => ({ path: item.path, size: item.file.size })),
+        spaFallback,
+      ),
+    [files, spaFallback],
+  )
+  function showAdvanced() {
+    setAdvanced(true)
+    advancedOptions.current?.querySelector('summary')?.focus()
+  }
   const totalBytes = files.reduce((sum, item) => sum + item.file.size, 0)
 
   function chooseFiles(selected: FileList | null) {
@@ -274,6 +290,11 @@ function Dashboard() {
         path: file.webkitRelativePath || file.name,
       })),
     )
+    selectFiles(next)
+  }
+
+  function selectFiles(next: Array<UploadFile>) {
+    setReview(null)
     setOriginalFiles(next)
     setFiles(next)
     setError('')
@@ -285,11 +306,7 @@ function Dashboard() {
     setPhase('idle')
   }
 
-  async function deploy(previewOnly = true) {
-    if (!previewOnly && !reviewIsCurrent) {
-      setError('Review these changes before deploying.')
-      return
-    }
+  async function deploy(previewOnly = false) {
     if (!files.length) return
     setError('')
     setResultUrl('')
@@ -434,7 +451,6 @@ function Dashboard() {
       setResultShareUrl(completed.shareUrl ?? '')
       setSlug(completed.site)
       setDeployPassword('')
-      setPrivateDeploy(false)
       saveRecovery(null)
       setReview(null)
       setPhase('done')
@@ -598,12 +614,12 @@ function Dashboard() {
           </section>
         ) : null}
         {recoveryWarning ? <p role="status">{recoveryWarning}</p> : null}
-        <section className="deploy-card">
+        <section className="deploy-card quick-deploy-card">
           <div
             className={`dropzone ${dragging ? 'is-dragging' : ''} ${files.length ? 'has-files' : ''}`}
             onDragEnter={(event) => {
               event.preventDefault()
-              if (phase === 'idle') setDragging(true)
+              if (!busy) setDragging(true)
             }}
             onDragOver={(event) => event.preventDefault()}
             onDragLeave={(event) => {
@@ -612,13 +628,16 @@ function Dashboard() {
             onDrop={async (event) => {
               event.preventDefault()
               setDragging(false)
-              if (phase !== 'idle') return
-              const dropped = await filesFromDrop(event.dataTransfer)
-              setOriginalFiles(dropped)
-              setFiles(dropped)
-              setError('')
-              setResultUrl('')
-              setResultShareUrl('')
+              if (busy) return
+              setPhase('preparing')
+              try {
+                selectFiles(await filesFromDrop(event.dataTransfer))
+              } catch {
+                setPhase('idle')
+                setError(
+                  'Could not read those files. Try Choose files or Choose folder.',
+                )
+              }
             }}
           >
             <input
@@ -626,7 +645,11 @@ function Dashboard() {
               type="file"
               multiple
               hidden
-              onChange={(event) => chooseFiles(event.target.files)}
+              disabled={busy}
+              onChange={(event) => {
+                chooseFiles(event.target.files)
+                event.target.value = ''
+              }}
             />
             <input
               ref={folderInput}
@@ -637,7 +660,11 @@ function Dashboard() {
                 webkitdirectory: '',
                 directory: '',
               } as React.InputHTMLAttributes<HTMLInputElement>)}
-              onChange={(event) => chooseFiles(event.target.files)}
+              disabled={busy}
+              onChange={(event) => {
+                chooseFiles(event.target.files)
+                event.target.value = ''
+              }}
             />
             <div className="mascot-console">
               <Yeeetling
@@ -666,20 +693,23 @@ function Dashboard() {
             ) : (
               <>
                 <h2>Drop a folder or files here</h2>
-                <p>Your files upload directly to private object storage.</p>
+                <p>
+                  Drop your built site, then click Deploy. A shareable link is
+                  next.
+                </p>
               </>
             )}
             <div className="drop-actions">
               <button
                 type="button"
-                disabled={phase !== 'idle'}
+                disabled={busy}
                 onClick={() => folderInput.current?.click()}
               >
                 Choose folder
               </button>
               <button
                 type="button"
-                disabled={phase !== 'idle'}
+                disabled={busy}
                 onClick={() => fileInput.current?.click()}
               >
                 Choose files
@@ -687,113 +717,38 @@ function Dashboard() {
             </div>
           </div>
 
-          <div className="deploy-controls">
+          <div className="deploy-controls quick-deploy-controls">
             <div className="deploy-controls-heading">
-              <span>Launch settings</span>
-              <h2>Choose the destination</h2>
-              <p>Name the site, pick its routing, and send it to the edge.</p>
+              <span>Quick deploy</span>
+              <h2>Drop. Deploy. Done.</h2>
+              <p>
+                Choose your files and get a shareable link. No setup required.
+              </p>
             </div>
-            <label>
-              <span>Site address</span>
-              <div className="slug-input">
-                <input
-                  name="site-slug"
-                  disabled={phase !== 'idle'}
-                  value={slug}
-                  onChange={(event) =>
-                    setSlug(
-                      event.target.value
-                        .toLowerCase()
-                        .replace(/[^a-z0-9-]/g, ''),
-                    )
-                  }
-                  placeholder="Random if blank…"
-                  autoComplete="off"
-                  spellCheck={false}
-                />
-                <b>.{data.platform.siteDomain}</b>
-              </div>
-            </label>
-            <label>
-              <span>Deployment channel (optional)</span>
-              <div className="slug-input">
-                <input
-                  name="deployment-channel"
-                  disabled={phase !== 'idle'}
-                  value={channel}
-                  onChange={(event) =>
-                    setChannel(
-                      event.target.value
-                        .toLowerCase()
-                        .replace(/[^a-z0-9-]/g, '')
-                        .slice(0, 32),
-                    )
-                  }
-                  placeholder="production"
-                  autoComplete="off"
-                  spellCheck={false}
-                />
-                <b>mutable alias</b>
-              </div>
-              <small>
-                Example: staging creates a no-index site channel without moving
-                production.
-              </small>
-            </label>
-            <label className="routing-toggle">
-              <input
-                name="spa-fallback"
-                disabled={phase !== 'idle'}
-                type="checkbox"
-                checked={spaFallback}
-                onChange={(event) => setSpaFallback(event.target.checked)}
-              />
-              <span>
-                <b>SPA routing</b>
-                <small>Refresh any client route through index.html</small>
-              </span>
-            </label>
-            <label className="routing-toggle">
-              <input
-                name="private-deploy"
-                disabled={phase !== 'idle'}
-                type="checkbox"
-                checked={privateDeploy}
-                onChange={(event) => {
-                  setPrivateDeploy(event.target.checked)
-                  if (!event.target.checked) setDeployPassword('')
-                }}
-              />
-              <span>
-                <b>Private sharing</b>
-                <small>Password + one-click share link</small>
-              </span>
-            </label>
-            <button
-              type="button"
-              className="button button-coral deploy-button"
-              disabled={
-                !files.length ||
-                phase !== 'idle' ||
-                (privateDeploy && deployPassword.length < 8)
-              }
-              onClick={() => void deploy(true)}
+            <p
+              className="deploy-destination"
+              aria-label="Deployment destination"
             >
-              {phase === 'idle'
-                ? 'Review deployment →'
-                : phase === 'preparing'
-                  ? 'Plotting course…'
-                  : phase === 'uploading'
-                    ? `Uploading ${uploaded}/${uploadTotal || files.length}`
-                    : phase === 'done'
-                      ? 'Landed ✓'
-                      : 'Going live…'}
-            </button>
+              <strong>
+                {slug
+                  ? `${slug}.${data.platform.siteDomain}`
+                  : 'New site · automatic address'}
+              </strong>
+              <span>
+                {channel
+                  ? `${channel} channel · production stays unchanged`
+                  : slug
+                    ? 'Updates this site’s production version'
+                    : 'Publishes a new site'}{' '}
+                · {privateDeploy ? 'Password protected' : 'Public'}
+              </span>
+            </p>
             {privateDeploy ? (
               <label className="private-password">
                 <span>Deployment password</span>
                 <input
                   name="deployment-password"
+                  disabled={busy}
                   type="password"
                   value={deployPassword}
                   onChange={(event) => setDeployPassword(event.target.value)}
@@ -808,69 +763,196 @@ function Dashboard() {
                 </small>
               </label>
             ) : null}
-          </div>
-          {originalFiles.length ? (
-            <UploadSelection
-              original={originalFiles}
-              files={files}
-              disabled={phase !== 'idle' && phase !== 'done'}
-              onChange={(next) => {
-                setFiles(next)
-                setReview(null)
-                setPhase('idle')
-                setError('')
-                setResultUrl('')
-                setResultShareUrl('')
-              }}
-            />
-          ) : null}
-          {files.length ? (
-            <DeploymentPreflight
-              files={files}
-              spa={spaFallback}
-              disabled={phase !== 'idle' && phase !== 'done'}
-              onExclude={(paths) => {
-                const excluded = new Set(paths)
-                setFiles(files.filter((item) => !excluded.has(item.path)))
-                setReview(null)
-                setPhase('idle')
-                setError('')
-                setResultUrl('')
-                setResultShareUrl('')
-              }}
-            />
-          ) : null}
-          {reviewIsCurrent ? (
-            <section
-              className="deployment-review"
-              aria-label="Deployment review"
+            {preflight.privatePaths.length ? (
+              <p className="quick-deploy-warning" role="status">
+                Your selection includes files that may be private.{' '}
+                <button type="button" disabled={busy} onClick={showAdvanced}>
+                  Review files
+                </button>
+              </p>
+            ) : null}
+            <button
+              type="button"
+              className="button button-coral deploy-button"
+              disabled={
+                !files.length ||
+                phase !== 'idle' ||
+                (privateDeploy && deployPassword.length < 8)
+              }
+              onClick={() => void deploy()}
             >
-              <h3>Review your deployment</h3>
-              <p>
-                {review.targetUrl ?? 'A new generated site address'} ·{' '}
-                {channel
-                  ? `${channel} channel; production stays unchanged`
-                  : 'Production'}{' '}
-                · {privateDeploy ? 'Password protected' : 'Public'}
-              </p>
-              <ManifestDiff diff={review.diff} />
-              <p>
-                Changes are compared with{' '}
-                {review.baseDeploymentId
-                  ? review.baseDeploymentId.slice(0, 8)
-                  : 'an empty site'}
-                . A new immutable version will be created.
-              </p>
-              <button
-                type="button"
-                className="button button-coral"
-                disabled={phase !== 'idle'}
-                onClick={() => void deploy(false)}
-              >
-                {recovery ? 'Resume upload ↗' : 'Deploy this build ↗'}
-              </button>
-            </section>
-          ) : null}
+              {phase === 'idle'
+                ? recovery
+                  ? 'Resume upload ↗'
+                  : 'Deploy now ↗'
+                : phase === 'preparing'
+                  ? 'Preparing files…'
+                  : phase === 'uploading'
+                    ? `Uploading ${uploaded}/${uploadTotal || files.length}`
+                    : phase === 'done'
+                      ? 'Deployed ✓'
+                      : 'Going live…'}
+            </button>
+            <p className="quick-deploy-hint">
+              {phase === 'done'
+                ? 'Drop more files to deploy another update.'
+                : 'Want to customize or review first? Open Advanced options below.'}
+            </p>
+          </div>
+          <details
+            ref={advancedOptions}
+            className="deploy-advanced"
+            open={advanced}
+            onToggle={(event) => setAdvanced(event.currentTarget.open)}
+          >
+            <summary>
+              Advanced options{' '}
+              <span>Address, privacy, routing, and file review</span>
+            </summary>
+            <div className="deploy-advanced-content">
+              <div className="deploy-controls">
+                <label>
+                  <span>Site address</span>
+                  <div className="slug-input">
+                    <input
+                      name="site-slug"
+                      disabled={phase !== 'idle'}
+                      value={slug}
+                      onChange={(event) =>
+                        setSlug(
+                          event.target.value
+                            .toLowerCase()
+                            .replace(/[^a-z0-9-]/g, ''),
+                        )
+                      }
+                      placeholder="Random if blank…"
+                      autoComplete="off"
+                      spellCheck={false}
+                    />
+                    <b>.{data.platform.siteDomain}</b>
+                  </div>
+                </label>
+                <label>
+                  <span>Deployment channel (optional)</span>
+                  <div className="slug-input">
+                    <input
+                      name="deployment-channel"
+                      disabled={phase !== 'idle'}
+                      value={channel}
+                      onChange={(event) =>
+                        setChannel(
+                          event.target.value
+                            .toLowerCase()
+                            .replace(/[^a-z0-9-]/g, '')
+                            .slice(0, 32),
+                        )
+                      }
+                      placeholder="production"
+                      autoComplete="off"
+                      spellCheck={false}
+                    />
+                    <b>mutable alias</b>
+                  </div>
+                  <small>
+                    Example: staging creates a no-index site channel without
+                    moving production.
+                  </small>
+                </label>
+                <label className="routing-toggle">
+                  <input
+                    name="spa-fallback"
+                    disabled={phase !== 'idle'}
+                    type="checkbox"
+                    checked={spaFallback}
+                    onChange={(event) => setSpaFallback(event.target.checked)}
+                  />
+                  <span>
+                    <b>SPA routing</b>
+                    <small>Refresh any client route through index.html</small>
+                  </span>
+                </label>
+                <label className="routing-toggle">
+                  <input
+                    name="private-deploy"
+                    disabled={phase !== 'idle'}
+                    type="checkbox"
+                    checked={privateDeploy}
+                    onChange={(event) => {
+                      setPrivateDeploy(event.target.checked)
+                      if (!event.target.checked) setDeployPassword('')
+                    }}
+                  />
+                  <span>
+                    <b>Private sharing</b>
+                    <small>Password + one-click share link</small>
+                  </span>
+                </label>
+
+                <button
+                  type="button"
+                  className="button button-paper deploy-button"
+                  disabled={!files.length || busy || phase === 'done'}
+                  onClick={() => void deploy(true)}
+                >
+                  Review changes
+                </button>
+              </div>
+              {originalFiles.length ? (
+                <UploadSelection
+                  original={originalFiles}
+                  files={files}
+                  disabled={phase !== 'idle' && phase !== 'done'}
+                  onChange={(next) => {
+                    setFiles(next)
+                    setReview(null)
+                    setPhase('idle')
+                    setError('')
+                    setResultUrl('')
+                    setResultShareUrl('')
+                  }}
+                />
+              ) : null}
+              {files.length ? (
+                <DeploymentPreflight
+                  files={files}
+                  spa={spaFallback}
+                  disabled={phase !== 'idle' && phase !== 'done'}
+                  onExclude={(paths) => {
+                    const excluded = new Set(paths)
+                    setFiles(files.filter((item) => !excluded.has(item.path)))
+                    setReview(null)
+                    setPhase('idle')
+                    setError('')
+                    setResultUrl('')
+                    setResultShareUrl('')
+                  }}
+                />
+              ) : null}
+              {reviewIsCurrent ? (
+                <section
+                  className="deployment-review"
+                  aria-label="Deployment review"
+                >
+                  <h3>Review your deployment</h3>
+                  <p>
+                    {review.targetUrl ?? 'A new generated site address'} ·{' '}
+                    {channel
+                      ? `${channel} channel; production stays unchanged`
+                      : 'Production'}{' '}
+                    · {privateDeploy ? 'Password protected' : 'Public'}
+                  </p>
+                  <ManifestDiff diff={review.diff} />
+                  <p>
+                    Changes are compared with{' '}
+                    {review.baseDeploymentId
+                      ? review.baseDeploymentId.slice(0, 8)
+                      : 'an empty site'}
+                    . A new immutable version will be created.
+                  </p>
+                </section>
+              ) : null}
+            </div>
+          </details>
           {phase === 'preparing' || phase === 'uploading' ? (
             <div className="console-actions">
               <p role="status">

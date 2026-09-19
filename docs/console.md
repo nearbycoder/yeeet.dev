@@ -2,11 +2,19 @@
 
 ## Deploy and review
 
-Use **Deploy an update** from a site's overview to prefill its destination. Select
-a folder or files, then **Review deployment** to inspect added, changed, removed,
-and reused files before uploading. Changing the files or deployment options
-requires a fresh review. A channel deployment updates that channel without moving
-production.
+Drag a folder or files onto the launchpad and click **Deploy now**. A new public
+site gets an automatic address; no settings or separate review step are required.
+The destination and public/private status stay visible beside the deploy button.
+Use **Deploy an update** from a site's overview to prefill its destination and
+preserve its routing and privacy settings. Private updates still require a password.
+
+Open **Advanced options** for a custom address, channel, routing, private sharing,
+file selection, preflight details, or an optional **Review changes** comparison.
+Closing advanced options keeps your choices. Changing files or settings invalidates
+an old comparison; review again if you want to inspect the revised plan. Publishing
+does not require a comparison. A channel deployment updates that channel without
+moving production. Likely private filenames still trigger a compact warning in the
+quick flow. After publishing, drop or choose more files to deploy another update.
 
 **Inspect** lists a deployment's file paths, sizes, checksums, headers, redirects,
 and routing settings. Choose another version as the comparison baseline.
@@ -15,7 +23,7 @@ and routing settings. Choose another version as the comparison baseline.
 Browser uploads hash files in a Web Worker, retry each missing file up to three
 times, and support pausing. An account-scoped recovery record stays in this browser
 for seven days. After a reload, restore the destination settings, reselect the
-original files, review, and resume. Successfully stored files are skipped and
+original files, and click **Resume upload**. Successfully stored files are skipped and
 upload links are refreshed. Private builds require the same password again;
 passwords and file contents are never stored in recovery metadata. Forget the
 saved attempt to deploy a different build. If browser storage is unavailable,
