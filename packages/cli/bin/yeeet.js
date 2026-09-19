@@ -727,6 +727,52 @@ async function analytics(site, options) {
   console.log('\n  Privacy: aggregate counts only; no visitor identifiers.\n')
 }
 
+async function openSite(slug, selector, options) {
+  let url, version
+  if (selector) {
+    const data = await apiRequest(
+      `/api/v1/sites/${encodeURIComponent(slug)}/versions/${encodeURIComponent(selector)}`,
+      {},
+      options,
+    )
+    if (data.version.status !== 'ready' || !data.version.url)
+      throw new Error('This version is not ready to open.')
+    url = data.version.url
+    version = data.version.id
+  } else {
+    const data = await apiRequest(
+      `/api/v1/sites/${encodeURIComponent(slug)}/versions`,
+      {},
+      options,
+    )
+    if (!data.site.activeDeploymentId)
+      throw new Error(
+        'This site has no live version. Specify a ready version ID.',
+      )
+    url = data.site.url
+    version = data.site.activeDeploymentId
+  }
+  const target = new URL(url)
+  if (
+    !['https:', 'http:'].includes(target.protocol) ||
+    target.username ||
+    target.password
+  )
+    throw new Error('The server returned an invalid site URL.')
+  const result = { site: slug, version, url: target.href }
+  if (options.json) return print(result, true)
+  console.log(result.url)
+  if (!options.print) {
+    try {
+      await open(result.url)
+    } catch {
+      throw new Error(
+        'Could not open the browser. Use the URL above or run with --print.',
+      )
+    }
+  }
+}
+
 async function versions(slug, options) {
   const data = await apiRequest(
     `/api/v1/sites/${encodeURIComponent(slug)}/versions`,
@@ -1003,6 +1049,18 @@ program
   .description('Deploy a file or folder')
   .action(async (target, options) =>
     deploy(target, { ...program.opts(), ...options }),
+  )
+
+program
+  .command('open')
+  .argument('<site>', 'site name')
+  .argument('[version]', 'full version ID or an 8+ character prefix')
+  .option('--print', 'print the URL without opening a browser')
+  .description(
+    'Open the live site or an exact ready version; JSON never launches a browser',
+  )
+  .action(async (site, version, options) =>
+    openSite(site, version, { ...program.opts(), ...options }),
   )
 
 program

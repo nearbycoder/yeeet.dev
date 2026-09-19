@@ -95,3 +95,17 @@ source maps, and empty files without hashing, uploading, or requiring login.
 Empty builds, private files, and standard count/size limit violations fail with
 exit code 1; `--strict` also fails on warnings. Self-hosted users can set
 `--max-bytes` to match their server. The server still validates every deployment.
+
+## Open a site or version
+
+```sh
+yeeet open my-site
+yeeet open my-site 52eabb5f
+yeeet open my-site --print
+yeeet open my-site 52eabb5f --json
+```
+
+The default opens the live site in your browser. A full version ID or unique
+prefix of at least eight characters opens its immutable URL. Non-ready versions
+and ambiguous prefixes fail clearly. `--print` and `--json` never launch a
+browser. URLs contain no private share token; password protection still applies.
