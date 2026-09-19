@@ -1,5 +1,7 @@
 # @yeeet.dev/mcp
 
+Requires Node.js 20 or newer.
+
 Official Model Context Protocol server for Yeeet. It gives coding agents typed
 tools to plan and deploy local static builds, inspect sites and immutable
 versions, roll back production, manage channels and domains, retrieve private
