@@ -420,3 +420,10 @@ logical duplicate bytes are not an estimate of physical storage charges.
 Search file changes by path in either the upload review or inspector comparison.
 The category totals remain for the full comparison; matching paths are listed in
 groups of 100 so large builds stay responsive. Use Show more to extend a group.
+
+### Bookmark file filters
+
+Set a file path search, type, and sort order in the inspector, then choose
+**Bookmark these file filters**. The URL records those filters and pins the
+selected version, ready to bookmark or share. Opening it still requires normal
+site access. Filtering itself stays local and does not reload deployment data.
