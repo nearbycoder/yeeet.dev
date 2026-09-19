@@ -344,3 +344,11 @@ Leaving a selected build or unsaved site/release notes opens a confirmation with
 own warning when supported. Saved notes and completed deployments do not warn.
 Fleet filter changes keep a selected build in place. Leaving an active upload
 pauses it; recovery still requires reselecting its original files.
+
+## Connection awareness
+
+The launchpad shows a compact offline notice and disables deployment/review while
+the browser reports no connection. A running upload is paused and its selection
+and recovery metadata stay available. Reconnect and explicitly choose Deploy or
+Resume; reconnecting never publishes automatically. Online status is a browser
+hint, so normal request-error handling still applies to server outages.

@@ -1,3 +1,4 @@
+import { useOnlineStatus } from '#/lib/online-status'
 import { UnsavedWorkGuard } from '#/components/unsaved-work-guard'
 import { RecentSites } from '#/components/recent-sites'
 import { SavedViews } from '#/components/saved-views'
@@ -268,6 +269,10 @@ function Dashboard() {
   const reviewIsCurrent =
     review?.files === files && review.options === reviewOptions
   const busy = phase !== 'idle' && phase !== 'done'
+  const online = useOnlineStatus()
+  useEffect(() => {
+    if (!online) uploadController.current?.abort()
+  }, [online])
   const preflight = useMemo(
     () =>
       deploymentPreflight(
@@ -341,7 +346,7 @@ function Dashboard() {
   }
 
   async function deploy(previewOnly = false) {
-    if (!files.length) return
+    if (!files.length || !online) return
     setError('')
     setResultUrl('')
     setResultShareUrl('')
@@ -814,6 +819,7 @@ function Dashboard() {
               className="button button-coral deploy-button"
               disabled={
                 !files.length ||
+                !online ||
                 phase !== 'idle' ||
                 (privateDeploy && deployPassword.length < 8)
               }
@@ -839,6 +845,12 @@ function Dashboard() {
               >
                 Deploy a new site
               </button>
+            ) : null}
+            {!online ? (
+              <p className="quick-deploy-warning" role="status">
+                You’re offline. Your selected files stay here. Reconnect, then
+                choose Deploy or Resume upload.
+              </p>
             ) : null}
             <p className="quick-deploy-hint">
               {phase === 'done'
@@ -933,7 +945,9 @@ function Dashboard() {
                 <button
                   type="button"
                   className="button button-paper deploy-button"
-                  disabled={!files.length || busy || phase === 'done'}
+                  disabled={
+                    !files.length || !online || busy || phase === 'done'
+                  }
                   onClick={() => void deploy(true)}
                 >
                   Review changes
