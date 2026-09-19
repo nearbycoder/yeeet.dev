@@ -217,7 +217,6 @@ function Dashboard() {
     data.destinationSite?.protected ?? false,
   )
   const [deployPassword, setDeployPassword] = useState('')
-  const [advanced, setAdvanced] = useState(false)
   const advancedOptions = useRef<HTMLDetailsElement>(null)
   const [dragging, setDragging] = useState(false)
   const [phase, setPhase] = useState<
@@ -277,7 +276,7 @@ function Dashboard() {
     [files, spaFallback],
   )
   function showAdvanced() {
-    setAdvanced(true)
+    if (advancedOptions.current) advancedOptions.current.open = true
     advancedOptions.current?.querySelector('summary')?.focus()
   }
   const totalBytes = files.reduce((sum, item) => sum + item.file.size, 0)
@@ -304,6 +303,23 @@ function Dashboard() {
     setUploadTotal(0)
     setReused(0)
     setPhase('idle')
+  }
+
+  function startFreshSite() {
+    selectFiles([])
+    hashedFiles.current = null
+    setSlug('')
+    setChannel('')
+    setSpaFallback(true)
+    setPrivateDeploy(false)
+    setDeployPassword('')
+    if (advancedOptions.current) advancedOptions.current.open = false
+    saveRecovery(null)
+    void navigate({
+      search: { ...filters, site: undefined, channel: undefined },
+      resetScroll: false,
+    })
+    fileInput.current?.closest('.dropzone')?.querySelector('button')?.focus()
   }
 
   async function deploy(previewOnly = false) {
@@ -793,18 +809,22 @@ function Dashboard() {
                       ? 'Deployed ✓'
                       : 'Going live…'}
             </button>
+            {phase === 'done' ? (
+              <button
+                type="button"
+                className="button button-paper"
+                onClick={startFreshSite}
+              >
+                Deploy a new site
+              </button>
+            ) : null}
             <p className="quick-deploy-hint">
               {phase === 'done'
                 ? 'Drop more files to deploy another update.'
                 : 'Want to customize or review first? Open Advanced options below.'}
             </p>
           </div>
-          <details
-            ref={advancedOptions}
-            className="deploy-advanced"
-            open={advanced}
-            onToggle={(event) => setAdvanced(event.currentTarget.open)}
-          >
+          <details ref={advancedOptions} className="deploy-advanced">
             <summary>
               Advanced options{' '}
               <span>Address, privacy, routing, and file review</span>
