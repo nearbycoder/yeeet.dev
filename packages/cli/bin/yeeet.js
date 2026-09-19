@@ -774,13 +774,31 @@ async function openSite(slug, selector, options) {
 }
 
 async function versions(slug, options) {
+  const params = new URLSearchParams()
+  if (options.search !== undefined) {
+    const query = options.search.trim()
+    if (query.length > 200)
+      throw new Error('--search accepts at most 200 characters.')
+    if (query) params.set('q', query)
+  }
+  if (options.status) {
+    if (!['all', 'ready', 'uploading', 'failed'].includes(options.status))
+      throw new Error('--status must be all, ready, uploading, or failed.')
+    params.set('status', options.status)
+  }
+  if (options.cursor) {
+    if (options.cursor.length > 600) throw new Error('--cursor is too long.')
+    params.set('cursor', options.cursor)
+  }
+  const queryString = params.toString()
   const data = await apiRequest(
-    `/api/v1/sites/${encodeURIComponent(slug)}/versions`,
+    `/api/v1/sites/${encodeURIComponent(slug)}/versions${queryString ? `?${queryString}` : ''}`,
     {},
     options,
   )
   if (options.json) return print(data, true)
   console.log(`\n  Versions for ${data.site.url}\n`)
+  if (!data.versions.length) console.log('  No versions match these filters.')
   for (const version of data.versions) {
     const marker = version.current
       ? '● live'
@@ -793,6 +811,10 @@ async function versions(slug, options) {
     if (version.previewUrl) console.log(`             ${version.previewUrl}`)
     if (version.shareUrl) console.log(`     share → ${version.shareUrl}`)
   }
+  if (data.nextCursor)
+    console.log(
+      `\n  More versions available. Use --cursor ${data.nextCursor} with the same search and status.`,
+    )
   console.log('')
 }
 
@@ -1066,8 +1088,16 @@ program
 program
   .command('versions')
   .argument('<site>', 'site name')
-  .description('List immutable versions and preview URLs')
-  .action(async (site) => versions(site, program.opts()))
+  .option('--search <query>', 'search version IDs, release labels, or notes')
+  .option('--status <status>', 'all, ready, uploading, or failed')
+  .option(
+    '--cursor <cursor>',
+    'continue using the nextCursor from the previous page',
+  )
+  .description('List and search immutable versions with pagination')
+  .action(async (site, options) =>
+    versions(site, { ...program.opts(), ...options }),
+  )
 
 program
   .command('analytics')

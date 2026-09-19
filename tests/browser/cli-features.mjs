@@ -70,8 +70,32 @@ try {
     ).status,
     404,
   )
+  const filtered = JSON.parse(
+    cli(
+      'versions',
+      site.slug,
+      '--search',
+      site.activeDeploymentId.slice(0, 8),
+      '--status',
+      'ready',
+      '--json',
+    ),
+  )
+  assert.equal(filtered.versions.length, 1)
+  assert.equal(filtered.versions[0].id, site.activeDeploymentId)
+  const empty = JSON.parse(
+    cli(
+      'versions',
+      site.slug,
+      '--search',
+      'no-such-cli-release-fixture',
+      '--json',
+    ),
+  )
+  assert.equal(empty.versions.length, 0)
+  assert.equal(empty.nextCursor, null)
   console.log(
-    'CLI open resolves live and exact ready versions through authenticated local APIs.',
+    'CLI open and version search resolve owned deployments through authenticated local APIs.',
   )
 } finally {
   if (key?.id)

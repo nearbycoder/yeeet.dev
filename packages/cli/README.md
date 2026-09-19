@@ -109,3 +109,16 @@ The default opens the live site in your browser. A full version ID or unique
 prefix of at least eight characters opens its immutable URL. Non-ready versions
 and ambiguous prefixes fail clearly. `--print` and `--json` never launch a
 browser. URLs contain no private share token; password protection still applies.
+
+## Search and page through versions
+
+```sh
+yeeet versions my-site --search "launch" --status ready
+yeeet versions my-site --status failed --json
+yeeet versions my-site --cursor '<nextCursor>' --status failed --json
+```
+
+Search matches version IDs, release labels, and notes. Each response is one
+page. JSON preserves `nextCursor`; human output shows it when more results
+exist. Pass that cursor with the same search and status to continue. Empty
+results are successful; invalid filters and server errors return a nonzero exit.
