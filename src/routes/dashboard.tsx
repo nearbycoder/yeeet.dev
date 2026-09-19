@@ -1,3 +1,4 @@
+import { mergeUploadFiles } from '#/lib/merge-upload-files'
 import { uploadLimitErrors } from '#/lib/upload-limits'
 import { DeploymentPresets } from '#/components/deployment-presets'
 import { publishFolders, selectPublishFolder } from '#/lib/publish-folder'
@@ -177,6 +178,7 @@ function Dashboard() {
   const router = useRouter()
   const fileInput = useRef<HTMLInputElement>(null)
   const folderInput = useRef<HTMLInputElement>(null)
+  const additionalInput = useRef<HTMLInputElement>(null)
   const uploadController = useRef<AbortController | null>(null)
   const hashedFiles = useRef<{
     files: Array<UploadFile>
@@ -1001,6 +1003,52 @@ function Dashboard() {
                   setResultShareUrl('')
                 }}
               />
+              {originalFiles.length ? (
+                <div className="console-actions">
+                  <input
+                    ref={additionalInput}
+                    name="additional-files"
+                    type="file"
+                    multiple
+                    hidden
+                    disabled={busy}
+                    onChange={(event) => {
+                      const incoming = Array.from(event.target.files ?? []).map(
+                        (file) => ({ file, path: file.name }),
+                      )
+                      if (!incoming.length) return
+                      const root = publishRoot
+                      selectFiles(
+                        mergeUploadFiles(files, incoming),
+                        mergeUploadFiles(
+                          sourceFiles,
+                          incoming.map((item) => ({
+                            ...item,
+                            path: root ? `${root}/${item.path}` : item.path,
+                          })),
+                        ),
+                      )
+                      setOriginalFiles(
+                        mergeUploadFiles(originalFiles, incoming),
+                      )
+                      setPublishRoot(root)
+                      event.target.value = ''
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className="button button-paper"
+                    disabled={busy}
+                    onClick={() => additionalInput.current?.click()}
+                  >
+                    Add files to selection
+                  </button>
+                  <small>
+                    Matching paths are replaced. Other selected and excluded
+                    files stay as they are.
+                  </small>
+                </div>
+              ) : null}
               {folderChoices.length ? (
                 <label className="console-field">
                   Publish folder

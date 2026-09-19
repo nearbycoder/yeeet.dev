@@ -373,3 +373,10 @@ The console checks selected file count and total size against this server's
 upload limits before hashing or requesting an upload. An oversized selection
 shows its limit beside Deploy; use Advanced options to exclude files or choose a
 smaller publish folder. The server independently enforces the same limits.
+
+### Add a missing file
+
+After selecting a build, use **Add files to selection** in Advanced options to
+include extra files without dropping the build again. An added file replaces an
+exact matching path; other exclusions stay excluded. With a publish folder
+selected, new files are added at that folder's root. Changes clear the review.
