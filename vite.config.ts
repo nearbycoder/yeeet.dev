@@ -8,6 +8,8 @@ import { nitro } from 'nitro/vite'
 
 const config = defineConfig({
   resolve: { tsconfigPaths: true },
+  // Native image rendering runs on the server and cannot be prebundled as JS.
+  optimizeDeps: { exclude: ['@resvg/resvg-js'] },
   plugins: [
     devtools(),
     nitro({

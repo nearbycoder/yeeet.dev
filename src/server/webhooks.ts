@@ -2,7 +2,7 @@ import { createHmac, randomBytes, randomUUID } from 'node:crypto'
 import { lookup } from 'node:dns/promises'
 import { request as httpRequest } from 'node:http'
 import { request as httpsRequest } from 'node:https'
-import { isIP } from 'node:net'
+import { BlockList, isIP } from 'node:net'
 import { and, asc, desc, eq, lte } from 'drizzle-orm'
 import { db } from '#/db'
 import { webhookDeliveries, webhookEndpoints } from '#/db/schema'
@@ -51,40 +51,50 @@ export function webhookSignature(
     .digest('hex')}`
 }
 
-function privateIpv4(value: string) {
-  const octets = value.split('.').map(Number)
-  if (octets.length !== 4 || octets.some((part) => !Number.isInteger(part))) {
-    return true
-  }
-  const [first, second] = octets
-  return (
-    first === 0 ||
-    first === 10 ||
-    first === 127 ||
-    (first === 100 && second >= 64 && second <= 127) ||
-    (first === 169 && second === 254) ||
-    (first === 172 && second >= 16 && second <= 31) ||
-    (first === 192 && second === 168) ||
-    first >= 224
-  )
-}
+const blockedNetworks = new BlockList()
+for (const [network, prefix] of [
+  ['0.0.0.0', 8],
+  ['10.0.0.0', 8],
+  ['100.64.0.0', 10],
+  ['127.0.0.0', 8],
+  ['169.254.0.0', 16],
+  ['172.16.0.0', 12],
+  ['192.0.0.0', 24],
+  ['192.0.2.0', 24],
+  ['192.168.0.0', 16],
+  ['198.18.0.0', 15],
+  ['198.51.100.0', 24],
+  ['203.0.113.0', 24],
+  ['224.0.0.0', 4],
+  ['240.0.0.0', 4],
+] as const)
+  blockedNetworks.addSubnet(network, prefix, 'ipv4')
+for (const [network, prefix] of [
+  ['::', 96],
+  ['64:ff9b::', 96],
+  ['64:ff9b:1::', 48],
+  ['100::', 64],
+  ['2001::', 32],
+  ['2001:db8::', 32],
+  ['2002::', 16],
+  ['fc00::', 7],
+  ['fe80::', 10],
+  ['fec0::', 10],
+  ['ff00::', 8],
+] as const)
+  blockedNetworks.addSubnet(network, prefix, 'ipv6')
 
 export function isPrivateWebhookAddress(value: string) {
   const normalized = value.toLowerCase().replace(/^\[|\]$/g, '')
   const version = isIP(normalized)
-  if (version === 4) return privateIpv4(normalized)
-  if (version !== 6) return false
-  if (
-    normalized === '::' ||
-    normalized === '::1' ||
-    normalized.startsWith('fc') ||
-    normalized.startsWith('fd') ||
-    /^fe[89ab]/.test(normalized)
-  ) {
-    return true
-  }
-  const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(normalized)
-  return mapped ? privateIpv4(mapped[1]) : false
+  return (
+    version !== 0 &&
+    blockedNetworks.check(normalized, version === 4 ? 'ipv4' : 'ipv6')
+  )
+}
+
+function webhookHostname(url: URL) {
+  return url.hostname.replace(/^\[|\]$/g, '')
 }
 
 export async function normalizeWebhookUrl(value: string) {
@@ -124,7 +134,10 @@ export async function normalizeWebhookUrl(value: string) {
     }
     let addresses: Array<{ address: string }>
     try {
-      addresses = await lookup(url.hostname, { all: true, verbatim: true })
+      addresses = await lookup(webhookHostname(url), {
+        all: true,
+        verbatim: true,
+      })
     } catch {
       throw new HttpError(
         400,
@@ -336,7 +349,10 @@ async function postWebhook(
   headers: Record<string, string>,
   body: string,
 ) {
-  const addresses = await lookup(url.hostname, { all: true, verbatim: true })
+  const addresses = await lookup(webhookHostname(url), {
+    all: true,
+    verbatim: true,
+  })
   const address = addresses.find(
     (entry) => !isPrivateWebhookAddress(entry.address),
   )
@@ -354,6 +370,7 @@ async function postWebhook(
       url,
       {
         method: 'POST',
+        family: address.family,
         headers: {
           ...headers,
           'content-length': String(Buffer.byteLength(body)),

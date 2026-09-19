@@ -11,6 +11,7 @@ import {
 } from '#/db/schema'
 import {
   deploymentShareCookieName,
+  safeDeploymentReturnTo,
   shareTokenForDeployment,
   verifyDeploymentPassword,
   verifyDeploymentShareToken,
@@ -160,7 +161,11 @@ function deploymentAccessCookie(
   deploymentId: string,
   shareNonce: string,
 ) {
-  const secure = new URL(request.url).protocol === 'https:' ? '; Secure' : ''
+  const secure =
+    process.env.NODE_ENV === 'production' ||
+    new URL(request.url).protocol === 'https:'
+      ? '; Secure'
+      : ''
   return `${deploymentShareCookieName(deploymentId)}=${encodeURIComponent(shareTokenForDeployment(deploymentId, shareNonce))}; Path=/; HttpOnly${secure}; SameSite=Lax; Max-Age=2592000`
 }
 
@@ -173,14 +178,6 @@ function hasDeploymentAccess(
   return Boolean(
     token && verifyDeploymentShareToken(token, deploymentId, shareNonce),
   )
-}
-
-function safeReturnTo(value: FormDataEntryValue | null) {
-  return typeof value === 'string' &&
-    value.startsWith('/') &&
-    !value.startsWith('//')
-    ? value
-    : '/'
 }
 
 function unlockPage(request: Request, hostname: string, error?: string) {
@@ -212,7 +209,7 @@ function grantDeploymentAccess(
   return new Response(null, {
     status: 303,
     headers: {
-      location,
+      location: safeDeploymentReturnTo(location),
       'set-cookie': deploymentAccessCookie(request, deploymentId, shareNonce),
       'cache-control': 'private, no-store',
       'referrer-policy': 'no-referrer',
@@ -364,7 +361,7 @@ export async function maybeServeSite(
           request,
           deployment.id,
           deployment.shareNonce,
-          safeReturnTo(form.get('returnTo')),
+          safeDeploymentReturnTo(form.get('returnTo')),
         )
       }
       return unlockPage(request, target.label, 'That password did not match.')

@@ -64,6 +64,7 @@ export async function verifyDeploymentPassword(
   password: string,
   encoded: string,
 ) {
+  if (password.length < 8 || password.length > 128) return false
   const [algorithm, cost, blockSize, parallelization, saltValue, keyValue] =
     encoded.split('$')
   if (
@@ -120,4 +121,24 @@ export function verifyDeploymentShareToken(
 
 export function deploymentShareCookieName(deploymentId: string) {
   return `yeeet_share_${deploymentId.replaceAll('-', '')}`
+}
+
+export function safeDeploymentReturnTo(value: unknown) {
+  if (
+    typeof value !== 'string' ||
+    !value.startsWith('/') ||
+    value.startsWith('//') ||
+    value.includes('\\') ||
+    Array.from(value).some(
+      (character) =>
+        character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127,
+    )
+  )
+    return '/'
+  const base = 'https://deployment.invalid'
+  try {
+    return new URL(value, base).origin === base ? value : '/'
+  } catch {
+    return '/'
+  }
 }

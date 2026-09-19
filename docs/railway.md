@@ -76,8 +76,10 @@ DB_POOL_SIZE=10
 
 Use `VITE_GITHUB_AUTH_ENABLED=true` only after both GitHub OAuth variables are
 present. `ADMIN_EMAILS` is a comma-separated bootstrap allowlist. The
-pre-deploy command promotes matching existing users on each release, while
-Better Auth assigns the role when a matching account is created.
+pre-deploy command promotes matching users with verified email addresses on each
+release. New accounts also require verified email ownership before the allowlist
+grants an administrator role. For a local email/password account, the operator
+must verify ownership before marking its email verified and running the bootstrap.
 
 `INITIAL_INVITATION_CODE` seeds an idempotent first invitation. After the first
 administrator signs in, create, rotate, and revoke invitations from `/admin`.

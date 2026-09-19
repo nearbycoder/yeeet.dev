@@ -117,7 +117,7 @@ Yeeet leaves author-provided social metadata untouched.
 
 ## Use the hosted CLI
 
-Requires Node.js `20.19+` or `22.12+`.
+Requires Node.js `22.13+` (22.x) or `24+`.
 
 ```sh
 npm install --global @yeeet.dev/cli
@@ -338,7 +338,7 @@ Railway domain for each site.
 
 Prerequisites:
 
-- Node.js `20.19+` or `22.12+`
+- Node.js `22.13+` (22.x) or `24+`
 - PostgreSQL
 - A private S3-compatible bucket and credentials
 
@@ -362,7 +362,9 @@ openssl rand -base64 32
 ```
 
 The first administrator is selected from the comma-separated `ADMIN_EMAILS`
-list. Registration remains invitation-only; `INITIAL_INVITATION_CODE` creates
+list after the email has been verified. Email/password registration alone does not
+grant administrator privileges. Operators must verify ownership before marking
+a local account verified and running `npm run admin:bootstrap`. Registration remains invitation-only; `INITIAL_INVITATION_CODE` creates
 the first bootstrap invitation idempotently.
 
 ## Configuration
