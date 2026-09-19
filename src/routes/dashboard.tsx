@@ -1,3 +1,4 @@
+import { deployCommand } from '#/lib/deploy-command'
 import { mergeUploadFiles } from '#/lib/merge-upload-files'
 import { uploadLimitErrors } from '#/lib/upload-limits'
 import { DeploymentPresets } from '#/components/deployment-presets'
@@ -1049,6 +1050,40 @@ function Dashboard() {
                   </small>
                 </div>
               ) : null}
+              <details className="console-item">
+                <summary>Use these settings in the CLI</summary>
+                <p>
+                  For Bash or Zsh. Replace the build-folder path and run{' '}
+                  <code>yeeet login</code> first. This previews changes; remove{' '}
+                  <code>--dry-run</code> to publish. Browser file exclusions are
+                  not included: prepare the same files locally or use{' '}
+                  <code>.yeeetignore</code>.
+                </p>
+                {privateDeploy ? (
+                  <p>
+                    Set <code>YEEET_DEPLOY_PASSWORD</code> securely in your
+                    shell. Your browser password is never copied.
+                  </p>
+                ) : null}
+                <pre className="console-code">
+                  {deployCommand(data.platform.controlPlaneUrl, {
+                    slug,
+                    channel,
+                    spaFallback,
+                    privateDeploy,
+                  })}
+                </pre>
+                <CopyButton
+                  className="button button-paper"
+                  label="Copy CLI preview command"
+                  value={deployCommand(data.platform.controlPlaneUrl, {
+                    slug,
+                    channel,
+                    spaFallback,
+                    privateDeploy,
+                  })}
+                />
+              </details>
               {folderChoices.length ? (
                 <label className="console-field">
                   Publish folder
