@@ -1,3 +1,4 @@
+import { DeploymentPresets } from '#/components/deployment-presets'
 import { publishFolders, selectPublishFolder } from '#/lib/publish-folder'
 import { useOnlineStatus } from '#/lib/online-status'
 import { UnsavedWorkGuard } from '#/components/unsaved-work-guard'
@@ -962,6 +963,23 @@ function Dashboard() {
                   Review changes
                 </button>
               </div>
+              <DeploymentPresets
+                userId={user.id}
+                settings={{ slug, channel, spaFallback, privateDeploy }}
+                disabled={busy}
+                onApply={(settings) => {
+                  setSlug(settings.slug)
+                  setChannel(settings.channel)
+                  setSpaFallback(settings.spaFallback)
+                  setPrivateDeploy(settings.privateDeploy)
+                  setDeployPassword('')
+                  setReview(null)
+                  setPhase('idle')
+                  setError('')
+                  setResultUrl('')
+                  setResultShareUrl('')
+                }}
+              />
               {folderChoices.length ? (
                 <label className="console-field">
                   Publish folder
