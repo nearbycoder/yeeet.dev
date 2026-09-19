@@ -1,3 +1,5 @@
+import { MAX_FILE_COUNT, deployByteLimit } from '#/lib/upload-limits'
+
 const DEFAULT_CONTROL_PLANE_URL = 'https://yeeet.dev'
 const DEFAULT_SITE_DOMAIN = 'site.yeeet.dev'
 const DEFAULT_DOCS_HOST = 'docs.yeeet.dev'
@@ -41,6 +43,10 @@ export function siteWildcardOrigin() {
 
 export function publicPlatformConfig() {
   return {
+    uploadLimits: {
+      maxFileCount: MAX_FILE_COUNT,
+      maxDeployBytes: deployByteLimit(process.env.MAX_DEPLOY_BYTES),
+    },
     controlPlaneUrl: controlPlaneUrl(),
     docsUrl: docsUrl(),
     siteDomain: siteDomain(),
