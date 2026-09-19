@@ -1,3 +1,4 @@
+import { fileGrowth } from '#/lib/file-growth'
 import { and, asc, eq } from 'drizzle-orm'
 import { db } from '#/db'
 import { deploymentFiles, deployments, sites } from '#/db/schema'
@@ -61,6 +62,7 @@ export async function compareDeployments(
   ])
   return {
     ...diffManifests(next.files, previous?.files ?? []),
+    fileGrowth: fileGrowth(next.files, previous?.files ?? []),
     target: next.id,
     base: previous?.id ?? null,
     routingChanged: Boolean(

@@ -434,3 +434,10 @@ Save per-file and total budget thresholds from Asset budget review. Preferences
 apply to this site and account in the current browser across versions. Reset
 budgets removes the saved values and restores the defaults. Budgets remain
 advisory and never block deployment.
+
+### See which files grew
+
+Choose a comparison version in the inspector to review File size changes.
+The report shows before/after bytes for added, removed, growing, and shrinking
+files, plus the net build change. It starts with growing files and can include
+reductions. Same-size content changes remain visible in the regular manifest diff.
