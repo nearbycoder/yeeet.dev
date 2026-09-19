@@ -1,8 +1,19 @@
+import { FilePreview } from '#/components/file-preview'
+import { canPreviewText } from '#/lib/text-preview'
 import { useMemo, useState } from 'react'
 import { exploreFiles, fileFamily } from '#/lib/file-explorer'
 import type { ManifestFile } from '#/lib/file-explorer'
 
-export function FileExplorer({ files }: { files: Array<ManifestFile> }) {
+export function FileExplorer({
+  files,
+  slug,
+  version,
+}: {
+  files: Array<ManifestFile>
+  slug: string
+  version: string
+}) {
+  const [preview, setPreview] = useState('')
   const [query, setQuery] = useState('')
   const [family, setFamily] = useState('')
   const [order, setOrder] = useState('path')
@@ -80,6 +91,7 @@ export function FileExplorer({ files }: { files: Array<ManifestFile> }) {
               <th scope="col">Size</th>
               <th scope="col">Type</th>
               <th scope="col">SHA-256</th>
+              <th scope="col">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -93,11 +105,33 @@ export function FileExplorer({ files }: { files: Array<ManifestFile> }) {
                 <td>
                   <code>{file.checksum ?? 'Not recorded'}</code>
                 </td>
+                <td>
+                  {canPreviewText(file.contentType) ? (
+                    <button
+                      className="button button-paper"
+                      onClick={() => setPreview(file.path)}
+                      aria-label={`Preview ${file.path}`}
+                    >
+                      Preview text
+                    </button>
+                  ) : (
+                    '—'
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+      {preview ? (
+        <FilePreview
+          key={preview}
+          slug={slug}
+          version={version}
+          path={preview}
+          onClose={() => setPreview('')}
+        />
+      ) : null}
       {!matching.length ? (
         <p>
           No files match.{' '}

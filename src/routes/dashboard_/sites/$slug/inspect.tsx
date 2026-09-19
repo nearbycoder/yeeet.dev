@@ -156,7 +156,12 @@ function Inspector() {
           />
           <AssetBudget files={version.files} />
           <ManifestExport slug={history.site.slug} version={version} />
-          <FileExplorer key={version.id} files={version.files} />
+          <FileExplorer
+            key={version.id}
+            files={version.files}
+            slug={history.site.slug}
+            version={version.id}
+          />
           <Link
             className="button button-paper"
             to="/dashboard/sites/$slug/versions"
