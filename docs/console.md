@@ -352,3 +352,10 @@ the browser reports no connection. A running upload is paused and its selection
 and recovery metadata stay available. Reconnect and explicitly choose Deploy or
 Resume; reconnecting never publishes automatically. Online status is a browser
 hint, so normal request-error handling still applies to server outages.
+
+### Publish a nested build folder
+
+When a selection contains nested folders with `index.html`, Advanced options
+lets you choose the **Publish folder**. Only that folder's contents are uploaded,
+with its prefix removed. Choose **All selected files** to restore the source
+selection. Changing the folder clears the previous review.

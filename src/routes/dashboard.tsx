@@ -1,3 +1,4 @@
+import { publishFolders, selectPublishFolder } from '#/lib/publish-folder'
 import { useOnlineStatus } from '#/lib/online-status'
 import { UnsavedWorkGuard } from '#/components/unsaved-work-guard'
 import { RecentSites } from '#/components/recent-sites'
@@ -209,6 +210,12 @@ function Dashboard() {
     }
   }
   const [files, setFiles] = useState<Array<UploadFile>>([])
+  const [sourceFiles, setSourceFiles] = useState<Array<UploadFile>>([])
+  const [publishRoot, setPublishRoot] = useState('')
+  const folderChoices = useMemo(
+    () => publishFolders(sourceFiles),
+    [sourceFiles],
+  )
   const [originalFiles, setOriginalFiles] = useState<Array<UploadFile>>([])
   const [slug, setSlug] = useState(destination.site ?? '')
   const [channel, setChannel] = useState(destination.channel ?? '')
@@ -315,7 +322,9 @@ function Dashboard() {
     selectFiles(next)
   }
 
-  function selectFiles(next: Array<UploadFile>) {
+  function selectFiles(next: Array<UploadFile>, source = next) {
+    setSourceFiles(source)
+    setPublishRoot('')
     setReview(null)
     setOriginalFiles(next)
     setFiles(next)
@@ -953,6 +962,35 @@ function Dashboard() {
                   Review changes
                 </button>
               </div>
+              {folderChoices.length ? (
+                <label className="console-field">
+                  Publish folder
+                  <select
+                    name="publish-folder"
+                    value={publishRoot}
+                    disabled={busy}
+                    onChange={(event) => {
+                      const root = event.target.value
+                      selectFiles(
+                        selectPublishFolder(sourceFiles, root),
+                        sourceFiles,
+                      )
+                      setPublishRoot(root)
+                    }}
+                  >
+                    <option value="">All selected files</option>
+                    {folderChoices.map((folder) => (
+                      <option key={folder} value={folder}>
+                        {folder}/
+                      </option>
+                    ))}
+                  </select>
+                  <small>
+                    Publish only this folder’s contents at the site root. Other
+                    files stay out of this deployment.
+                  </small>
+                </label>
+              ) : null}
               {originalFiles.length ? (
                 <UploadSelection
                   original={originalFiles}
