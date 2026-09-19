@@ -1,3 +1,4 @@
+import { fileFilterSearchSchema } from '#/lib/file-filters'
 import { DuplicateAssets } from '#/components/duplicate-assets'
 import { RouteSimulator } from '#/components/route-simulator'
 import { VersionNotes } from '#/components/version-notes'
@@ -14,11 +15,11 @@ import {
 import { ManifestDiff } from '#/components/manifest-diff'
 
 export const Route = createFileRoute('/dashboard_/sites/$slug/inspect')({
-  validateSearch: z.object({
+  validateSearch: fileFilterSearchSchema.extend({
     version: z.string().optional(),
     base: z.string().optional(),
   }),
-  loaderDeps: ({ search }) => search,
+  loaderDeps: ({ search }) => ({ version: search.version, base: search.base }),
   loader: async ({ params, deps }) => {
     const history = await getSiteVersionsData({
       data: { slug: params.slug, version: deps.version },
@@ -162,7 +163,19 @@ function Inspector() {
           />
           <ManifestExport slug={history.site.slug} version={version} />
           <FileExplorer
-            key={version.id}
+            key={JSON.stringify([
+              version.id,
+              search.fileQuery,
+              search.fileType,
+              search.fileOrder,
+            ])}
+            filters={search}
+            onBookmark={(filters) =>
+              void navigate({
+                search: { ...search, ...filters, version: version.id },
+                resetScroll: false,
+              })
+            }
             files={version.files}
             previewUrl={version.previewUrl}
             slug={history.site.slug}

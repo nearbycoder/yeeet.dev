@@ -1,3 +1,4 @@
+import type { FileFilters } from '#/lib/file-filters'
 import { fileVersionUrl } from '#/lib/file-version-url'
 import { FilePreview } from '#/components/file-preview'
 import { canPreviewText } from '#/lib/text-preview'
@@ -10,16 +11,22 @@ export function FileExplorer({
   slug,
   version,
   previewUrl,
+  filters,
+  onBookmark,
 }: {
   files: Array<ManifestFile>
   slug: string
   version: string
   previewUrl: string | null
+  filters: FileFilters
+  onBookmark: (filters: FileFilters) => void
 }) {
   const [preview, setPreview] = useState('')
-  const [query, setQuery] = useState('')
-  const [family, setFamily] = useState('')
-  const [order, setOrder] = useState('path')
+  const [query, setQuery] = useState(filters.fileQuery ?? '')
+  const [family, setFamily] = useState<
+    Exclude<FileFilters['fileType'], undefined> | ''
+  >(filters.fileType ?? '')
+  const [order, setOrder] = useState(filters.fileOrder ?? 'path')
   const [page, setPage] = useState(0)
   const matching = useMemo(
     () => exploreFiles(files, query, family, order),
@@ -40,6 +47,7 @@ export function FileExplorer({
           Find a file
           <input
             type="search"
+            maxLength={200}
             value={query}
             onChange={(event) => {
               setQuery(event.target.value)
@@ -53,7 +61,7 @@ export function FileExplorer({
           <select
             value={family}
             onChange={(event) => {
-              setFamily(event.target.value)
+              setFamily(event.target.value as typeof family)
               setPage(0)
             }}
           >
@@ -68,7 +76,7 @@ export function FileExplorer({
           <select
             value={order}
             onChange={(event) => {
-              setOrder(event.target.value)
+              setOrder(event.target.value as typeof order)
               setPage(0)
             }}
           >
@@ -77,6 +85,24 @@ export function FileExplorer({
             <option value="smallest">Smallest first</option>
           </select>
         </label>
+      </div>
+      <div className="console-actions">
+        <button
+          className="button button-paper"
+          onClick={() =>
+            onBookmark({
+              fileQuery: query || undefined,
+              fileType: family || undefined,
+              fileOrder: order,
+            })
+          }
+        >
+          Bookmark these file filters
+        </button>
+        <small>
+          Updates this page’s URL for bookmarking or sharing. Site access is
+          still required.
+        </small>
       </div>
       <p role="status">
         {matching.length
