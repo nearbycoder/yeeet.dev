@@ -20,7 +20,7 @@ try {
   )
   browser(
     'select',
-    'section[aria-label="File explorer"] select >> nth=0',
+    'section[aria-label="File explorer"] label:nth-child(2) select',
     'HTML',
   )
   browser(
@@ -34,6 +34,7 @@ try {
   )
   browser('wait', '--fn', 'location.search.includes("fileQuery")')
   const url = evaluate('location.href')
+  assert.equal(new URL(url).searchParams.get('fileType'), 'HTML')
   assert.ok(new URL(url).searchParams.get('version'))
   open(url)
   assert.equal(
