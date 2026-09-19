@@ -336,3 +336,11 @@ Paste files or a screenshot onto the dashboard with Ctrl/⌘ V to select them fo
 deployment. Pasting while editing an input or notes field keeps its normal behavior.
 Plain text is not treated as a file. Clipboard files replace the selection, use
 the current destination settings, and cannot interrupt an active upload.
+
+## Protect unsaved work
+
+Leaving a selected build or unsaved site/release notes opens a confirmation with
+**Keep working** and **Leave page**. Reloading or closing the tab uses the browser's
+own warning when supported. Saved notes and completed deployments do not warn.
+Fleet filter changes keep a selected build in place. Leaving an active upload
+pauses it; recovery still requires reselecting its original files.

@@ -1,3 +1,4 @@
+import { UnsavedWorkGuard } from '#/components/unsaved-work-guard'
 import { useState } from 'react'
 import { updateSiteNotes } from '#/server/functions'
 import { useConsoleMutation } from '#/lib/console-request'
@@ -8,6 +9,10 @@ export function SiteNotes({ slug, notes }: { slug: string; notes: string }) {
   const mutation = useConsoleMutation()
   return (
     <section className="panel site-page-panel">
+      <UnsavedWorkGuard
+        dirty={draft !== base}
+        description="Your changes to site notes have not been saved."
+      />
       <h2>Site notes</h2>
       <p>
         Private operational notes for the site owner. Stored as plain text with

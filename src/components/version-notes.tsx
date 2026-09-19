@@ -1,3 +1,4 @@
+import { UnsavedWorkGuard } from '#/components/unsaved-work-guard'
 import { useState } from 'react'
 import { updateVersionNotes } from '#/server/functions'
 import { useConsoleMutation } from '#/lib/console-request'
@@ -22,6 +23,10 @@ export function VersionNotes({
         Release label and notes
         {version.releaseLabel ? `: ${version.releaseLabel}` : ''}
       </summary>
+      <UnsavedWorkGuard
+        dirty={label !== base.label || notes !== base.notes}
+        description="Your release label or notes have not been saved."
+      />
       <p>
         Labels and notes describe this exact version and are visible to its
         workspace reviewers.
