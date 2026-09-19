@@ -1,3 +1,4 @@
+import { DuplicateAssets } from '#/components/duplicate-assets'
 import { RouteSimulator } from '#/components/route-simulator'
 import { VersionNotes } from '#/components/version-notes'
 import { AssetBudget } from '#/components/asset-budget'
@@ -155,6 +156,10 @@ function Inspector() {
             version={version}
           />
           <AssetBudget files={version.files} />
+          <DuplicateAssets
+            key={`duplicates:${version.id}`}
+            files={version.files}
+          />
           <ManifestExport slug={history.site.slug} version={version} />
           <FileExplorer
             key={version.id}

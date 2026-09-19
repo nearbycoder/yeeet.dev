@@ -407,3 +407,10 @@ The inspector's file Actions menu includes **Open version file** for ready
 versions. It opens the encoded file path on the version's immutable hostname,
 so later production deployments do not change the link. Password protection
 still applies, and the link does not include a private share token.
+
+### Find repeated assets
+
+The inspector's collapsed Duplicate assets review groups non-empty files with
+matching recorded SHA-256 checksums and byte sizes. It ranks repeated content
+by bytes so you can clean up source builds. No files are deleted, and these
+logical duplicate bytes are not an estimate of physical storage charges.
