@@ -79,6 +79,26 @@ try {
     ),
     false,
   )
+  evaluate(
+    `(()=>{const transfer=new DataTransfer();transfer.items.add(new File(['clipboard fixture'],'pasted.txt',{type:'text/plain'}));document.dispatchEvent(new ClipboardEvent('paste',{bubbles:true,cancelable:true,clipboardData:transfer}))})()`,
+  )
+  browser(
+    'wait',
+    '--fn',
+    'document.querySelector(".dropzone").textContent.includes("1 file cleared")',
+  )
+  assert.equal(
+    evaluate(
+      'document.querySelector(".dropzone").textContent.includes("no index.html")',
+    ),
+    true,
+  )
+  assert.equal(
+    evaluate(
+      `(()=>{const editor=document.createElement('div');editor.contentEditable='plaintext-only';document.body.append(editor);const transfer=new DataTransfer();transfer.items.add(new File(['a'],'a.txt'));transfer.items.add(new File(['b'],'b.txt'));const event=new ClipboardEvent('paste',{bubbles:true,cancelable:true,clipboardData:transfer});editor.dispatchEvent(event);editor.remove();return event.defaultPrevented})()`,
+    ),
+    false,
+  )
   captureRequests()
   drop()
   const url = await publish()

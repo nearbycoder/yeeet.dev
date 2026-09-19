@@ -329,3 +329,10 @@ After a successful deployment, **Deploy a new site** clears the selected files,
 destination, channel, and private password and restores public SPA defaults.
 Dropping another build without choosing this action continues updating the current
 site. The destination summary shows which path you are taking.
+
+## Paste copied files
+
+Paste files or a screenshot onto the dashboard with Ctrl/⌘ V to select them for
+deployment. Pasting while editing an input or notes field keeps its normal behavior.
+Plain text is not treated as a file. Clipboard files replace the selection, use
+the current destination settings, and cannot interrupt an active upload.
