@@ -388,3 +388,9 @@ current destination, routing, and privacy choices. Set the local folder path and
 review with `--dry-run` before publishing. Browser exclusions need to be repeated
 locally. Private commands require `YEEET_DEPLOY_PASSWORD`; entered passwords
 never appear in the generated command.
+
+### Preview deployed source
+
+The inspector can show UTF-8 text files from a ready version without executing
+HTML, JavaScript, or SVG. Previews show at most 64 KiB and label truncation.
+Access is checked against your site and the exact version before reading storage.

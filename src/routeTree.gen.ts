@@ -57,6 +57,7 @@ import { Route as ApiV1SitesSlugDomainsDomainIdIndexRouteImport } from './routes
 import { Route as ApiV1SitesSlugDomainsDomainIdRefreshRouteImport } from './routes/api/v1/sites/$slug/domains/$domainId/refresh'
 import { Route as ApiV1SitesSlugVersionsDeploymentIdAccessRouteImport } from './routes/api/v1/sites/$slug/versions/$deploymentId/access'
 import { Route as ApiV1SitesSlugVersionsDeploymentIdActivateRouteImport } from './routes/api/v1/sites/$slug/versions/$deploymentId/activate'
+import { Route as ApiV1SitesSlugVersionsDeploymentIdFileRouteImport } from './routes/api/v1/sites/$slug/versions/$deploymentId/file'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -321,6 +322,12 @@ const ApiV1SitesSlugVersionsDeploymentIdActivateRoute =
     path: '/activate',
     getParentRoute: () => ApiV1SitesSlugVersionsDeploymentIdRoute,
   } as any)
+const ApiV1SitesSlugVersionsDeploymentIdFileRoute =
+  ApiV1SitesSlugVersionsDeploymentIdFileRouteImport.update({
+    id: '/file',
+    path: '/file',
+    getParentRoute: () => ApiV1SitesSlugVersionsDeploymentIdRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -370,6 +377,7 @@ export interface FileRoutesByFullPath {
   '/api/v1/sites/$slug/domains/$domainId/refresh': typeof ApiV1SitesSlugDomainsDomainIdRefreshRoute
   '/api/v1/sites/$slug/versions/$deploymentId/access': typeof ApiV1SitesSlugVersionsDeploymentIdAccessRoute
   '/api/v1/sites/$slug/versions/$deploymentId/activate': typeof ApiV1SitesSlugVersionsDeploymentIdActivateRoute
+  '/api/v1/sites/$slug/versions/$deploymentId/file': typeof ApiV1SitesSlugVersionsDeploymentIdFileRoute
   '/api/v1/sites/$slug/domains/$domainId/': typeof ApiV1SitesSlugDomainsDomainIdIndexRoute
 }
 export interface FileRoutesByTo {
@@ -419,6 +427,7 @@ export interface FileRoutesByTo {
   '/api/v1/sites/$slug/domains/$domainId/refresh': typeof ApiV1SitesSlugDomainsDomainIdRefreshRoute
   '/api/v1/sites/$slug/versions/$deploymentId/access': typeof ApiV1SitesSlugVersionsDeploymentIdAccessRoute
   '/api/v1/sites/$slug/versions/$deploymentId/activate': typeof ApiV1SitesSlugVersionsDeploymentIdActivateRoute
+  '/api/v1/sites/$slug/versions/$deploymentId/file': typeof ApiV1SitesSlugVersionsDeploymentIdFileRoute
   '/api/v1/sites/$slug/domains/$domainId': typeof ApiV1SitesSlugDomainsDomainIdIndexRoute
 }
 export interface FileRoutesById {
@@ -470,6 +479,7 @@ export interface FileRoutesById {
   '/api/v1/sites/$slug/domains/$domainId/refresh': typeof ApiV1SitesSlugDomainsDomainIdRefreshRoute
   '/api/v1/sites/$slug/versions/$deploymentId/access': typeof ApiV1SitesSlugVersionsDeploymentIdAccessRoute
   '/api/v1/sites/$slug/versions/$deploymentId/activate': typeof ApiV1SitesSlugVersionsDeploymentIdActivateRoute
+  '/api/v1/sites/$slug/versions/$deploymentId/file': typeof ApiV1SitesSlugVersionsDeploymentIdFileRoute
   '/api/v1/sites/$slug/domains/$domainId/': typeof ApiV1SitesSlugDomainsDomainIdIndexRoute
 }
 export interface FileRouteTypes {
@@ -522,6 +532,7 @@ export interface FileRouteTypes {
     | '/api/v1/sites/$slug/domains/$domainId/refresh'
     | '/api/v1/sites/$slug/versions/$deploymentId/access'
     | '/api/v1/sites/$slug/versions/$deploymentId/activate'
+    | '/api/v1/sites/$slug/versions/$deploymentId/file'
     | '/api/v1/sites/$slug/domains/$domainId/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -571,6 +582,7 @@ export interface FileRouteTypes {
     | '/api/v1/sites/$slug/domains/$domainId/refresh'
     | '/api/v1/sites/$slug/versions/$deploymentId/access'
     | '/api/v1/sites/$slug/versions/$deploymentId/activate'
+    | '/api/v1/sites/$slug/versions/$deploymentId/file'
     | '/api/v1/sites/$slug/domains/$domainId'
   id:
     | '__root__'
@@ -621,6 +633,7 @@ export interface FileRouteTypes {
     | '/api/v1/sites/$slug/domains/$domainId/refresh'
     | '/api/v1/sites/$slug/versions/$deploymentId/access'
     | '/api/v1/sites/$slug/versions/$deploymentId/activate'
+    | '/api/v1/sites/$slug/versions/$deploymentId/file'
     | '/api/v1/sites/$slug/domains/$domainId/'
   fileRoutesById: FileRoutesById
 }
@@ -990,6 +1003,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiV1SitesSlugVersionsDeploymentIdActivateRouteImport
       parentRoute: typeof ApiV1SitesSlugVersionsDeploymentIdRoute
     }
+    '/api/v1/sites/$slug/versions/$deploymentId/file': {
+      id: '/api/v1/sites/$slug/versions/$deploymentId/file'
+      path: '/file'
+      fullPath: '/api/v1/sites/$slug/versions/$deploymentId/file'
+      preLoaderRoute: typeof ApiV1SitesSlugVersionsDeploymentIdFileRouteImport
+      parentRoute: typeof ApiV1SitesSlugVersionsDeploymentIdRoute
+    }
   }
 }
 
@@ -1040,6 +1060,7 @@ const ApiV1SitesSlugChannelsRouteWithChildren =
 interface ApiV1SitesSlugVersionsDeploymentIdRouteChildren {
   ApiV1SitesSlugVersionsDeploymentIdAccessRoute: typeof ApiV1SitesSlugVersionsDeploymentIdAccessRoute
   ApiV1SitesSlugVersionsDeploymentIdActivateRoute: typeof ApiV1SitesSlugVersionsDeploymentIdActivateRoute
+  ApiV1SitesSlugVersionsDeploymentIdFileRoute: typeof ApiV1SitesSlugVersionsDeploymentIdFileRoute
 }
 
 const ApiV1SitesSlugVersionsDeploymentIdRouteChildren: ApiV1SitesSlugVersionsDeploymentIdRouteChildren =
@@ -1048,6 +1069,8 @@ const ApiV1SitesSlugVersionsDeploymentIdRouteChildren: ApiV1SitesSlugVersionsDep
       ApiV1SitesSlugVersionsDeploymentIdAccessRoute,
     ApiV1SitesSlugVersionsDeploymentIdActivateRoute:
       ApiV1SitesSlugVersionsDeploymentIdActivateRoute,
+    ApiV1SitesSlugVersionsDeploymentIdFileRoute:
+      ApiV1SitesSlugVersionsDeploymentIdFileRoute,
   }
 
 const ApiV1SitesSlugVersionsDeploymentIdRouteWithChildren =
