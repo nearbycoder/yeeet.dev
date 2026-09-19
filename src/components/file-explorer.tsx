@@ -106,17 +106,28 @@ export function FileExplorer({
                   <code>{file.checksum ?? 'Not recorded'}</code>
                 </td>
                 <td>
-                  {canPreviewText(file.contentType) ? (
-                    <button
+                  <details>
+                    <summary aria-label={`Actions for ${file.path}`}>
+                      Actions
+                    </summary>
+                    {canPreviewText(file.contentType) ? (
+                      <button
+                        className="button button-paper"
+                        onClick={() => setPreview(file.path)}
+                        aria-label={`Preview ${file.path}`}
+                      >
+                        Preview text
+                      </button>
+                    ) : null}
+                    <a
                       className="button button-paper"
-                      onClick={() => setPreview(file.path)}
-                      aria-label={`Preview ${file.path}`}
+                      aria-label={`Download ${file.path}`}
+                      href={`/api/v1/sites/${encodeURIComponent(slug)}/versions/${encodeURIComponent(version)}/file?${new URLSearchParams({ path: file.path, download: '1' })}`}
+                      download
                     >
-                      Preview text
-                    </button>
-                  ) : (
-                    '—'
-                  )}
+                      Download original
+                    </a>
+                  </details>
                 </td>
               </tr>
             ))}

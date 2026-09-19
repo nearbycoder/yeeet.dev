@@ -12,6 +12,8 @@ try {
   const slug = evaluate('document.querySelector("[name=site-slug]").value')
   assert.ok(slug)
   open(`/dashboard/sites/${slug}/inspect`)
+  browser('focus', 'summary[aria-label="Actions for index.html"]')
+  browser('press', 'Enter')
   browser(
     'find',
     'role',
@@ -29,6 +31,14 @@ try {
     source,
   )
   assert.equal(evaluate('Boolean(window.previewExecuted)'), false)
+  const download = evaluate(
+    `(async()=>{const link=document.querySelector('a[aria-label="Download index.html"]');const response=await fetch(link.href);return {status:response.status,text:await response.text(),type:response.headers.get('content-type'),disposition:response.headers.get('content-disposition'),cache:response.headers.get('cache-control')}})()`,
+  )
+  assert.equal(download.status, 200)
+  assert.equal(download.text, source)
+  assert.equal(download.type, 'application/octet-stream')
+  assert.ok(download.disposition.startsWith('attachment;'))
+  assert.ok(download.cache.includes('no-store'))
   const version = evaluate(
     'document.querySelector(".site-page-panel .console-form-grid select").value',
   )
@@ -37,6 +47,12 @@ try {
       `(async()=>{const r=await fetch('/api/v1/sites/${slug}/versions/${version}/file?path=index.html',{credentials:'omit'});return r.status})()`,
     ),
     401,
+  )
+  assert.equal(
+    evaluate(
+      `(async()=>{const response=await fetch('/api/v1/sites/${slug}/versions/${version}/file?path=missing&download=1');return response.status})()`,
+    ),
+    404,
   )
   browser(
     'find',
