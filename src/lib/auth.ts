@@ -11,8 +11,9 @@ import {
   validateInvitationCode,
   validateInvitationGrant,
 } from '#/server/invitations'
+import { initialUserRole } from '#/server/request-security'
 import { HttpError } from '#/server/http'
-import { controlPlaneUrl, siteWildcardOrigin } from '#/server/platform-config'
+import { controlPlaneUrl } from '#/server/platform-config'
 
 const githubEnabled = Boolean(
   process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET,
@@ -86,9 +87,11 @@ export const auth = betterAuth({
           return {
             data: {
               ...newUser,
-              role: adminEmails.has(newUser.email.toLowerCase())
-                ? 'admin'
-                : 'user',
+              role: initialUserRole(
+                newUser.email,
+                newUser.emailVerified === true,
+                adminEmails,
+              ),
             },
           }
         },
@@ -112,7 +115,7 @@ export const auth = betterAuth({
         },
       }
     : undefined,
-  trustedOrigins: [controlPlaneUrl(), siteWildcardOrigin()],
+  trustedOrigins: [controlPlaneUrl()],
   advanced: {
     ipAddress: {
       // Railway's edge supplies the original client as a single trusted value.

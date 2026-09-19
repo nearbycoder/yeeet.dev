@@ -15,7 +15,7 @@ try {
   let promoted = 0
   if (adminEmails.length) {
     const result = await pool.query(
-      "update \"user\" set role = 'admin', updated_at = now() where lower(email) = any($1::text[]) and role <> 'admin'",
+      "update \"user\" set role = 'admin', updated_at = now() where lower(email) = any($1::text[]) and email_verified = true and role <> 'admin'",
       [adminEmails],
     )
     promoted = result.rowCount ?? 0

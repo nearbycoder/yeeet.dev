@@ -469,7 +469,7 @@ export function YeeetlingArtwork({
   )
 }
 
-export const Yeeetling = memo(function Yeeetling({
+export const Yeeetling = memo(function YeeetlingView({
   seed,
   phase = 'idle',
   compact = false,

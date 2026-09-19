@@ -13,7 +13,7 @@ work, deployment-provider improvements, and focused features are welcome.
 
 ## Development setup
 
-Use Node.js `20.19+` or `22.12+`, PostgreSQL, and a private S3-compatible bucket.
+Use Node.js `22.13+` (22.x) or `24+`, PostgreSQL, and a private S3-compatible bucket.
 
 ```sh
 cp .env.example .env.local
@@ -88,3 +88,21 @@ YEEET_TEST_EMAIL=review@example.com YEEET_TEST_PASSWORD=local-test-password \
 
 This optional browser test creates public and private deployments in that local
 account and verifies the served content. Never point it at production resources.
+
+To verify request-origin checks, authentication, API keys, and CLI compatibility
+against the same disposable local app, run:
+
+```sh
+YEEET_TEST_EMAIL=review@example.com YEEET_TEST_PASSWORD=local-test-password \
+  node tests/browser/security.mjs http://localhost:3000
+```
+
+Use a non-administrator test account. The test creates and revokes a temporary
+API key and signs out its own session. The quick-deploy browser regression
+should run after the dev server has finished optimizing dependencies.
+
+Dependency updates must pass `npm run audit:dependencies` and the full checks
+above. TypeScript stays on the newest version supported by `typescript-eslint`;
+Node type definitions track the supported Node 22 runtime. The scoped esbuild
+override replaces Drizzle Kit's obsolete loader dependency; check migrations and
+`npx drizzle-kit check` when changing it.

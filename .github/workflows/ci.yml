@@ -37,6 +37,7 @@ jobs:
       - name: Use the lockfile npm version
         run: npm install --global npm@11.18.0
       - run: npm ci
+      - run: npm run audit:dependencies
       - run: npm run check
       - run: npm run lint
       - run: npm run typecheck
