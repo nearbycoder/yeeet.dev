@@ -10,6 +10,7 @@ import { Command } from 'commander'
 import fg from 'fast-glob'
 import mime from 'mime-types'
 import open from 'open'
+import { localPreflight } from './preflight.js'
 
 const VERSION = '0.0.2'
 const CLIENT_ID = 'yeeet-cli'
@@ -277,6 +278,37 @@ function printDeploymentDiff(plan) {
   console.log('')
 }
 
+async function checkBuild(target, options) {
+  const maxBytes = Number(options.maxBytes)
+  if (!Number.isSafeInteger(maxBytes) || maxBytes < 1)
+    throw new Error('--max-bytes must be a positive whole number.')
+  const files = await findFiles(resolve(target))
+  const report = localPreflight(files, { maxBytes })
+  const failed =
+    report.errors.length > 0 ||
+    Boolean(options.strict && report.warnings.length)
+  const result = { status: failed ? 'failed' : 'passed', ...report }
+  if (options.json) print(result, true)
+  else {
+    console.log(
+      `\n  Local check: ${result.status} · ${report.fileCount} files · ${formatBytes(report.totalBytes)}`,
+    )
+    for (const [kind, items] of [
+      ['Error', report.errors],
+      ['Warning', report.warnings],
+    ])
+      for (const item of items) {
+        console.log(`  ${kind}: ${item.message}`)
+        for (const path of item.paths ?? [])
+          console.log(`    ${JSON.stringify(path)}`)
+      }
+    console.log(
+      '  No files uploaded. Server-specific validation still runs at deployment.\n',
+    )
+  }
+  if (failed) process.exitCode = 1
+}
+
 async function deploy(target, options) {
   const targetPath = resolve(target)
   const projectConfig = await readJson(
@@ -320,7 +352,13 @@ async function deploy(target, options) {
       {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ slug, channel, files: manifest, dryRun: true }),
+        body: JSON.stringify({
+          slug,
+          channel,
+          spaFallback,
+          files: manifest,
+          dryRun: true,
+        }),
       },
       options,
     )
@@ -926,6 +964,20 @@ program
         `${site.slug.padEnd(24)} ${(site.protected ? 'private' : 'public').padEnd(7)} ${site.url}`,
       )
   })
+
+program
+  .command('check')
+  .argument('[path]', 'file or directory to check', '.')
+  .option('--strict', 'fail on warnings as well as errors')
+  .option(
+    '--max-bytes <number>',
+    'deployment byte limit for a self-hosted server',
+    String(500 * 1024 * 1024),
+  )
+  .description('Check local build files without logging in or uploading')
+  .action(async (target, options) =>
+    checkBuild(target, { ...program.opts(), ...options }),
+  )
 
 program
   .command('deploy')

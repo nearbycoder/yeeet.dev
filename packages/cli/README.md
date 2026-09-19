@@ -81,3 +81,17 @@ can combine `YEEET_API` with `YEEET_TOKEN` and `--json`.
 
 Source, deployment documentation, and the MIT license are available in the
 [Yeeet repository](https://github.com/nearbycoder/yeeet.dev).
+
+## Check a build locally
+
+```sh
+yeeet check ./dist
+yeeet check ./dist --strict --json
+```
+
+This offline check uses the same file discovery and `.yeeetignore` rules as
+deploy. It reports counts, bytes, likely private files, missing entry pages,
+source maps, and empty files without hashing, uploading, or requiring login.
+Empty builds, private files, and standard count/size limit violations fail with
+exit code 1; `--strict` also fails on warnings. Self-hosted users can set
+`--max-bytes` to match their server. The server still validates every deployment.
