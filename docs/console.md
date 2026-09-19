@@ -427,3 +427,10 @@ Set a file path search, type, and sort order in the inspector, then choose
 **Bookmark these file filters**. The URL records those filters and pins the
 selected version, ready to bookmark or share. Opening it still requires normal
 site access. Filtering itself stays local and does not reload deployment data.
+
+### Remember asset budgets
+
+Save per-file and total budget thresholds from Asset budget review. Preferences
+apply to this site and account in the current browser across versions. Reset
+budgets removes the saved values and restores the defaults. Budgets remain
+advisory and never block deployment.

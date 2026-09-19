@@ -38,6 +38,7 @@ export const Route = createFileRoute('/dashboard_/sites/$slug/inspect')({
 })
 
 function Inspector() {
+  const { user } = Route.useRouteContext()
   const { history, detail } = Route.useLoaderData()
   const search = Route.useSearch()
   const navigate = Route.useNavigate()
@@ -156,7 +157,12 @@ function Inspector() {
             slug={history.site.slug}
             version={version}
           />
-          <AssetBudget files={version.files} />
+          <AssetBudget
+            key={`${user.id}:${history.site.slug}`}
+            files={version.files}
+            userId={user.id}
+            slug={history.site.slug}
+          />
           <DuplicateAssets
             key={`duplicates:${version.id}`}
             files={version.files}
