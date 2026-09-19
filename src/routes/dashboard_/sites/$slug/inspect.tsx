@@ -1,3 +1,4 @@
+import { FileGrowth } from '#/components/file-growth'
 import { fileFilterSearchSchema } from '#/lib/file-filters'
 import { DuplicateAssets } from '#/components/duplicate-assets'
 import { RouteSimulator } from '#/components/route-simulator'
@@ -116,6 +117,10 @@ function Inspector() {
             <>
               <h3>Changes from the comparison version</h3>
               <ManifestDiff diff={detail.comparison} />
+              <FileGrowth
+                key={`${version.id}:${search.base}`}
+                report={detail.comparison.fileGrowth}
+              />
               <ComparisonReport
                 site={history.site.slug}
                 diff={detail.comparison}
