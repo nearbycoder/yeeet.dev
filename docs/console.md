@@ -359,3 +359,10 @@ When a selection contains nested folders with `index.html`, Advanced options
 lets you choose the **Publish folder**. Only that folder's contents are uploaded,
 with its prefix removed. Choose **All selected files** to restore the source
 selection. Changing the folder clears the previous review.
+
+### Deployment presets
+
+Save named deployment settings under Advanced options for repeated uploads.
+Presets are scoped to your account in this browser and never include passwords
+or files. Applying one only fills settings; review its destination and enter a
+fresh password for private sharing before deploying. Delete unused presets here.
