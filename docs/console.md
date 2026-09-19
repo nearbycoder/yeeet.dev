@@ -380,3 +380,11 @@ After selecting a build, use **Add files to selection** in Advanced options to
 include extra files without dropping the build again. An added file replaces an
 exact matching path; other exclusions stay excluded. With a publish folder
 selected, new files are added at that folder's root. Changes clear the review.
+
+### Move a deployment to the terminal
+
+Advanced options includes a copyable Bash/Zsh CLI preview command using the
+current destination, routing, and privacy choices. Set the local folder path and
+review with `--dry-run` before publishing. Browser exclusions need to be repeated
+locally. Private commands require `YEEET_DEPLOY_PASSWORD`; entered passwords
+never appear in the generated command.
