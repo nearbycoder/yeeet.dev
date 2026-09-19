@@ -281,6 +281,23 @@ function Dashboard() {
   }
   const totalBytes = files.reduce((sum, item) => sum + item.file.size, 0)
 
+  useEffect(() => {
+    function pasteFiles(event: ClipboardEvent) {
+      if (busy || !event.clipboardData?.files.length) return
+      const target = event.target
+      if (
+        target instanceof Element &&
+        (target.closest('input, textarea') ||
+          (target instanceof HTMLElement && target.isContentEditable))
+      )
+        return
+      event.preventDefault()
+      chooseFiles(event.clipboardData.files)
+    }
+    document.addEventListener('paste', pasteFiles)
+    return () => document.removeEventListener('paste', pasteFiles)
+  }, [busy])
+
   function chooseFiles(selected: FileList | null) {
     if (!selected) return
     const next = stripCommonRoot(
@@ -710,8 +727,7 @@ function Dashboard() {
               <>
                 <h2>Drop a folder or files here</h2>
                 <p>
-                  Drop your built site, then click Deploy. A shareable link is
-                  next.
+                  Drop your built site or paste copied files, then click Deploy.
                 </p>
               </>
             )}
