@@ -1,3 +1,4 @@
+import { MAX_FILE_COUNT, deployByteLimit } from '#/lib/upload-limits'
 import { lockSite, lockedVersion, withSiteLock } from './site-lock'
 import { attemptStorageCleanup } from './storage-cleanup'
 import {
@@ -61,7 +62,6 @@ async function emitDeploymentEvent(
 }
 
 const SLUG = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/
-const MAX_FILE_COUNT = 5_000
 const SHA256 = /^[a-f0-9]{64}$/
 const CHANNEL = /^[a-z0-9](?:[a-z0-9-]{0,30}[a-z0-9])?$/
 const RESERVED_CHANNELS = new Set(['live', 'production'])
@@ -213,7 +213,7 @@ export function validateManifest(files: Array<ManifestFile>) {
   })
 
   const totalBytes = normalized.reduce((sum, file) => sum + file.size, 0)
-  const maxBytes = Number(process.env.MAX_DEPLOY_BYTES ?? 500 * 1024 * 1024)
+  const maxBytes = deployByteLimit(process.env.MAX_DEPLOY_BYTES)
   if (totalBytes > maxBytes) {
     throw new HttpError(
       413,

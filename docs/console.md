@@ -366,3 +366,10 @@ Save named deployment settings under Advanced options for repeated uploads.
 Presets are scoped to your account in this browser and never include passwords
 or files. Applying one only fills settings; review its destination and enter a
 fresh password for private sharing before deploying. Delete unused presets here.
+
+### Early upload limits
+
+The console checks selected file count and total size against this server's
+upload limits before hashing or requesting an upload. An oversized selection
+shows its limit beside Deploy; use Advanced options to exclude files or choose a
+smaller publish folder. The server independently enforces the same limits.

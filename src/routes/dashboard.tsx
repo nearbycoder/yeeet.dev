@@ -1,3 +1,4 @@
+import { uploadLimitErrors } from '#/lib/upload-limits'
 import { DeploymentPresets } from '#/components/deployment-presets'
 import { publishFolders, selectPublishFolder } from '#/lib/publish-folder'
 import { useOnlineStatus } from '#/lib/online-status'
@@ -294,6 +295,11 @@ function Dashboard() {
     advancedOptions.current?.querySelector('summary')?.focus()
   }
   const totalBytes = files.reduce((sum, item) => sum + item.file.size, 0)
+  const limitErrors = uploadLimitErrors(
+    files.length,
+    totalBytes,
+    data.platform.uploadLimits,
+  )
 
   useEffect(() => {
     function pasteFiles(event: ClipboardEvent) {
@@ -356,7 +362,7 @@ function Dashboard() {
   }
 
   async function deploy(previewOnly = false) {
-    if (!files.length || !online) return
+    if (!files.length || !online || limitErrors.length) return
     setError('')
     setResultUrl('')
     setResultShareUrl('')
@@ -816,6 +822,16 @@ function Dashboard() {
                 </small>
               </label>
             ) : null}
+            {limitErrors.length ? (
+              <div className="quick-deploy-warning" role="alert">
+                {limitErrors.map((message) => (
+                  <p key={message}>{message}</p>
+                ))}
+                <button type="button" onClick={showAdvanced}>
+                  Choose fewer files
+                </button>
+              </div>
+            ) : null}
             {preflight.privatePaths.length ? (
               <p className="quick-deploy-warning" role="status">
                 Your selection includes files that may be private.{' '}
@@ -830,6 +846,7 @@ function Dashboard() {
               disabled={
                 !files.length ||
                 !online ||
+                limitErrors.length > 0 ||
                 phase !== 'idle' ||
                 (privateDeploy && deployPassword.length < 8)
               }
@@ -956,7 +973,11 @@ function Dashboard() {
                   type="button"
                   className="button button-paper deploy-button"
                   disabled={
-                    !files.length || !online || busy || phase === 'done'
+                    !files.length ||
+                    !online ||
+                    limitErrors.length > 0 ||
+                    busy ||
+                    phase === 'done'
                   }
                   onClick={() => void deploy(true)}
                 >
