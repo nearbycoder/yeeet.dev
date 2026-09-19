@@ -1,3 +1,4 @@
+import { UnsavedWorkGuard } from '#/components/unsaved-work-guard'
 import { RecentSites } from '#/components/recent-sites'
 import { SavedViews } from '#/components/saved-views'
 import { deploymentPreflight } from '#/lib/deployment-preflight'
@@ -592,6 +593,11 @@ function Dashboard() {
 
   return (
     <div className="dashboard-shell">
+      <UnsavedWorkGuard
+        dirty={files.length > 0 && phase !== 'done'}
+        watchSearch={false}
+        description="Your selected files are only kept in this tab. Leaving will pause any upload and clear the selection."
+      />
       <a className="skip-link" href="#main-content">
         Skip to content
       </a>
