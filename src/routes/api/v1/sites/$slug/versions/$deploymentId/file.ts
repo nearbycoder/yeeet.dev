@@ -1,3 +1,4 @@
+import { downloadDeploymentFile } from '#/server/file-download'
 import { createFileRoute } from '@tanstack/react-router'
 import { requireActor } from '#/server/actor'
 import {
@@ -25,6 +26,8 @@ export const Route = createFileRoute(
               'Choose a valid version and file path.',
               'invalid_file',
             )
+          if (new URL(request.url).searchParams.get('download') === '1')
+            return await downloadDeploymentFile(actor.userId, input.data)
           return json(await previewDeploymentFile(actor.userId, input.data), {
             headers: {
               'cache-control': 'no-store',

@@ -394,3 +394,9 @@ never appear in the generated command.
 The inspector can show UTF-8 text files from a ready version without executing
 HTML, JavaScript, or SVG. Previews show at most 64 KiB and label truncation.
 Access is checked against your site and the exact version before reading storage.
+
+### Download an original file
+
+Open a file's Actions menu in the inspector and choose **Download original**.
+The download streams the stored version's bytes after checking ownership. Files
+are sent as attachments with private caching disabled, including HTML and SVG.
