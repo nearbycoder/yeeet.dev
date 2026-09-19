@@ -414,3 +414,9 @@ The inspector's collapsed Duplicate assets review groups non-empty files with
 matching recorded SHA-256 checksums and byte sizes. It ranks repeated content
 by bytes so you can clean up source builds. No files are deleted, and these
 logical duplicate bytes are not an estimate of physical storage charges.
+
+### Search a deployment comparison
+
+Search file changes by path in either the upload review or inspector comparison.
+The category totals remain for the full comparison; matching paths are listed in
+groups of 100 so large builds stay responsive. Use Show more to extend a group.
