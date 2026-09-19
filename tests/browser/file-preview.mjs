@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { localBrowser } from './helpers.mjs'
-const { browser, evaluate, login, open, drop, close } = localBrowser('preview')
+const { browser, evaluate, login, open, drop, close, origin } =
+  localBrowser('preview')
 try {
   login()
   open('/dashboard')
@@ -31,6 +32,26 @@ try {
     source,
   )
   assert.equal(evaluate('Boolean(window.previewExecuted)'), false)
+  const versionLink = evaluate(
+    `document.querySelector('a[aria-label="Open version file index.html"]').href`,
+  )
+  const versionUrl = new URL(versionLink)
+  assert.match(versionUrl.hostname, /^v-[a-f0-9]+\./)
+  assert.equal(versionUrl.pathname, '/index.html')
+  assert.equal(versionUrl.search, '')
+  const served = await fetch(new URL(versionUrl.pathname, origin), {
+    headers: { 'x-yeeet-site': versionUrl.hostname.split('.')[0] },
+  })
+  assert.equal(served.status, 200)
+  assert.ok(
+    (await served.text()).includes(
+      '<script>window.previewExecuted=true</script>Preview fixture',
+    ),
+  )
+  assert.equal(
+    served.headers.get('x-yeeet-deployment')?.replaceAll('-', ''),
+    versionUrl.hostname.split('.')[0].slice(2),
+  )
   const download = evaluate(
     `(async()=>{const link=document.querySelector('a[aria-label="Download index.html"]');const response=await fetch(link.href);return {status:response.status,text:await response.text(),type:response.headers.get('content-type'),disposition:response.headers.get('content-disposition'),cache:response.headers.get('cache-control')}})()`,
   )

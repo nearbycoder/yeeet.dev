@@ -1,7 +1,7 @@
 import { and, asc, eq } from 'drizzle-orm'
 import { db } from '#/db'
 import { deploymentFiles, deployments, sites } from '#/db/schema'
-import { diffManifests, normalizeSlug } from './deployments'
+import { diffManifests, normalizeSlug, versionUrl } from './deployments'
 import { HttpError } from './http'
 
 export async function inspectDeployment(
@@ -43,6 +43,7 @@ export async function inspectDeployment(
   return {
     ...version,
     current: site.activeDeploymentId === id,
+    previewUrl: version.status === 'ready' ? versionUrl(id) : null,
     createdAt: version.createdAt.toISOString(),
     completedAt: version.completedAt?.toISOString() ?? null,
   }

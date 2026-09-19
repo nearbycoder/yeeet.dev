@@ -1,3 +1,4 @@
+import { fileVersionUrl } from '#/lib/file-version-url'
 import { FilePreview } from '#/components/file-preview'
 import { canPreviewText } from '#/lib/text-preview'
 import { useMemo, useState } from 'react'
@@ -8,10 +9,12 @@ export function FileExplorer({
   files,
   slug,
   version,
+  previewUrl,
 }: {
   files: Array<ManifestFile>
   slug: string
   version: string
+  previewUrl: string | null
 }) {
   const [preview, setPreview] = useState('')
   const [query, setQuery] = useState('')
@@ -127,6 +130,18 @@ export function FileExplorer({
                     >
                       Download original
                     </a>
+                    {previewUrl &&
+                    !['_headers', '_redirects'].includes(file.path) ? (
+                      <a
+                        className="button button-paper"
+                        aria-label={`Open version file ${file.path}`}
+                        href={fileVersionUrl(previewUrl, file.path)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        Open version file
+                      </a>
+                    ) : null}
                   </details>
                 </td>
               </tr>

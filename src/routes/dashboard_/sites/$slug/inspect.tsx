@@ -159,6 +159,7 @@ function Inspector() {
           <FileExplorer
             key={version.id}
             files={version.files}
+            previewUrl={version.previewUrl}
             slug={history.site.slug}
             version={version.id}
           />

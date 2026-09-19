@@ -400,3 +400,10 @@ Access is checked against your site and the exact version before reading storage
 Open a file's Actions menu in the inspector and choose **Download original**.
 The download streams the stored version's bytes after checking ownership. Files
 are sent as attachments with private caching disabled, including HTML and SVG.
+
+### Open a file in an exact version
+
+The inspector's file Actions menu includes **Open version file** for ready
+versions. It opens the encoded file path on the version's immutable hostname,
+so later production deployments do not change the link. Password protection
+still applies, and the link does not include a private share token.
