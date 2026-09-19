@@ -322,3 +322,10 @@ previews. Access mode is reported for
 review, never inferred as user approval. Root routing uses the route simulator
 and a bounded manifest query. Open the live site for actual visual/network checks;
 metadata cannot guarantee DNS/CDN propagation or present object availability.
+
+## Start another site
+
+After a successful deployment, **Deploy a new site** clears the selected files,
+destination, channel, and private password and restores public SPA defaults.
+Dropping another build without choosing this action continues updating the current
+site. The destination summary shows which path you are taking.

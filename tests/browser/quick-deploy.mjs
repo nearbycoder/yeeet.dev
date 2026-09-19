@@ -51,7 +51,8 @@ function publish() {
 }
 function advanced() {
   const wasOpen = evaluate('document.querySelector(".deploy-advanced").open')
-  browser('click', '.deploy-advanced > summary')
+  evaluate('document.querySelector(".deploy-advanced > summary").focus()')
+  browser('press', 'Enter')
   browser(
     'wait',
     '--fn',
@@ -184,7 +185,7 @@ try {
     evaluate('document.querySelector("input[name=private-deploy]").checked'),
     true,
   )
-  open(`/dashboard?site=${slug}`)
+  open(`/dashboard?site=${slug}&channel=review`)
   assert.equal(
     evaluate('document.querySelector(".deploy-advanced").open'),
     false,
@@ -212,7 +213,33 @@ try {
   captureRequests()
   await publish()
   assert.equal(evaluate('window.deployRequests[0].private'), true)
+  assert.equal(evaluate('window.deployRequests[0].channel'), 'review')
 
+  browser('find', 'role', 'button', 'click', '--name', 'Deploy a new site')
+  assert.equal(
+    evaluate('document.querySelector("input[name=site-slug]").value'),
+    '',
+  )
+  assert.equal(
+    evaluate('document.querySelector("input[name=private-deploy]").checked'),
+    false,
+  )
+  assert.equal(
+    evaluate('document.querySelector("input[name=spa-fallback]").checked'),
+    true,
+  )
+  assert.equal(
+    evaluate(
+      'document.querySelector(".quick-deploy-controls .deploy-button").disabled',
+    ),
+    true,
+  )
+  assert.equal(
+    evaluate(
+      'new URL(location.href).searchParams.has("site") || new URL(location.href).searchParams.has("channel")',
+    ),
+    false,
+  )
   open('/dashboard')
   evaluate(
     `(()=>{const transfer=new DataTransfer();transfer.items.add(new File(['placeholder'],'.env',{type:'text/plain'}));document.querySelector('.dropzone').dispatchEvent(new DragEvent('drop',{bubbles:true,dataTransfer:transfer}))})()`,
