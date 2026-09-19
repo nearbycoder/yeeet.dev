@@ -12,7 +12,7 @@ import fg from 'fast-glob'
 import mime from 'mime-types'
 import * as z from 'zod/v4'
 
-const VERSION = '0.0.1'
+const VERSION = '0.0.2'
 const DEFAULT_API = 'https://yeeet.dev'
 
 function apiOrigin() {

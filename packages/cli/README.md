@@ -2,6 +2,8 @@
 
 Deploy a folder of static assets to a globally cached `*.site.yeeet.dev` URL.
 
+Requires Node.js 22.12 or newer.
+
 ```sh
 npm install --global @yeeet.dev/cli
 yeeet login
