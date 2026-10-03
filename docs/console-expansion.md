@@ -84,7 +84,7 @@ palette, routes, and responsive layout stay in place.
 
 ## Validation and review
 
-Typecheck, ESLint, Prettier, the production build, 104 unit tests, and 22 database
+Typecheck, ESLint, Prettier, the production build, 109 unit tests, and 22 database
 integration tests passed. Both the existing browser feedback suite and the new
 console browser regression passed. Integration tests used a separate local Postgres
 database. Source previews used a read-only local object-storage fixture. No live
@@ -105,3 +105,14 @@ performed because the storage fixture accepts only reads. Accessibility scans
 reported no remaining violations on the reviewed dashboard, inspector, release
 history, and analytics screens. Decorative glyphs and off-screen table cells
 were marked for manual contrast review; light/dark screenshots were inspected.
+
+The CI dependency audit identified an unpatched `braces` vulnerability through
+`fast-glob` in the CLI and MCP packages. Both scanners now use the existing safe
+`fdir`, `picomatch`, and `brace-expansion` versions. Before removing the old
+dependency, 36 isolated compatibility cases produced identical file selections.
+Regression tests preserve hidden files, defaults, symlink boundaries, directory
+exclusions, escapes, extglobs, and numeric brace ranges, and compare both clients'
+dry-run manifests against a local mock API. Excessively nested or large ignore
+expansions fail before scanning or contacting the API. The npm package contents
+include the replacement helper; no package version or public API changed. The
+unchanged dependency audit now reports zero vulnerabilities.

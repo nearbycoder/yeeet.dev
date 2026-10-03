@@ -7,7 +7,7 @@ import { homedir } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
 import process from 'node:process'
 import { Command } from 'commander'
-import fg from 'fast-glob'
+import { scanDeploymentFiles } from './deployment-files.js'
 import mime from 'mime-types'
 import open from 'open'
 import { localPreflight } from './preflight.js'
@@ -217,13 +217,7 @@ async function findFiles(target) {
       .map((line) => line.trim())
       .filter((line) => line && !line.startsWith('#')),
   ]
-  const matches = await fg('**/*', {
-    cwd: targetPath,
-    onlyFiles: true,
-    dot: true,
-    followSymbolicLinks: false,
-    ignore,
-  })
+  const matches = await scanDeploymentFiles(targetPath, ignore)
   return Promise.all(
     matches.sort().map(async (path) => {
       const absolutePath = join(targetPath, ...path.split('/'))
