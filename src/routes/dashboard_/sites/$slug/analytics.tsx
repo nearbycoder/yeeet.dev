@@ -1,23 +1,85 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { useState } from 'react'
+import { z } from 'zod'
+import { DownloadButton } from '#/components/download-button'
+import {
+  aggregateWeeks,
+  analyticsCsv,
+  periodChange,
+} from '#/lib/analytics-report'
 import { getSiteAnalyticsData } from '#/server/functions'
 
 export const Route = createFileRoute('/dashboard_/sites/$slug/analytics')({
-  loader: ({ params }) =>
-    getSiteAnalyticsData({ data: { slug: params.slug, days: 30 } }),
+  validateSearch: z.object({
+    days: z.coerce
+      .number()
+      .pipe(z.union([z.literal(7), z.literal(30), z.literal(90)]))
+      .optional()
+      .catch(30),
+  }),
+  loaderDeps: ({ search }) => ({ days: search.days ?? 30 }),
+  loader: ({ params, deps }) =>
+    getSiteAnalyticsData({ data: { slug: params.slug, days: deps.days } }),
   component: SiteAnalytics,
 })
 
 function SiteAnalytics() {
   const data = Route.useLoaderData()
-  const maxViews = Math.max(...data.daily.map((day) => day.views), 1)
+  const navigate = Route.useNavigate()
+  const [interval, setInterval] = useState<'day' | 'week'>('day')
+  const chart = interval === 'week' ? aggregateWeeks(data.daily) : data.daily
+  const maxViews = Math.max(...chart.map((day) => day.views), 1)
 
   return (
     <div className="site-page-stack">
+      <div className="analytics-toolbar">
+        <div
+          className="segmented-control"
+          role="group"
+          aria-label="Analytics period"
+        >
+          {([7, 30, 90] as const).map((days) => (
+            <button
+              key={days}
+              aria-pressed={data.period.days === days}
+              onClick={() =>
+                void navigate({ search: { days }, resetScroll: false })
+              }
+            >
+              {days} days
+            </button>
+          ))}
+        </div>
+        <div className="console-actions">
+          <DownloadButton
+            name={`${data.site.slug}-analytics-${data.period.from}.csv`}
+            type="text/csv;charset=utf-8"
+            content={() => analyticsCsv(data)}
+          >
+            Export analytics CSV
+          </DownloadButton>
+          <DownloadButton
+            name={`${data.site.slug}-analytics-${data.period.from}.json`}
+            type="application/json"
+            content={() => JSON.stringify(data, null, 2)}
+          >
+            Export analytics JSON
+          </DownloadButton>
+        </div>
+      </div>
+      <p className="site-page-note">
+        {data.period.from}–{data.period.to} UTC · Includes today’s partial
+        totals. Top paths includes at most 20 normalized paths.
+      </p>
       <section className="site-analytics-summary" aria-label="Traffic summary">
         <article>
           <span>Page views</span>
           <strong>{data.totalViews.toLocaleString()}</strong>
           <small>Last {data.period.days} days</small>
+          <small>
+            {periodChange(data.totalViews, data.comparison.totalViews)} from
+            previous period
+          </small>
         </article>
         <article>
           <span>Successful</span>
@@ -36,6 +98,44 @@ function SiteAnalytics() {
         </article>
       </section>
 
+      <section
+        className="comparison-summary"
+        aria-label="Previous period comparison"
+      >
+        <div>
+          <strong>Previous {data.period.days} days</strong>
+          <span>
+            {data.comparison.period.from}–{data.comparison.period.to} UTC
+          </span>
+        </div>
+        <div>
+          <b>{data.comparison.totalViews.toLocaleString()}</b>
+          <span>page views</span>
+        </div>
+        <div>
+          <b>
+            {data.totalViews
+              ? ((data.statuses.errors / data.totalViews) * 100).toFixed(1)
+              : '0.0'}
+            %
+          </b>
+          <span>current error rate</span>
+        </div>
+        <div>
+          <b>
+            {data.comparison.totalViews
+              ? (
+                  (data.comparison.statuses.errors /
+                    data.comparison.totalViews) *
+                  100
+                ).toFixed(1)
+              : '0.0'}
+            %
+          </b>
+          <span>previous error rate</span>
+        </div>
+      </section>
+
       <div className="site-analytics-grid">
         <section
           className="panel site-page-panel"
@@ -48,8 +148,31 @@ function SiteAnalytics() {
               <p>Daily aggregate page views in UTC.</p>
             </div>
           </div>
+          <div
+            className="segmented-control"
+            role="group"
+            aria-label="Traffic aggregation"
+          >
+            <button
+              aria-pressed={interval === 'day'}
+              onClick={() => setInterval('day')}
+            >
+              Daily
+            </button>
+            <button
+              aria-pressed={interval === 'week'}
+              onClick={() => setInterval('week')}
+            >
+              Weekly
+            </button>
+          </div>
+          <p className="site-page-note">
+            {interval === 'week'
+              ? 'Weeks begin Monday in UTC. First and last weeks may be partial.'
+              : 'Each row is one UTC day.'}
+          </p>
           <div className="site-analytics-chart">
-            {data.daily.map((day) => (
+            {chart.map((day) => (
               <div className="site-analytics-day" key={day.date}>
                 <time dateTime={day.date}>
                   {new Date(`${day.date}T00:00:00Z`).toLocaleDateString(

@@ -1,4 +1,6 @@
 import { FileGrowth } from '#/components/file-growth'
+import { AssetComposition } from '#/components/asset-composition'
+import { DeploymentSafety } from '#/components/deployment-safety'
 import { fileFilterSearchSchema } from '#/lib/file-filters'
 import { DuplicateAssets } from '#/components/duplicate-assets'
 import { RouteSimulator } from '#/components/route-simulator'
@@ -172,6 +174,12 @@ function Inspector() {
             key={`duplicates:${version.id}`}
             files={version.files}
           />
+          <AssetComposition files={version.files} />
+          <DeploymentSafety
+            files={version.files}
+            spa={version.spaFallback}
+            version={version.id}
+          />
           <ManifestExport slug={history.site.slug} version={version} />
           <FileExplorer
             key={JSON.stringify([
@@ -179,6 +187,9 @@ function Inspector() {
               search.fileQuery,
               search.fileType,
               search.fileOrder,
+              search.fileDirectory,
+              search.fileMin,
+              search.fileMax,
             ])}
             filters={search}
             onBookmark={(filters) =>

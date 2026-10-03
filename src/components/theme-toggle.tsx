@@ -9,7 +9,7 @@ function applyTheme(theme: Theme) {
   document.documentElement.style.colorScheme = theme
   document
     .querySelector('meta[name="theme-color"]')
-    ?.setAttribute('content', theme === 'dark' ? '#171714' : '#f5f1e8')
+    ?.setAttribute('content', theme === 'dark' ? '#181b17' : '#f7f7f4')
 }
 
 export function ThemeToggle() {

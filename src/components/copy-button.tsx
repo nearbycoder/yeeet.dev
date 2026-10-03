@@ -9,10 +9,12 @@ export function CopyButton({
   value,
   label,
   className,
+  ariaLabel,
 }: {
   value: string
   label: string
   className?: string
+  ariaLabel?: string
 }) {
   const [feedback, setFeedback] = useState<CopyFeedback | null>(null)
   const status = feedback?.value === value ? feedback.status : null
@@ -30,7 +32,7 @@ export function CopyButton({
     <button
       type="button"
       className={className}
-      aria-label={label}
+      aria-label={ariaLabel ?? label}
       aria-busy={status === 'copying'}
       disabled={status === 'copying'}
       title={

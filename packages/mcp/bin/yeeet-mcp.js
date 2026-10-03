@@ -8,7 +8,7 @@ import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { McpServer } from '@modelcontextprotocol/server'
 import { serveStdio } from '@modelcontextprotocol/server/stdio'
-import fg from 'fast-glob'
+import { scanDeploymentFiles } from './deployment-files.js'
 import mime from 'mime-types'
 import * as z from 'zod/v4'
 
@@ -89,22 +89,16 @@ async function deploymentFiles(target) {
       join(targetPath, '.yeeetignore'),
       'utf8',
     ).catch(() => '')
-    const matches = await fg('**/*', {
-      cwd: targetPath,
-      onlyFiles: true,
-      dot: true,
-      followSymbolicLinks: false,
-      ignore: [
-        '.git/**',
-        'node_modules/**',
-        '.DS_Store',
-        '.yeeetignore',
-        ...ignoreFile
-          .split(/\r?\n/)
-          .map((line) => line.trim())
-          .filter((line) => line && !line.startsWith('#')),
-      ],
-    })
+    const matches = await scanDeploymentFiles(targetPath, [
+      '.git/**',
+      'node_modules/**',
+      '.DS_Store',
+      '.yeeetignore',
+      ...ignoreFile
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter((line) => line && !line.startsWith('#')),
+    ])
     files = await Promise.all(
       matches.sort().map(async (path) => {
         const absolutePath = join(targetPath, ...path.split('/'))

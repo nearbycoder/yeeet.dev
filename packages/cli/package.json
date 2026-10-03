@@ -27,9 +27,11 @@
     "node": ">=22.12.0"
   },
   "dependencies": {
+    "brace-expansion": "^5.0.12",
     "commander": "^15.0.0",
-    "fast-glob": "^3.3.3",
+    "fdir": "^6.5.0",
     "mime-types": "^3.0.2",
-    "open": "^11.0.4"
+    "open": "^11.0.4",
+    "picomatch": "^4.0.7"
   }
 }

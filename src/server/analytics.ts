@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
-import { and, asc, eq, gte, sql } from 'drizzle-orm'
+import { and, asc, eq, gte, lte, sql } from 'drizzle-orm'
+import { analyticsPeriod } from '#/lib/analytics-report'
 import { db } from '#/db'
 import { deployments, siteAnalyticsDaily, sites } from '#/db/schema'
 import { HttpError } from './http'
@@ -186,8 +187,9 @@ export async function getSiteAnalytics(
     where: and(eq(sites.slug, value), eq(sites.userId, userId)),
   })
   if (!site) throw new HttpError(404, 'Site not found.', 'not_found')
-  const start = new Date()
-  start.setUTCDate(start.getUTCDate() - days + 1)
+  const now = new Date()
+  const start = new Date(now)
+  start.setUTCDate(start.getUTCDate() - days * 2 + 1)
   const from = utcDate(start)
   const rows = await db
     .select({
@@ -201,42 +203,14 @@ export async function getSiteAnalytics(
       and(
         eq(siteAnalyticsDaily.siteId, site.id),
         gte(siteAnalyticsDaily.date, from),
+        lte(siteAnalyticsDaily.date, utcDate(now)),
       ),
     )
     .orderBy(asc(siteAnalyticsDaily.date))
 
-  const daily = new Map<string, number>()
-  const paths = new Map<string, number>()
-  const statuses = { successful: 0, redirects: 0, errors: 0 }
-  let totalViews = 0
-  for (const row of rows) {
-    totalViews += row.views
-    daily.set(row.date, (daily.get(row.date) ?? 0) + row.views)
-    paths.set(row.path, (paths.get(row.path) ?? 0) + row.views)
-    if (row.status >= 400) statuses.errors += row.views
-    else if (row.status >= 300) statuses.redirects += row.views
-    else statuses.successful += row.views
-  }
-  const dailyRows = Array.from({ length: days }, (_, index) => {
-    const date = new Date(start)
-    date.setUTCDate(start.getUTCDate() + index)
-    const key = utcDate(date)
-    return { date: key, views: daily.get(key) ?? 0 }
-  })
-
   return {
     site: { id: site.id, slug: site.slug, url: siteUrl(site.slug) },
-    period: { days, from, to: utcDate() },
-    totalViews,
-    statuses,
-    daily: dailyRows,
-    topPaths: [...paths.entries()]
-      .map(([path, views]) => ({ path, views }))
-      .sort(
-        (left, right) =>
-          right.views - left.views || left.path.localeCompare(right.path),
-      )
-      .slice(0, 20),
+    ...analyticsPeriod(rows, days, now),
     privacy: {
       uniqueVisitors: false,
       stored: ['UTC day', 'normalized path', 'HTTP status', 'aggregate views'],

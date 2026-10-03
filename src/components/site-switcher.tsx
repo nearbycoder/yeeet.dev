@@ -2,6 +2,29 @@ import { useEffect, useId, useRef, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { getSiteSearchPage } from '#/server/functions'
 
+const destinations = [
+  {
+    to: '/dashboard',
+    label: 'Dashboard',
+    detail: 'Deploy a build or browse your fleet',
+  },
+  {
+    to: '/dashboard/workspaces',
+    label: 'Workspaces',
+    detail: 'Team sites and version feedback',
+  },
+  {
+    to: '/dashboard/storage',
+    label: 'Storage',
+    detail: 'Review retained deployment bytes',
+  },
+  {
+    to: '/dashboard/settings',
+    label: 'Integrations',
+    detail: 'API keys, webhooks, sessions, preferences',
+  },
+] as const
+
 export function SiteSwitcher() {
   const [open, setOpen] = useState(false),
     [query, setQuery] = useState(''),
@@ -16,6 +39,33 @@ export function SiteSwitcher() {
   const trigger = useRef<HTMLButtonElement>(null)
   const previousFocus = useRef<HTMLElement | null>(null)
   const title = useId()
+  const commands = destinations.filter((command) =>
+    `${command.label} ${command.detail}`
+      .toLowerCase()
+      .includes(query.trim().toLowerCase()),
+  )
+  function moveResult(event: React.KeyboardEvent<HTMLDialogElement>) {
+    const targets = Array.from(
+      dialog.current?.querySelectorAll<HTMLAnchorElement>(
+        '[data-command-result]',
+      ) ?? [],
+    )
+    if (!targets.length) return
+    const index = targets.indexOf(document.activeElement as HTMLAnchorElement)
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault()
+      const next =
+        event.key === 'ArrowDown'
+          ? (index + 1) % targets.length
+          : index < 0
+            ? targets.length - 1
+            : (index + targets.length - 1) % targets.length
+      targets[next].focus()
+    } else if (event.key === 'Enter' && event.target === input.current) {
+      event.preventDefault()
+      targets[0].click()
+    }
+  }
   useEffect(() => {
     function shortcut(event: KeyboardEvent) {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
@@ -73,7 +123,7 @@ export function SiteSwitcher() {
         ref={trigger}
         aria-keyshortcuts="Control+k Meta+k"
       >
-        Switch site
+        Switch site <kbd>⌘/Ctrl K</kbd>
       </button>
       <dialog
         className="panel site-page-panel site-switcher-dialog"
@@ -85,6 +135,7 @@ export function SiteSwitcher() {
           setOpen(false)
         }}
         onKeyDown={(event) => {
+          moveResult(event)
           if (event.key === 'Escape') {
             event.preventDefault()
             event.stopPropagation()
@@ -93,7 +144,7 @@ export function SiteSwitcher() {
         }}
       >
         <div className="console-actions">
-          <h2 id={title}>Switch site</h2>
+          <h2 id={title}>Go to…</h2>
           <button
             className="button button-paper"
             onClick={() => setOpen(false)}
@@ -102,19 +153,44 @@ export function SiteSwitcher() {
           </button>
         </div>
         <label className="console-field">
-          Search your sites
+          Search sites and commands
           <input
             ref={input}
             type="search"
             value={query}
             maxLength={200}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Site, domain, project, or tag…"
+            placeholder="Site, domain, project, tag, or command…"
           />
         </label>
-        <p>
-          Ctrl/⌘ K opens this switcher. Tab through results; Escape closes it.
-        </p>
+        <p>↑ ↓ to choose · Enter to open · Escape to close</p>
+        {commands.length ? (
+          <section aria-label="Quick commands">
+            <h3>Quick commands</h3>
+            <ul className="command-results">
+              {commands.map((command) => (
+                <li key={command.to}>
+                  <Link
+                    data-command-result
+                    to={command.to}
+                    search={
+                      command.to === '/dashboard/storage'
+                        ? { sort: 'bytes', page: 0 }
+                        : {}
+                    }
+                    onClick={() => setOpen(false)}
+                  >
+                    <span>
+                      <strong>{command.label}</strong>
+                      <small>{command.detail}</small>
+                    </span>
+                    <span aria-hidden="true">↗</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
         {loading ? (
           <p role="status">Searching sites…</p>
         ) : error ? (
@@ -132,15 +208,23 @@ export function SiteSwitcher() {
                 ? 'Showing the first 20; narrow your search.'
                 : ''}
             </p>
-            <ul>
+            <ul className="command-results">
               {result?.sites.map((site) => (
                 <li key={site.id}>
                   <Link
                     to="/dashboard/sites/$slug"
                     params={{ slug: site.slug }}
                     onClick={() => setOpen(false)}
+                    data-command-result
                   >
-                    {site.slug}
+                    <span>
+                      <strong>{site.slug}</strong>
+                      <small>
+                        {site.organization.project ||
+                          new URL(site.url).hostname}
+                      </small>
+                    </span>
+                    <span aria-hidden="true">↗</span>
                   </Link>
                 </li>
               ))}

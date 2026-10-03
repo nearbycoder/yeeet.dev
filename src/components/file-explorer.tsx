@@ -2,6 +2,14 @@ import type { FileFilters } from '#/lib/file-filters'
 import { fileVersionUrl } from '#/lib/file-version-url'
 import { FilePreview } from '#/components/file-preview'
 import { canPreviewText } from '#/lib/text-preview'
+import { CopyButton } from './copy-button'
+import { DownloadButton } from './download-button'
+import { toCsv } from '#/lib/download'
+import {
+  fileDirectories,
+  filterFileRange,
+  formatBytes,
+} from '#/lib/asset-review'
 import { useMemo, useState } from 'react'
 import { exploreFiles, fileFamily } from '#/lib/file-explorer'
 import type { ManifestFile } from '#/lib/file-explorer'
@@ -28,10 +36,35 @@ export function FileExplorer({
   >(filters.fileType ?? '')
   const [order, setOrder] = useState(filters.fileOrder ?? 'path')
   const [page, setPage] = useState(0)
+  const [directory, setDirectory] = useState(filters.fileDirectory ?? '')
+  const [minimum, setMinimum] = useState(filters.fileMin?.toString() ?? '')
+  const [maximum, setMaximum] = useState(filters.fileMax?.toString() ?? '')
+  const [selected, setSelected] = useState<Set<string>>(() => new Set())
+  const directories = useMemo(() => fileDirectories(files), [files])
   const matching = useMemo(
-    () => exploreFiles(files, query, family, order),
-    [files, query, family, order],
+    () =>
+      filterFileRange(
+        exploreFiles(files, query, family, order),
+        directory,
+        minimum === '' ? undefined : Number(minimum) * 1024,
+        maximum === '' ? undefined : Number(maximum) * 1024,
+      ),
+    [files, query, family, order, directory, minimum, maximum],
   )
+  const selectedFiles = useMemo(
+    () => files.filter((file) => selected.has(file.path)),
+    [files, selected],
+  )
+  function selectPaths(paths: Array<string>, include: boolean) {
+    setSelected((previous) => {
+      const next = new Set(previous)
+      for (const path of paths) {
+        if (include) next.add(path)
+        else next.delete(path)
+      }
+      return next
+    })
+  }
   const families = [
     ...new Set(files.map((file) => fileFamily(file.contentType))),
   ].sort()
@@ -41,7 +74,8 @@ export function FileExplorer({
     Math.max(0, Math.ceil(matching.length / pageSize) - 1) * pageSize,
   )
   return (
-    <section aria-label="File explorer">
+    <section className="file-explorer" aria-label="File explorer">
+      <h3>Files</h3>
       <div className="console-form-grid">
         <label>
           Find a file
@@ -85,7 +119,62 @@ export function FileExplorer({
             <option value="smallest">Smallest first</option>
           </select>
         </label>
+        <label>
+          Folder
+          <select
+            value={directory}
+            onChange={(event) => {
+              setDirectory(event.target.value)
+              setPage(0)
+            }}
+          >
+            <option value="">All folders</option>
+            {directory && !directories.includes(directory) ? (
+              <option value={directory}>{directory}</option>
+            ) : null}
+            {directories.map((folder) => (
+              <option key={folder} value={folder}>
+                {folder}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Minimum size (KiB)
+          <input
+            type="number"
+            min="0"
+            max="1000000000"
+            step="any"
+            value={minimum}
+            onChange={(event) => {
+              setMinimum(event.target.value)
+              setPage(0)
+            }}
+            placeholder="No minimum"
+          />
+        </label>
+        <label>
+          Maximum size (KiB)
+          <input
+            type="number"
+            min="0"
+            max="1000000000"
+            step="any"
+            value={maximum}
+            onChange={(event) => {
+              setMaximum(event.target.value)
+              setPage(0)
+            }}
+            placeholder="No maximum"
+          />
+        </label>
       </div>
+      {minimum !== '' && maximum !== '' && Number(minimum) > Number(maximum) ? (
+        <p role="alert" className="form-error">
+          Minimum size must be no greater than maximum size.
+        </p>
+      ) : null}
       <div className="console-actions">
         <button
           className="button button-paper"
@@ -94,6 +183,9 @@ export function FileExplorer({
               fileQuery: query || undefined,
               fileType: family || undefined,
               fileOrder: order,
+              fileDirectory: directory || undefined,
+              fileMin: minimum === '' ? undefined : Number(minimum),
+              fileMax: maximum === '' ? undefined : Number(maximum),
             })
           }
         >
@@ -103,6 +195,66 @@ export function FileExplorer({
           Updates this page’s URL for bookmarking or sharing. Site access is
           still required.
         </small>
+      </div>
+      <div className="selection-toolbar">
+        <span role="status">
+          {selected.size} selected ·{' '}
+          {formatBytes(selectedFiles.reduce((sum, file) => sum + file.size, 0))}
+        </span>
+        <button
+          className="button button-paper"
+          disabled={!matching.length}
+          onClick={() =>
+            selectPaths(
+              matching.map((file) => file.path),
+              true,
+            )
+          }
+        >
+          Select all matches
+        </button>
+        <button
+          className="button button-paper"
+          disabled={!selected.size}
+          onClick={() => setSelected(new Set())}
+        >
+          Clear selection
+        </button>
+        {selected.size ? (
+          <>
+            <CopyButton
+              className="button button-paper"
+              label="Copy selected paths"
+              value={selectedFiles.map((file) => file.path).join('\n')}
+            />
+            <DownloadButton
+              name={`${slug}-${version}-selected-files.csv`}
+              type="text/csv;charset=utf-8"
+              content={() =>
+                toCsv([
+                  [
+                    'site',
+                    'version',
+                    'path',
+                    'bytes',
+                    'content_type',
+                    'sha256',
+                  ],
+                  ...selectedFiles.map((file) => [
+                    slug,
+                    version,
+                    file.path,
+                    file.size,
+                    file.contentType,
+                    file.checksum,
+                  ]),
+                ])
+              }
+            >
+              Export selected CSV
+            </DownloadButton>
+          </>
+        ) : null}
       </div>
       <p role="status">
         {matching.length
@@ -116,6 +268,9 @@ export function FileExplorer({
         <table className="console-table">
           <thead>
             <tr>
+              <th scope="col">
+                <span className="sr-only">Select files</span>
+              </th>
               <th scope="col">Path</th>
               <th scope="col">Size</th>
               <th scope="col">Type</th>
@@ -127,15 +282,32 @@ export function FileExplorer({
             {matching.slice(start, start + pageSize).map((file) => (
               <tr key={file.path}>
                 <td>
+                  <input
+                    type="checkbox"
+                    aria-label={`Select ${file.path}`}
+                    checked={selected.has(file.path)}
+                    onChange={(event) =>
+                      selectPaths([file.path], event.target.checked)
+                    }
+                  />
+                </td>
+                <td>
                   <code>{file.path}</code>
                 </td>
                 <td>{file.size.toLocaleString()} B</td>
                 <td>{file.contentType}</td>
                 <td>
-                  <code>{file.checksum ?? 'Not recorded'}</code>
+                  <code
+                    className="checksum-value"
+                    title={file.checksum ?? undefined}
+                  >
+                    {file.checksum
+                      ? `${file.checksum.slice(0, 12)}…`
+                      : 'Not recorded'}
+                  </code>
                 </td>
                 <td>
-                  <details>
+                  <details className="file-actions-menu">
                     <summary aria-label={`Actions for ${file.path}`}>
                       Actions
                     </summary>
@@ -168,6 +340,29 @@ export function FileExplorer({
                         Open version file
                       </a>
                     ) : null}
+                    <CopyButton
+                      className="button button-paper"
+                      value={file.path}
+                      label="Copy path"
+                      ariaLabel={`Copy path: ${file.path}`}
+                    />
+                    {file.checksum ? (
+                      <CopyButton
+                        className="button button-paper"
+                        value={file.checksum}
+                        label="Copy checksum"
+                        ariaLabel={`Copy checksum: ${file.path}`}
+                      />
+                    ) : null}
+                    {previewUrl &&
+                    !['_headers', '_redirects'].includes(file.path) ? (
+                      <CopyButton
+                        className="button button-paper"
+                        value={fileVersionUrl(previewUrl, file.path)}
+                        label="Copy version URL"
+                        ariaLabel={`Copy version URL: ${file.path}`}
+                      />
+                    ) : null}
                   </details>
                 </td>
               </tr>
@@ -192,6 +387,9 @@ export function FileExplorer({
             onClick={() => {
               setQuery('')
               setFamily('')
+              setDirectory('')
+              setMinimum('')
+              setMaximum('')
               setPage(0)
             }}
           >

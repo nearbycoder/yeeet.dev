@@ -22,7 +22,7 @@ export const Route = createRootRouteWithContext<RouterContext>()({
         content:
           'Yeeet static sites from your terminal or browser. Instant subdomains, SSL, and CDN delivery.',
       },
-      { name: 'theme-color', content: '#f5f1e8' },
+      { name: 'theme-color', content: '#f7f7f4' },
       { title: 'Yeeet — static sites at terminal velocity' },
     ],
     links: [
@@ -50,7 +50,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <HeadContent />
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var stored=localStorage.getItem('yeeet-theme');var theme=stored==='light'||stored==='dark'?stored:matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';document.documentElement.dataset.theme=theme;document.documentElement.style.colorScheme=theme;var meta=document.querySelector('meta[name="theme-color"]');if(meta)meta.content=theme==='dark'?'#171714':'#f5f1e8'}catch(_){}})()`,
+            __html: `(function(){try{var stored=localStorage.getItem('yeeet-theme');var theme=stored==='light'||stored==='dark'?stored:matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';document.documentElement.dataset.theme=theme;document.documentElement.style.colorScheme=theme;var meta=document.querySelector('meta[name="theme-color"]');if(meta)meta.content=theme==='dark'?'#181b17':'#f7f7f4'}catch(_){}})()`,
           }}
         />
       </head>
