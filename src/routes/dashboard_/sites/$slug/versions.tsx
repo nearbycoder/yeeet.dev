@@ -1,4 +1,6 @@
 import { versionSearchSchema } from '#/lib/pagination'
+import { DownloadButton } from '#/components/download-button'
+import { releaseCsv } from '#/lib/release-report'
 import { ManifestDiff } from '#/components/manifest-diff'
 import type { ManifestDiffData } from '#/components/manifest-diff'
 import { CopyButton } from '#/components/copy-button'
@@ -55,6 +57,19 @@ function SiteVersions() {
   const [accessVersion, setAccessVersion] = useState('')
   const [password, setPassword] = useState('')
   const [action, setAction] = useState<VersionAction | null>(null)
+  const [selection, setSelection] = useState<{
+    slug: string
+    ids: Array<string>
+  }>({ slug: data.site.slug, ids: [] })
+  const compareIds = selection.slug === data.site.slug ? selection.ids : []
+  function toggleComparison(id: string) {
+    setSelection({
+      slug: data.site.slug,
+      ids: compareIds.includes(id)
+        ? compareIds.filter((value) => value !== id)
+        : [...compareIds, id].slice(0, 2),
+    })
+  }
   const currentIndex = data.versions.findIndex((version) => version.current)
   const previous =
     currentIndex >= 0
@@ -259,6 +274,62 @@ function SiteVersions() {
       <p role="status">
         Showing {data.versions.length} versions, newest first.
       </p>
+      <div className="console-actions">
+        <DownloadButton
+          name={`${data.site.slug}-versions-page.csv`}
+          disabled={!data.versions.length}
+          type="text/csv;charset=utf-8"
+          content={() => releaseCsv(data.versions)}
+        >
+          Export release page CSV
+        </DownloadButton>
+        <small>Includes labels, notes, and retention pins for this page.</small>
+      </div>
+      <aside
+        className="comparison-tray"
+        aria-label="Version comparison selection"
+      >
+        <div>
+          <strong>Compare two releases</strong>
+          <p>
+            {compareIds.length
+              ? `Baseline: ${compareIds[0].slice(0, 8)}${compareIds[1] ? ` → Target: ${compareIds[1].slice(0, 8)}` : ' · Choose a target version'}`
+              : 'Select a baseline and a target. Selections stay while paging through this site’s history.'}
+          </p>
+        </div>
+        <div className="console-actions">
+          {compareIds.length === 2 ? (
+            <>
+              <button
+                className="button button-paper"
+                onClick={() =>
+                  setSelection({
+                    slug: data.site.slug,
+                    ids: [...compareIds].reverse(),
+                  })
+                }
+              >
+                Swap baseline and target
+              </button>
+              <Link
+                className="button button-ink"
+                to="/dashboard/sites/$slug/inspect"
+                params={{ slug: data.site.slug }}
+                search={{ base: compareIds[0], version: compareIds[1] }}
+              >
+                Compare selected versions
+              </Link>
+            </>
+          ) : null}
+          <button
+            className="button button-paper"
+            disabled={!compareIds.length}
+            onClick={() => setSelection({ slug: data.site.slug, ids: [] })}
+          >
+            Clear comparison
+          </button>
+        </div>
+      </aside>
       {data.versions.length ? (
         <div className="site-version-list">
           {data.versions.map((version) => (
@@ -304,6 +375,18 @@ function SiteVersions() {
                   </small>
                 </div>
                 <div className="site-version-actions">
+                  <label className="checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={compareIds.includes(version.id)}
+                      disabled={
+                        compareIds.length === 2 &&
+                        !compareIds.includes(version.id)
+                      }
+                      onChange={() => toggleComparison(version.id)}
+                    />
+                    Compare {version.id.slice(0, 8)}
+                  </label>
                   <button
                     className="button button-paper"
                     disabled={Boolean(busy)}

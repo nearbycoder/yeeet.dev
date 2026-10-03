@@ -1,4 +1,5 @@
 import { deployCommand } from '#/lib/deploy-command'
+import { FleetExport } from '#/components/fleet-export'
 import { mergeUploadFiles } from '#/lib/merge-upload-files'
 import { uploadLimitErrors } from '#/lib/upload-limits'
 import { DeploymentPresets } from '#/components/deployment-presets'
@@ -789,6 +790,7 @@ function Dashboard() {
             </div>
             <p
               className="deploy-destination"
+              role="status"
               aria-label="Deployment destination"
             >
               <strong>
@@ -1234,6 +1236,7 @@ function Dashboard() {
               <b>{data.totalCount}</b>
             </div>
             <RecentSites key={user.id} userId={user.id} />
+            <FleetExport sites={data.sites} />
             <SavedViews
               userId={user.id}
               filters={filters}
@@ -1501,7 +1504,7 @@ function Dashboard() {
             <Link to="/dashboard/settings" className="text-link">
               Manage API keys and webhooks →
             </Link>
-            <pre>
+            <pre tabIndex={0} aria-label="CLI deployment command" role="region">
               <code>YEEET_TOKEN=yeeet_… yeeet deploy ./dist --json</code>
             </pre>
             <Link to="/device" search={{ user_code: undefined }}>

@@ -1,0 +1,313 @@
+/* Shared controls and the console's review tools use the same theme tokens. */
+:where(.dashboard-shell, .auth-page, .device-page)
+  :is(input:not([type='checkbox']):not([type='radio']), select, textarea) {
+  border-radius: var(--radius-sm);
+  line-height: 1.5;
+}
+:where(button, a, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--coral-dark);
+  outline-offset: 3px;
+}
+:where(.dashboard-shell) :is(input, textarea)::placeholder {
+  color: var(--muted);
+  opacity: 0.8;
+}
+:where(.dashboard-shell) input[type='checkbox'] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--coral);
+  cursor: pointer;
+}
+:where(.dashboard-shell) summary {
+  min-height: var(--control-height);
+  padding-block: 12px;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+:where(.dashboard-shell) details[open] > summary {
+  margin-bottom: 8px;
+}
+.summary-meta {
+  margin-left: 12px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+.dashboard-shell kbd {
+  padding: 3px 6px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  color: var(--muted);
+  background: var(--paper);
+  font:
+    10px 'DM Mono',
+    monospace;
+}
+.command-results {
+  padding: 0;
+  list-style: none;
+}
+.command-results a {
+  display: flex;
+  min-height: 58px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+}
+.command-results a:hover,
+.command-results a:focus-visible {
+  background: var(--paper);
+}
+.command-results small {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.command-results strong {
+  overflow-wrap: anywhere;
+  font-size: 14px;
+}
+.selection-toolbar,
+.comparison-tray,
+.comparison-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+}
+.selection-toolbar {
+  justify-content: flex-start;
+}
+.selection-toolbar > span {
+  margin-right: auto;
+  font-size: 13px;
+}
+.comparison-tray p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.comparison-tray .console-actions,
+.analytics-toolbar .console-actions {
+  margin: 0;
+}
+.comparison-summary > div {
+  display: grid;
+  gap: 6px;
+}
+.comparison-summary span {
+  color: var(--muted);
+  font-size: 12px;
+}
+.file-explorer {
+  margin-top: 24px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+.file-actions-menu[open] {
+  display: grid;
+  min-width: 180px;
+  gap: 8px;
+}
+.file-actions-menu .button {
+  width: 100%;
+  padding: 8px 12px;
+  font-size: 12px;
+}
+.checksum-value {
+  white-space: nowrap;
+}
+.file-explorer .console-table tr:has(input:checked),
+.site-version-card:has(input[type='checkbox']:checked) {
+  background: var(--paper-deep);
+}
+.composition-list {
+  display: grid;
+  gap: 16px;
+  padding: 0;
+  list-style: none;
+}
+.composition-list li > div {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+.composition-list span {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.composition-list code {
+  overflow-wrap: anywhere;
+}
+.composition-list meter {
+  display: block;
+  width: 100%;
+  height: 10px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--paper-deep);
+}
+.composition-list meter::-webkit-meter-bar {
+  border: 0;
+  background: var(--paper-deep);
+}
+.composition-list meter::-webkit-meter-optimum-value {
+  background: var(--coral);
+}
+.composition-list meter::-moz-meter-bar {
+  background: var(--coral);
+}
+.inline-field {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.inline-field select {
+  min-height: var(--control-height);
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  background: var(--field);
+}
+.source-reader {
+  display: flex;
+  max-height: 520px;
+  overflow: auto;
+  margin-block: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--field);
+}
+.source-reader pre {
+  margin: 0;
+  padding: 16px;
+  font:
+    12px/1.8 'DM Mono',
+    monospace;
+  tab-size: 2;
+}
+.source-reader code {
+  font: inherit;
+}
+.source-line-numbers {
+  position: sticky;
+  left: 0;
+  flex: 0 0 auto;
+  border-right: 1px solid var(--line);
+  color: var(--muted);
+  background: var(--paper);
+  text-align: right;
+  user-select: none;
+}
+.source-text {
+  min-width: 0;
+}
+.source-reader.is-wrapped .source-text {
+  width: 100%;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.source-reader mark {
+  color: var(--night);
+  background: var(--lime);
+}
+.source-reader mark.is-current {
+  outline: 2px solid var(--coral);
+  outline-offset: 1px;
+}
+.source-toolbar .console-field {
+  max-width: 460px;
+}
+.source-toolbar .console-actions > span {
+  color: var(--muted);
+  font-size: 12px;
+}
+.analytics-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.segmented-control {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+}
+.segmented-control button {
+  min-height: 40px;
+  padding: 8px 16px;
+  border: 0;
+  border-radius: 5px;
+  color: var(--muted);
+  background: transparent;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.segmented-control button[aria-pressed='true'] {
+  color: var(--ink);
+  background: var(--white);
+  box-shadow: var(--shadow-panel);
+}
+.segmented-control button:hover {
+  color: var(--ink);
+}
+.upload-rule-editor {
+  margin-block: 16px;
+  padding: 0 16px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+}
+.upload-rule-editor textarea {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--line);
+  background: var(--field);
+  font:
+    12px/1.7 'DM Mono',
+    monospace;
+  resize: vertical;
+}
+@media (max-width: 650px) {
+  .summary-meta {
+    display: block;
+    margin: 6px 0 0;
+  }
+  .source-toolbar input,
+  .upload-rule-editor textarea,
+  .inline-field select {
+    font-size: 16px;
+  }
+  .analytics-toolbar,
+  .analytics-toolbar .console-actions,
+  .comparison-tray .console-actions {
+    align-items: stretch;
+  }
+  .comparison-tray .console-actions .button,
+  .analytics-toolbar .console-actions .button {
+    flex: 1 1 140px;
+  }
+}

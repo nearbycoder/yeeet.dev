@@ -1,5 +1,8 @@
 # Working in the Yeeet console
 
+See the [20 console additions](console-expansion.md) for quick commands, bulk asset
+review, source reading, release exports, expanded analytics, and upload exclusions.
+
 ## Deploy and review
 
 Drag a folder or files onto the launchpad and click **Deploy now**. A new public
