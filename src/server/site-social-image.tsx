@@ -54,6 +54,8 @@ export function siteSocialImageSvg(input: { hostname: string; slug: string }) {
     Math.max(...lines.map((line) => line.length)) > 12 ? 70 : 82
   const subtitle = `${design.name} keeps this site airborne.`
 
+  const subtitleY = lines.length === 1 ? 128 : 210
+
   return renderToStaticMarkup(
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -63,30 +65,28 @@ export function siteSocialImageSvg(input: { hostname: string; slug: string }) {
     >
       <defs>
         <pattern id="grid" width="42" height="42" patternUnits="userSpaceOnUse">
-          <path d="M42 0H0V42" fill="none" stroke="#ddd7ca" strokeWidth="1" />
+          <path d="M42 0H0V42" fill="none" stroke="#e2e3db" strokeWidth="1" />
         </pattern>
-        <filter id="shadow" x="-30%" y="-30%" width="170%" height="170%">
-          <feDropShadow dx="12" dy="14" stdDeviation="0" floodColor="#f04d2f" />
-        </filter>
       </defs>
 
-      <rect width="1200" height="630" fill="#f5f1e8" />
-      <rect width="1200" height="630" fill="url(#grid)" opacity="0.62" />
-      <path d="M0 0H1200V18H0Z" fill="#181815" />
+      <rect width="1200" height="630" fill="#f7f7f4" />
+      <rect width="1200" height="630" fill="url(#grid)" />
 
-      <g transform="translate(58 52)">
-        <rect width="58" height="58" rx="14" fill="#181815" />
-        <text
-          x="29"
-          y="39"
-          textAnchor="middle"
-          fill="#f5f1e8"
-          fontFamily="Open Sans, sans-serif"
-          fontSize="26"
-          fontWeight="900"
-        >
-          Y!
-        </text>
+      <g transform="translate(62 54)">
+        <g transform="rotate(-3 29 29)">
+          <rect width="58" height="58" rx="14" fill="#181815" />
+          <text
+            x="29"
+            y="39"
+            textAnchor="middle"
+            fill="#f7f7f4"
+            fontFamily="Open Sans, sans-serif"
+            fontSize="26"
+            fontWeight="800"
+          >
+            Y!
+          </text>
+        </g>
         <text
           x="76"
           y="39"
@@ -94,13 +94,23 @@ export function siteSocialImageSvg(input: { hostname: string; slug: string }) {
           fontFamily="Open Sans, sans-serif"
           fontSize="27"
           fontWeight="800"
+          letterSpacing="-1"
         >
           yeeet
         </text>
       </g>
 
-      <g transform="translate(62 176)">
+      <g transform="translate(62 214)">
         <circle cx="7" cy="-21" r="7" fill="#f04d2f" />
+        <circle
+          cx="7"
+          cy="-21"
+          r="12"
+          fill="none"
+          stroke="#f04d2f"
+          strokeOpacity="0.25"
+          strokeWidth="5"
+        />
         <text
           x="27"
           y="-14"
@@ -113,24 +123,24 @@ export function siteSocialImageSvg(input: { hostname: string; slug: string }) {
           NOW LIVE / STATIC SITE
         </text>
         <text
-          x="0"
-          y="70"
+          x="-2"
+          y="62"
           fill="#181815"
           fontFamily="Open Sans, sans-serif"
           fontSize={titleFontSize}
-          fontWeight="900"
+          fontWeight="800"
           letterSpacing="-4"
         >
           {lines.map((line, index) => (
-            <tspan key={`${index}-${line}`} x="0" dy={index === 0 ? 0 : 82}>
+            <tspan key={`${index}-${line}`} x="-2" dy={index === 0 ? 0 : 82}>
               {line}
             </tspan>
           ))}
         </text>
         <text
-          x="3"
-          y={lines.length === 1 ? 190 : 272}
-          fill="#6e6a61"
+          x="1"
+          y={subtitleY}
+          fill="#61665c"
           fontFamily="Open Sans, sans-serif"
           fontSize="25"
         >
@@ -138,43 +148,71 @@ export function siteSocialImageSvg(input: { hostname: string; slug: string }) {
         </text>
       </g>
 
-      <g filter="url(#shadow)">
-        <path
-          d="M790 102C900 44 1056 84 1111 193C1170 310 1107 464 983 514C858 565 719 480 710 346C702 234 712 143 790 102Z"
-          fill="#fffdf8"
-          stroke="#181815"
-          strokeWidth="6"
-        />
-      </g>
       <ellipse
-        cx="921"
-        cy="308"
-        rx="183"
-        ry="203"
+        cx="930"
+        cy="270"
+        rx="250"
+        ry="170"
         fill="none"
-        stroke="#c9c3b7"
-        strokeWidth="2"
-        strokeDasharray="9 10"
-        transform="rotate(-18 921 308)"
-      />
-      <circle
-        cx="1081"
-        cy="188"
-        r="13"
-        fill="#d9ee55"
         stroke="#181815"
-        strokeWidth="4"
+        strokeWidth="3"
+        opacity="0.7"
+        transform="rotate(-20 930 270)"
       />
-      <circle
-        cx="744"
-        cy="367"
-        r="9"
+      <ellipse
+        cx="930"
+        cy="290"
+        rx="240"
+        ry="150"
+        fill="none"
+        stroke="#181815"
+        strokeWidth="2"
+        strokeDasharray="10 10"
+        opacity="0.25"
+        transform="rotate(34 930 290)"
+      />
+      <ellipse cx="942" cy="452" rx="196" ry="56" fill="#181815" />
+      <ellipse
+        cx="930"
+        cy="440"
+        rx="196"
+        ry="56"
         fill="#f04d2f"
         stroke="#181815"
-        strokeWidth="4"
+        strokeWidth="5"
       />
-      <svg x="765" y="135" width="324" height="324" viewBox="0 0 160 160">
-        <g transform={`rotate(${design.tilt} 80 80)`}>
+      <ellipse
+        cx="930"
+        cy="430"
+        rx="108"
+        ry="16"
+        fill="#fbe0d9"
+        fillOpacity="0.35"
+        stroke="#181815"
+        strokeWidth="3"
+      />
+      <g transform="translate(1082 92) rotate(14)">
+        <rect x="3" y="3" width="64" height="54" rx="9" fill="#181815" />
+        <rect
+          width="64"
+          height="54"
+          rx="9"
+          fill="#d9ee55"
+          stroke="#181815"
+          strokeWidth="4"
+        />
+        <path
+          d="M20 18h24v18H20zM20 27h24M32 18v18"
+          fill="none"
+          stroke="#181815"
+          strokeWidth="4"
+          strokeLinejoin="round"
+        />
+      </g>
+      <path d="M742 132l7 16 16 7-16 7-7 16-7-16-16-7 16-7z" fill="#f04d2f" />
+      <path d="M1126 330l5 11 11 5-11 5-5 11-5-11-11-5 11-5z" fill="#181815" />
+      <svg x="768" y="96" width="324" height="324" viewBox="0 0 160 160">
+        <g transform={`rotate(${design.tilt} 80 150)`}>
           <YeeetlingArtwork design={design} clipId="yeeetling-social-card" />
         </g>
       </svg>
@@ -185,7 +223,7 @@ export function siteSocialImageSvg(input: { hostname: string; slug: string }) {
         <text
           x="58"
           y="40"
-          fill="#f5f1e8"
+          fill="#f7f7f4"
           fontFamily="Open Sans, sans-serif"
           fontSize="22"
           fontWeight="700"
@@ -193,16 +231,25 @@ export function siteSocialImageSvg(input: { hostname: string; slug: string }) {
           {compactHostname(input.hostname)}
         </text>
         <text
-          x="1038"
+          x="1010"
           y="40"
           textAnchor="end"
           fill="#f04d2f"
           fontFamily="Open Sans, sans-serif"
           fontSize="20"
           fontWeight="800"
+          letterSpacing="1"
         >
-          DEPLOYED WITH YEEET ↗
+          DEPLOYED WITH YEEET
         </text>
+        <path
+          d="M1022 39l12-12M1024 27h10v10"
+          fill="none"
+          stroke="#f04d2f"
+          strokeWidth="3"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
       </g>
     </svg>,
   )

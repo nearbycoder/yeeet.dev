@@ -3,6 +3,8 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { z } from 'zod'
 import { Brand } from '#/components/brand'
 import { authClient } from '#/lib/auth-client'
+import { ThemeToggle } from '#/components/theme-toggle'
+import { Yeeetling } from '#/components/yeeetling'
 
 export const Route = createFileRoute('/device')({
   validateSearch: z.object({ user_code: z.string().optional() }),
@@ -86,10 +88,24 @@ function DeviceAuthorization() {
     <main id="main-content" tabIndex={-1} className="auth-page device-page">
       <div className="auth-top">
         <Brand />
+        <ThemeToggle inline />
       </div>
       <section className="auth-card">
         <div className="auth-heading">
-          <span className="mini-orbit">⌘</span>
+          <div className="auth-mascot">
+            <Yeeetling
+              seed="terminal-buddy"
+              phase={
+                busy
+                  ? 'uploading'
+                  : message.startsWith('Approved')
+                    ? 'done'
+                    : message
+                      ? 'error'
+                      : 'ready'
+              }
+            />
+          </div>
           <div>
             <div className="eyebrow">
               <span className="status-dot" /> Device authorization
@@ -138,7 +154,7 @@ function DeviceAuthorization() {
               </button>
               <button
                 type="button"
-                className="button"
+                className="button button-paper"
                 onClick={() => decide(false)}
                 disabled={busy}
               >

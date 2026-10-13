@@ -19,7 +19,7 @@ export function SiteNotes({ slug, notes }: { slug: string; notes: string }) {
         this site.
       </p>
       <form
-        className="site-page-stack"
+        className="site-notes-form"
         onSubmit={(event) => {
           event.preventDefault()
           void mutation.run(async () => {
@@ -40,7 +40,7 @@ export function SiteNotes({ slug, notes }: { slug: string; notes: string }) {
             placeholder="Purpose, release process, ownership, or things to remember…"
           />
         </label>
-        <p>
+        <p className="field-hint">
           {draft.length}/4000 characters
           {draft !== base ? ' · Unsaved changes' : ''}
         </p>

@@ -12,6 +12,15 @@ subdomain.
 </p>
 
 <p align="center">
+  <a href="https://yeeet.dev/promo">
+    <img src="public/promo/yeeet-promo-poster.jpg" alt="Watch the 40-second Yeeet promo: Zip Blob the Yeeetling yeeets a website" width="100%">
+  </a>
+  <br>
+  <strong>▶ <a href="https://yeeet.dev/promo">Watch Zip Blob yeeet a website</a></strong> ·
+  <a href="public/promo/yeeet-promo.mp4">download the MP4</a>
+</p>
+
+<p align="center">
   <a href="https://github.com/nearbycoder/yeeet.dev/actions/workflows/ci.yml"><img src="https://github.com/nearbycoder/yeeet.dev/actions/workflows/ci.yml/badge.svg" alt="CI status"></a>
   <a href="https://www.npmjs.com/package/@yeeet.dev/cli"><img src="https://img.shields.io/npm/v/%40yeeet.dev%2Fcli?label=CLI" alt="npm CLI version"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-111111" alt="MIT license"></a>

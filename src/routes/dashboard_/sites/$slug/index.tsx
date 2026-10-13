@@ -34,17 +34,6 @@ function SiteOverview() {
 
   return (
     <div className="site-page-stack">
-      <LaunchChecklist slug={site.slug} data={checklist} />
-      <SiteOrganization
-        key={site.slug}
-        slug={site.slug}
-        organization={site.organization}
-      />
-      <SiteNotes
-        key={`notes:${site.slug}`}
-        slug={site.slug}
-        notes={site.notes}
-      />
       <section className="site-metrics" aria-label="Site summary">
         <article>
           <span>Active payload</span>
@@ -109,7 +98,7 @@ function SiteOverview() {
                         : '↑'}
                   </span>
                   <div>
-                    <b>{version.id.slice(0, 8)}</b>
+                    <b>{version.releaseLabel || version.id.slice(0, 12)}</b>
                     <small>
                       {version.source} · {formatDate(version.createdAt)}
                     </small>
@@ -165,6 +154,19 @@ function SiteOverview() {
           </Link>
           <p>Last updated {formatDate(site.updatedAt)}.</p>
         </aside>
+      </div>
+      <LaunchChecklist slug={site.slug} data={checklist} />
+      <div className="site-overview-split">
+        <SiteOrganization
+          key={site.slug}
+          slug={site.slug}
+          organization={site.organization}
+        />
+        <SiteNotes
+          key={`notes:${site.slug}`}
+          slug={site.slug}
+          notes={site.notes}
+        />
       </div>
     </div>
   )

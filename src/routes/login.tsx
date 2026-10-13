@@ -3,6 +3,8 @@ import { Link, createFileRoute, redirect } from '@tanstack/react-router'
 import { z } from 'zod'
 import { Brand, GitHubIcon } from '#/components/brand'
 import { authClient } from '#/lib/auth-client'
+import { ThemeToggle } from '#/components/theme-toggle'
+import { Yeeetling } from '#/components/yeeetling'
 import { getSession } from '#/server/functions'
 
 const searchSchema = z.object({ redirect: z.string().optional() })
@@ -105,10 +107,16 @@ function Login() {
     <main id="main-content" tabIndex={-1} className="auth-page">
       <div className="auth-top">
         <Brand />
+        <ThemeToggle inline />
       </div>
       <section className="auth-card">
         <div className="auth-heading">
-          <span className="mini-orbit">Y!</span>
+          <div className="auth-mascot">
+            <Yeeetling
+              seed="launch-control"
+              phase={busy ? 'uploading' : error ? 'error' : 'ready'}
+            />
+          </div>
           <div>
             <div className="eyebrow">
               <span className="status-dot" /> Launch control

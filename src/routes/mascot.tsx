@@ -1,5 +1,7 @@
 import { NavigationMenu } from '#/components/navigation-menu'
-import { useState } from 'react'
+import { ThemeToggle } from '#/components/theme-toggle'
+import { canonicalLink, socialMeta } from '#/lib/seo'
+import { useRef, useState } from 'react'
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { Brand } from '#/components/brand'
 import { Yeeetling, getYeeetlingDesign } from '#/components/yeeetling'
@@ -7,17 +9,22 @@ import type { YeeetlingPhase } from '#/components/yeeetling'
 import { getPublicPlatformConfig } from '#/server/functions'
 
 export const Route = createFileRoute('/mascot')({
-  head: () => ({
-    meta: [
-      { title: 'Yeeetling Lab — Generate Your Site Mascot' },
-      {
-        name: 'description',
-        content:
-          'Enter a site name to generate its one-of-a-kind Yeeetling mascot and preview the deployment animations.',
-      },
-    ],
-  }),
   loader: () => getPublicPlatformConfig(),
+  head: ({ loaderData }) =>
+    loaderData
+      ? {
+          meta: socialMeta({
+            origin: loaderData.controlPlaneUrl,
+            path: '/mascot',
+            title: 'Yeeetling Lab — Generate Your Site Mascot',
+            description:
+              'Enter a site name to generate its one-of-a-kind Yeeetling mascot and preview the deployment animations.',
+            image: '/og/yeeetlings.png',
+            imageAlt: 'A lineup of six generated Yeeetling mascots.',
+          }),
+          links: [canonicalLink(loaderData.controlPlaneUrl, '/mascot')],
+        }
+      : {},
   component: MascotLab,
 })
 
@@ -61,6 +68,24 @@ function MascotLab() {
   const [phase, setPhase] = useState<YeeetlingPhase>('ready')
   const [replay, setReplay] = useState(0)
   const design = getYeeetlingDesign(slug || 'random-site')
+  const stage = useRef<HTMLDivElement>(null)
+
+  function downloadSvg() {
+    const svg = stage.current?.querySelector('svg')
+    if (!svg) return
+    const copy = svg.cloneNode(true) as SVGSVGElement
+    copy.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
+    copy.setAttribute('width', '640')
+    copy.setAttribute('height', '640')
+    const url = URL.createObjectURL(
+      new Blob([copy.outerHTML], { type: 'image/svg+xml' }),
+    )
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `${slug || 'random-site'}-yeeetling.svg`
+    link.click()
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+  }
 
   function play(nextPhase: YeeetlingPhase) {
     setPhase(nextPhase)
@@ -75,7 +100,9 @@ function MascotLab() {
       <header className="topbar wrap mascot-lab-header">
         <Brand />
         <NavigationMenu label="Mascot lab navigation">
+          <Link to="/promo">Watch the promo</Link>
           <a href={docsUrl}>Docs</a>
+          <ThemeToggle inline />
           <Link to="/dashboard" className="button button-small button-ink">
             Launch console ↗
           </Link>
@@ -125,18 +152,27 @@ function MascotLab() {
               Surprise me
             </button>
           </div>
+          <button
+            type="button"
+            className="mascot-download"
+            onClick={downloadSvg}
+          >
+            Download {design.name} as SVG ↓
+          </button>
         </section>
 
         <section className="mascot-generator" aria-labelledby="mascot-name">
           <div className="mascot-generator-grid" aria-hidden="true" />
           <div className="mascot-orbit mascot-orbit-one" aria-hidden="true" />
           <div className="mascot-orbit mascot-orbit-two" aria-hidden="true" />
-          <Yeeetling
-            key={`${slug}-${phase}-${replay}`}
-            seed={slug || 'random-site'}
-            phase={phase}
-            label={`${design.name}, the Yeeetling generated for ${slug || 'this site'}`}
-          />
+          <div className="mascot-stage" ref={stage}>
+            <Yeeetling
+              key={`${slug}-${phase}-${replay}`}
+              seed={slug || 'random-site'}
+              phase={phase}
+              label={`${design.name}, the Yeeetling generated for ${slug || 'this site'}`}
+            />
+          </div>
           <div className="mascot-identity">
             <span>Your Yeeetling</span>
             <h2 id="mascot-name">{design.name}</h2>

@@ -67,6 +67,9 @@ function Workspaces() {
       <main id="main-content" tabIndex={-1} className="dashboard-main">
         <div className="dashboard-intro">
           <div>
+            <div className="eyebrow">
+              <span className="status-dot" /> Crew quarters
+            </div>
             <h1>Team workspaces</h1>
             <p>
               Share selected sites, review versions, and keep feedback with the

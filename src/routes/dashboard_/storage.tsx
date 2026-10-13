@@ -5,6 +5,15 @@ import { downloadText, toCsv } from '#/lib/download'
 import { getSession, getStorageInventory } from '#/server/functions'
 import { useState } from 'react'
 
+function formatStorageBytes(value: number) {
+  const units = ['B', 'KB', 'MB', 'GB', 'TB']
+  const rank = Math.min(
+    Math.floor(Math.log(Math.max(value, 1)) / Math.log(1024)),
+    units.length - 1,
+  )
+  return `${(value / 1024 ** rank).toFixed(rank ? 1 : 0)} ${units[rank]}`
+}
+
 export const Route = createFileRoute('/dashboard_/storage')({
   validateSearch: storageSearchSchema,
   beforeLoad: async () => {
@@ -33,23 +42,35 @@ function StorageInventory() {
       </a>
       <DashboardHeader user={user} docsUrl={data.platform.docsUrl} />
       <main id="main-content" tabIndex={-1} className="dashboard-main">
-        <h1>Storage inventory</h1>
-        <p>
-          Recorded deployment bytes across your sites and all retained versions.
-          These manifest totals include failed and uploading versions and may
-          count shared files more than once; they are not a storage-provider
-          bill or physical disk measurement.
-        </p>
+        <section className="dashboard-intro">
+          <div>
+            <div className="eyebrow">
+              <span className="status-dot" /> Cargo hold
+            </div>
+            <h1>Storage inventory</h1>
+            <p>
+              Recorded deployment bytes across your sites and all retained
+              versions.
+            </p>
+          </div>
+        </section>
         <div className="site-metrics storage-metrics">
           <article>
-            <strong>{data.totalBytes.toLocaleString()}</strong>
-            <span> recorded bytes</span>
+            <span>Recorded bytes</span>
+            <strong>{formatStorageBytes(data.totalBytes)}</strong>
+            <small>{data.totalBytes.toLocaleString()} bytes</small>
           </article>
           <article>
+            <span>Versions</span>
             <strong>{data.totalVersions.toLocaleString()}</strong>
-            <span> versions across your account</span>
+            <small>Across your account</small>
           </article>
         </div>
+        <p className="page-footnote">
+          Manifest totals include failed and uploading versions and may count
+          shared files more than once; they are not a storage-provider bill or
+          physical disk measurement.
+        </p>
         <form
           className="site-filters"
           key={JSON.stringify(search)}
@@ -67,7 +88,12 @@ function StorageInventory() {
         >
           <label className="console-field">
             Find a site
-            <input name="q" defaultValue={search.q} maxLength={200} />
+            <input
+              name="q"
+              defaultValue={search.q}
+              maxLength={200}
+              placeholder="Site name…"
+            />
           </label>
           <label className="console-field">
             Sort inventory

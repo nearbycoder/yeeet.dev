@@ -1,3 +1,4 @@
+import { TrafficChart } from '#/components/traffic-chart'
 import { createFileRoute } from '@tanstack/react-router'
 import { useState } from 'react'
 import { z } from 'zod'
@@ -28,7 +29,6 @@ function SiteAnalytics() {
   const navigate = Route.useNavigate()
   const [interval, setInterval] = useState<'day' | 'week'>('day')
   const chart = interval === 'week' ? aggregateWeeks(data.daily) : data.daily
-  const maxViews = Math.max(...chart.map((day) => day.views), 1)
 
   return (
     <div className="site-page-stack">
@@ -169,28 +169,9 @@ function SiteAnalytics() {
           <p className="site-page-note">
             {interval === 'week'
               ? 'Weeks begin Monday in UTC. First and last weeks may be partial.'
-              : 'Each row is one UTC day.'}
+              : 'Each column is one UTC day. Hover a column for its total.'}
           </p>
-          <div className="site-analytics-chart">
-            {chart.map((day) => (
-              <div className="site-analytics-day" key={day.date}>
-                <time dateTime={day.date}>
-                  {new Date(`${day.date}T00:00:00Z`).toLocaleDateString(
-                    undefined,
-                    { month: 'short', day: 'numeric', timeZone: 'UTC' },
-                  )}
-                </time>
-                <span aria-hidden="true">
-                  <i
-                    style={{
-                      width: `${Math.max((day.views / maxViews) * 100, day.views ? 3 : 0)}%`,
-                    }}
-                  />
-                </span>
-                <b>{day.views.toLocaleString()}</b>
-              </div>
-            ))}
-          </div>
+          <TrafficChart points={chart} interval={interval} />
         </section>
 
         <section

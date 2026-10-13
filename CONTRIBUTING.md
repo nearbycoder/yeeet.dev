@@ -26,6 +26,25 @@ Never put real credentials in fixtures, screenshots, documentation, commit
 messages, or pull-request descriptions. Use neutral example domains and
 `example.com` addresses.
 
+## Promo film and brand media
+
+The promo video, its soundtrack, the social cards in `public/og`, and the app
+icons are generated from code. The film lives in
+`src/components/promo-film.tsx`; every frame is a pure function of time, and
+`src/lib/promo-timeline.ts` holds the shared scene timings and sound cues. Edit
+those, preview at `/promo` (scrub, chapters, and `?t=<ms>` all work), then
+start the app and regenerate the files:
+
+```sh
+npm run media:render -- --origin http://localhost:3000          # everything
+npm run media:render -- promo --origin http://localhost:3000    # just the film
+```
+
+Targets are `promo`, `brand` (social cards), `icons`, or `all`. Rendering needs
+`ffmpeg` and a Chromium build; set `CHROME_PATH` if it is not found
+automatically. The soundtrack is synthesized deterministically, so there are no
+third-party audio assets to license.
+
 ## Pull requests
 
 - Keep changes focused and explain the user impact.

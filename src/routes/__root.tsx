@@ -5,7 +5,6 @@ import {
   createRootRouteWithContext,
 } from '@tanstack/react-router'
 import type { QueryClient } from '@tanstack/react-query'
-import { ThemeToggle } from '#/components/theme-toggle'
 import appCss from '../styles.css?url'
 
 interface RouterContext {
@@ -23,6 +22,9 @@ export const Route = createRootRouteWithContext<RouterContext>()({
           'Yeeet static sites from your terminal or browser. Instant subdomains, SSL, and CDN delivery.',
       },
       { name: 'theme-color', content: '#f7f7f4' },
+      { name: 'color-scheme', content: 'light dark' },
+      { property: 'og:site_name', content: 'Yeeet' },
+      { name: 'twitter:card', content: 'summary_large_image' },
       { title: 'Yeeet — static sites at terminal velocity' },
     ],
     links: [
@@ -34,10 +36,9 @@ export const Route = createRootRouteWithContext<RouterContext>()({
         type: 'font/woff2',
         crossOrigin: 'anonymous',
       },
-      {
-        rel: 'icon',
-        href: 'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22><rect width=%2264%22 height=%2264%22 rx=%2214%22 fill=%22%23171714%22/><path d=%22M14 16h11l7 12 7-12h11L37 37v11H27V37z%22 fill=%22%23f04d2f%22/></svg>',
-      },
+      { rel: 'icon', href: '/favicon.svg', type: 'image/svg+xml' },
+      { rel: 'apple-touch-icon', href: '/apple-touch-icon.png' },
+      { rel: 'manifest', href: '/site.webmanifest' },
     ],
   }),
   shellComponent: RootDocument,
@@ -57,7 +58,6 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       <body>
         {children}
         <ApplyReadingPreferences />
-        <ThemeToggle />
         <Scripts />
       </body>
     </html>

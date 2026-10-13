@@ -1419,7 +1419,18 @@ const DOCS_HTML = String.raw`<!doctype html>
     <title>Yeeet CLI Docs — Folder to HTTPS in One Command</title>
     <link rel="canonical" href="https://docs.yeeet.dev/">
     <link rel="alternate" type="text/plain" href="https://docs.yeeet.dev/llms.txt" title="Yeeet docs for LLMs">
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect x='3' y='3' width='58' height='58' rx='15' fill='%23f04d2f' stroke='%23171714' stroke-width='6'/%3E%3Cpath d='M17 17h8l7 12 7-12h8L36 36v12h-8V36L17 17Z' fill='%23171714'/%3E%3Ccircle cx='48' cy='46' r='4' fill='%23d7f544'/%3E%3C/svg%3E" type="image/svg+xml">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='15' fill='%23181815'/%3E%3Cpath d='M8 14h10.5l7 12.4L32.5 14H43L30.4 35.5V50h-9.8V35.5Z' fill='%23f04d2f'/%3E%3Crect x='46.5' y='14' width='9' height='24' rx='4.5' fill='%23d9ee55'/%3E%3Ccircle cx='51' cy='45.5' r='4.8' fill='%23d9ee55'/%3E%3C/svg%3E" type="image/svg+xml">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Yeeet">
+    <meta property="og:title" content="Yeeet CLI Docs — Folder to HTTPS in One Command">
+    <meta property="og:description" content="Install the Yeeet CLI and deploy any static folder to a globally cached HTTPS URL in one command.">
+    <meta property="og:url" content="https://docs.yeeet.dev/">
+    <meta property="og:image" content="https://yeeet.dev/og/docs.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="Boing Satellite the Yeeetling next to the yeeet deploy command.">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content="https://yeeet.dev/og/docs.png">
     <style>${DOCS_CSS}</style>
     <script>${DOCS_JS}</script>
   </head>
@@ -1742,7 +1753,7 @@ yeeet webhook rotate-secret &lt;id&gt;</code></pre><button class="copy-button" t
 
 const NOT_FOUND_HTML = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#f3efe6"><meta name="robots" content="noindex"><title>Not found · Yeeet docs</title><style>${DOCS_CSS}</style><script>${DOCS_JS}</script></head><body><button class="theme-toggle not-found-theme" type="button" data-theme-toggle aria-label="Toggle color theme" title="Toggle color theme"><svg class="theme-icon theme-icon-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.4 15.2A8.5 8.5 0 0 1 8.8 3.6 8.5 8.5 0 1 0 20.4 15.2Z"/></svg><svg class="theme-icon theme-icon-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.66 6.34l1.41-1.41"/></svg></button><main class="not-found"><span class="section-label">404 / Off Course</span><h1>Nothing landed here.</h1><p class="hero-lede">The documentation path you requested does not exist.</p><p><a class="button button-primary" href="/">Return to the CLI docs</a></p></main></body></html>`
 
-const FAVICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect x="3" y="3" width="58" height="58" rx="15" fill="#f04d2f" stroke="#171714" stroke-width="6"/><path d="M17 17h8l7 12 7-12h8L36 36v12h-8V36L17 17Z" fill="#171714"/><circle cx="48" cy="46" r="4" fill="#d7f544"/></svg>`
+const FAVICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="15" fill="#181815"/><path d="M8 14h10.5l7 12.4L32.5 14H43L30.4 35.5V50h-9.8V35.5Z" fill="#f04d2f"/><rect x="46.5" y="14" width="9" height="24" rx="4.5" fill="#d9ee55"/><circle cx="51" cy="45.5" r="4.8" fill="#d9ee55"/></svg>`
 
 const ROBOTS_TXT = `User-agent: *\nAllow: /\n\nSitemap: https://docs.yeeet.dev/sitemap.xml\n`
 

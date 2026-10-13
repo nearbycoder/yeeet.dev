@@ -51,7 +51,9 @@ function SiteLayout() {
             </div>
           </div>
           <div className="site-hero-status">
-            <span className="state-pill live">
+            <span
+              className={`state-pill ${site.activeDeploymentId ? 'live' : ''}`}
+            >
               <i /> {site.activeDeploymentId ? 'Live' : 'No live version'}
             </span>
             <small>
