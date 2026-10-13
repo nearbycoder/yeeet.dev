@@ -11,11 +11,13 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminRouteImport } from './routes/admin'
+import { Route as BrandRouteImport } from './routes/brand'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as DeviceRouteImport } from './routes/device'
 import { Route as HealthRouteImport } from './routes/health'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as MascotRouteImport } from './routes/mascot'
+import { Route as PromoRouteImport } from './routes/promo'
 import { Route as DashboardSettingsRouteImport } from './routes/dashboard_/settings'
 import { Route as DashboardStorageRouteImport } from './routes/dashboard_/storage'
 import { Route as DashboardWorkspacesRouteImport } from './routes/dashboard_/workspaces'
@@ -69,6 +71,11 @@ const AdminRoute = AdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
+const BrandRoute = BrandRouteImport.update({
+  id: '/brand',
+  path: '/brand',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DashboardRoute = DashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -92,6 +99,11 @@ const LoginRoute = LoginRouteImport.update({
 const MascotRoute = MascotRouteImport.update({
   id: '/mascot',
   path: '/mascot',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PromoRoute = PromoRouteImport.update({
+  id: '/promo',
+  path: '/promo',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardSettingsRoute = DashboardSettingsRouteImport.update({
@@ -332,11 +344,13 @@ const ApiV1SitesSlugVersionsDeploymentIdFileRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/brand': typeof BrandRoute
   '/dashboard': typeof DashboardRoute
   '/device': typeof DeviceRoute
   '/health': typeof HealthRoute
   '/login': typeof LoginRoute
   '/mascot': typeof MascotRoute
+  '/promo': typeof PromoRoute
   '/dashboard/settings': typeof DashboardSettingsRoute
   '/dashboard/storage': typeof DashboardStorageRoute
   '/dashboard/workspaces': typeof DashboardWorkspacesRoute
@@ -383,11 +397,13 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/brand': typeof BrandRoute
   '/dashboard': typeof DashboardRoute
   '/device': typeof DeviceRoute
   '/health': typeof HealthRoute
   '/login': typeof LoginRoute
   '/mascot': typeof MascotRoute
+  '/promo': typeof PromoRoute
   '/dashboard/settings': typeof DashboardSettingsRoute
   '/dashboard/storage': typeof DashboardStorageRoute
   '/dashboard/workspaces': typeof DashboardWorkspacesRoute
@@ -434,11 +450,13 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/brand': typeof BrandRoute
   '/dashboard': typeof DashboardRoute
   '/device': typeof DeviceRoute
   '/health': typeof HealthRoute
   '/login': typeof LoginRoute
   '/mascot': typeof MascotRoute
+  '/promo': typeof PromoRoute
   '/dashboard_/settings': typeof DashboardSettingsRoute
   '/dashboard_/storage': typeof DashboardStorageRoute
   '/dashboard_/workspaces': typeof DashboardWorkspacesRoute
@@ -487,11 +505,13 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/admin'
+    | '/brand'
     | '/dashboard'
     | '/device'
     | '/health'
     | '/login'
     | '/mascot'
+    | '/promo'
     | '/dashboard/settings'
     | '/dashboard/storage'
     | '/dashboard/workspaces'
@@ -538,11 +558,13 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/admin'
+    | '/brand'
     | '/dashboard'
     | '/device'
     | '/health'
     | '/login'
     | '/mascot'
+    | '/promo'
     | '/dashboard/settings'
     | '/dashboard/storage'
     | '/dashboard/workspaces'
@@ -588,11 +610,13 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/admin'
+    | '/brand'
     | '/dashboard'
     | '/device'
     | '/health'
     | '/login'
     | '/mascot'
+    | '/promo'
     | '/dashboard_/settings'
     | '/dashboard_/storage'
     | '/dashboard_/workspaces'
@@ -640,11 +664,13 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRoute
+  BrandRoute: typeof BrandRoute
   DashboardRoute: typeof DashboardRoute
   DeviceRoute: typeof DeviceRoute
   HealthRoute: typeof HealthRoute
   LoginRoute: typeof LoginRoute
   MascotRoute: typeof MascotRoute
+  PromoRoute: typeof PromoRoute
   DashboardSettingsRoute: typeof DashboardSettingsRoute
   DashboardStorageRoute: typeof DashboardStorageRoute
   DashboardWorkspacesRoute: typeof DashboardWorkspacesRoute
@@ -681,6 +707,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/brand': {
+      id: '/brand'
+      path: '/brand'
+      fullPath: '/brand'
+      preLoaderRoute: typeof BrandRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/dashboard': {
       id: '/dashboard'
       path: '/dashboard'
@@ -714,6 +747,13 @@ declare module '@tanstack/react-router' {
       path: '/mascot'
       fullPath: '/mascot'
       preLoaderRoute: typeof MascotRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/promo': {
+      id: '/promo'
+      path: '/promo'
+      fullPath: '/promo'
+      preLoaderRoute: typeof PromoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dashboard_/settings': {
@@ -1161,11 +1201,13 @@ const ApiV1WebhooksRouteWithChildren = ApiV1WebhooksRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
+  BrandRoute: BrandRoute,
   DashboardRoute: DashboardRoute,
   DeviceRoute: DeviceRoute,
   HealthRoute: HealthRoute,
   LoginRoute: LoginRoute,
   MascotRoute: MascotRoute,
+  PromoRoute: PromoRoute,
   DashboardSettingsRoute: DashboardSettingsRoute,
   DashboardStorageRoute: DashboardStorageRoute,
   DashboardWorkspacesRoute: DashboardWorkspacesRoute,
