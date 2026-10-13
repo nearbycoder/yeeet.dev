@@ -118,12 +118,18 @@ export function SiteSwitcher() {
   return (
     <>
       <button
-        className="button button-paper"
+        type="button"
+        className="site-switcher-trigger"
         onClick={() => setOpen(true)}
         ref={trigger}
         aria-keyshortcuts="Control+k Meta+k"
       >
-        Switch site <kbd>⌘/Ctrl K</kbd>
+        <svg viewBox="0 0 20 20" aria-hidden="true">
+          <circle cx="8.5" cy="8.5" r="5.5" />
+          <path d="m13 13 4 4" />
+        </svg>
+        <span>Switch site</span>
+        <kbd>⌘K</kbd>
       </button>
       <dialog
         className="panel site-page-panel site-switcher-dialog"
@@ -143,17 +149,19 @@ export function SiteSwitcher() {
           }
         }}
       >
-        <div className="console-actions">
+        <div className="site-switcher-heading">
           <h2 id={title}>Go to…</h2>
           <button
-            className="button button-paper"
+            type="button"
+            className="dialog-close"
+            aria-label="Close site switcher"
             onClick={() => setOpen(false)}
           >
-            Close site switcher
+            ×
           </button>
         </div>
-        <label className="console-field">
-          Search sites and commands
+        <label className="console-field site-switcher-search">
+          <span className="sr-only">Search sites and commands</span>
           <input
             ref={input}
             type="search"
@@ -163,7 +171,10 @@ export function SiteSwitcher() {
             placeholder="Site, domain, project, tag, or command…"
           />
         </label>
-        <p>↑ ↓ to choose · Enter to open · Escape to close</p>
+        <p className="site-switcher-hint">
+          <kbd>↑</kbd> <kbd>↓</kbd> to choose · <kbd>Enter</kbd> to open ·{' '}
+          <kbd>Esc</kbd> to close
+        </p>
         {commands.length ? (
           <section aria-label="Quick commands">
             <h3>Quick commands</h3>

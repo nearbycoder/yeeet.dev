@@ -1235,21 +1235,6 @@ function Dashboard() {
               </div>
               <b>{data.totalCount}</b>
             </div>
-            <RecentSites key={user.id} userId={user.id} />
-            <FleetExport sites={data.sites} />
-            <SavedViews
-              userId={user.id}
-              filters={filters}
-              onLoad={(saved) =>
-                changeFilters({
-                  q: undefined,
-                  status: undefined,
-                  group: undefined,
-                  favorites: undefined,
-                  ...saved,
-                })
-              }
-            />
             {data.totalCount ? (
               <form
                 onSubmit={(event) => {
@@ -1290,7 +1275,7 @@ function Dashboard() {
                   </select>
                 </label>
                 <label>
-                  Project group
+                  <span>Project group</span>
                   <select
                     value={projectGroup}
                     onChange={(event) => {
@@ -1305,7 +1290,7 @@ function Dashboard() {
                     ))}
                   </select>
                 </label>
-                <label className="checkbox-label">
+                <label className="checkbox-label favorites-toggle">
                   <input
                     type="checkbox"
                     checked={favoritesOnly}
@@ -1315,10 +1300,10 @@ function Dashboard() {
                       })
                     }}
                   />
-                  Favorites only
+                  <span>Favorites</span>
                 </label>
-                <button className="button button-paper" type="submit">
-                  Search sites
+                <button className="button button-ink" type="submit">
+                  Search
                 </button>
                 <p role="status">
                   Showing {matchingSites.length} of {data.matchedCount} matching
@@ -1326,6 +1311,23 @@ function Dashboard() {
                 </p>
               </form>
             ) : null}
+            <div className="fleet-tools">
+              <RecentSites key={user.id} userId={user.id} />
+              <SavedViews
+                userId={user.id}
+                filters={filters}
+                onLoad={(saved) =>
+                  changeFilters({
+                    q: undefined,
+                    status: undefined,
+                    group: undefined,
+                    favorites: undefined,
+                    ...saved,
+                  })
+                }
+              />
+              <FleetExport sites={data.sites} />
+            </div>
             {data.totalCount ? (
               <div className="site-list">
                 {matchingSites.map((site) => (

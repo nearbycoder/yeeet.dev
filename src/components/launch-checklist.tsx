@@ -60,25 +60,47 @@ export function LaunchChecklist({
       to: '/dashboard/sites/$slug/lifecycle' as const,
     },
   ]
+  const all = [...required, ...optional]
+  const doneCount = all.filter((item) => item.done).length
+  const requiredDone = required.filter((item) => item.done).length
   return (
-    <section className="panel site-page-panel" aria-label="Launch checklist">
-      <h2>Launch checklist</h2>
-      <p role="status">
-        {required.filter((item) => item.done).length} of {required.length}{' '}
-        deployment checks ready
-      </p>
-      <p>
-        This checklist uses recorded configuration. Open the live site to
-        confirm its appearance and behavior; DNS, CDN propagation and current
-        object availability are not guaranteed by metadata.
-      </p>
-      <ol className="launch-checklist">
+    <section
+      className="panel site-page-panel launch-panel"
+      aria-label="Launch checklist"
+    >
+      <div className="launch-panel-heading">
+        <div>
+          <span className="panel-kicker">Preflight</span>
+          <h2>Launch checklist</h2>
+          <p role="status">
+            {requiredDone} of {required.length} deployment checks ready ·{' '}
+            {doneCount} of {all.length} overall
+          </p>
+        </div>
+        <div
+          className="launch-progress"
+          aria-hidden="true"
+          style={
+            {
+              '--progress': `${Math.round((doneCount / all.length) * 100)}%`,
+            } as React.CSSProperties
+          }
+        >
+          <span>
+            {doneCount}/{all.length}
+          </span>
+        </div>
+      </div>
+      <ol className="launch-checklist launch-checklist-required">
         {required.map((item) => (
-          <li key={item.title}>
-            <strong>
-              {item.done ? '✓' : '○'} {item.title}
-            </strong>
-            <p>{item.detail}</p>
+          <li key={item.title} className={item.done ? 'is-done' : ''}>
+            <span className="launch-check" aria-hidden="true">
+              {item.done ? '✓' : '!'}
+            </span>
+            <div>
+              <strong>{item.title}</strong>
+              <p>{item.detail}</p>
+            </div>
             <Link
               to={item.to}
               params={{ slug }}
@@ -87,46 +109,43 @@ export function LaunchChecklist({
                   ? { version: data.activeId ?? undefined }
                   : { q: data.activeId ?? undefined }
               }
+              aria-label={`Open ${item.title.toLowerCase()} settings`}
             >
-              Open {item.title.toLowerCase()} settings →
+              Open →
             </Link>
           </li>
         ))}
       </ol>
       <h3>Recommended review</h3>
-      <p>
-        These steps depend on your launch. A recorded access mode describes
-        configuration and still needs your review.
-      </p>
-      <ul className="launch-checklist">
+      <ul className="launch-checklist launch-checklist-optional">
         {optional.map((item) => (
-          <li key={item.title}>
-            <strong>
-              {item.title === 'Review access' ? '↗' : item.done ? '✓' : '○'}{' '}
-              {item.title}
-            </strong>
-            <p>{item.detail}</p>
-            <Link
-              to={item.to}
-              params={{ slug }}
-              search={
-                item.to.endsWith('/sharing')
-                  ? { version: data.activeId ?? undefined }
-                  : {}
-              }
-            >
-              {item.title} →
-            </Link>
+          <li key={item.title} className={item.done ? 'is-done' : ''}>
+            <span className="launch-check" aria-hidden="true">
+              {item.title === 'Review access' ? '↗' : item.done ? '✓' : ''}
+            </span>
+            <div>
+              <strong>{item.title}</strong>
+              <p>{item.detail}</p>
+              <Link
+                to={item.to}
+                params={{ slug }}
+                search={
+                  item.to.endsWith('/sharing')
+                    ? { version: data.activeId ?? undefined }
+                    : {}
+                }
+              >
+                {item.title} →
+              </Link>
+            </div>
           </li>
         ))}
       </ul>
-      <Link
-        className="button button-coral"
-        to="/dashboard"
-        search={{ site: slug }}
-      >
-        Deploy an update
-      </Link>
+      <p className="launch-note">
+        Checks use recorded configuration. Open the live site to confirm its
+        appearance; DNS, CDN propagation, and object availability are not
+        guaranteed by metadata.
+      </p>
     </section>
   )
 }

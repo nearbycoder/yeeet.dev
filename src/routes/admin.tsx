@@ -1,16 +1,13 @@
-import { SignOutButton } from '#/components/sign-out-button'
 import { CopyButton } from '#/components/copy-button'
-import { NavigationMenu } from '#/components/navigation-menu'
+import { DashboardHeader } from '#/components/dashboard-header'
 import { useState } from 'react'
-import {
-  Link,
-  createFileRoute,
-  redirect,
-  useRouter,
-} from '@tanstack/react-router'
-import { Brand } from '#/components/brand'
+import { createFileRoute, redirect, useRouter } from '@tanstack/react-router'
 import { ConfirmDialog } from '#/components/confirm-dialog'
-import { getAdminData, getSession } from '#/server/functions'
+import {
+  getAdminData,
+  getPublicPlatformConfig,
+  getSession,
+} from '#/server/functions'
 
 export const Route = createFileRoute('/admin')({
   beforeLoad: async () => {
@@ -20,7 +17,7 @@ export const Route = createFileRoute('/admin')({
     const role = (session.user as { role?: string }).role
     if (!role?.split(',').includes('admin'))
       throw redirect({ to: '/dashboard' })
-    return { user: session.user }
+    return { user: session.user, platform: await getPublicPlatformConfig() }
   },
   loader: () => getAdminData(),
   component: Admin,
@@ -56,7 +53,7 @@ async function adminRequest(path: string, init: RequestInit = {}) {
 }
 
 function Admin() {
-  const { user } = Route.useRouteContext()
+  const { user, platform } = Route.useRouteContext()
   const data = Route.useLoaderData()
   const router = useRouter()
   const [busy, setBusy] = useState('')
@@ -91,18 +88,7 @@ function Admin() {
       <a className="skip-link" href="#main-content">
         Skip to content
       </a>
-      <header className="dashboard-header">
-        <Brand />
-        <NavigationMenu label="Admin navigation">
-          <Link to="/dashboard">Launchpad</Link>
-          <span className="admin-badge">ADMIN</span>
-          <span className="user-chip">
-            <span>{user.name.slice(0, 1).toUpperCase()}</span>
-            {user.name}
-          </span>
-          <SignOutButton />
-        </NavigationMenu>
-      </header>
+      <DashboardHeader user={user} docsUrl={platform.docsUrl} />
 
       <main
         className="dashboard-main admin-main"

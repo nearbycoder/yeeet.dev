@@ -5,7 +5,6 @@ import {
   createRootRouteWithContext,
 } from '@tanstack/react-router'
 import type { QueryClient } from '@tanstack/react-query'
-import { ThemeToggle } from '#/components/theme-toggle'
 import appCss from '../styles.css?url'
 
 interface RouterContext {
@@ -57,7 +56,6 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       <body>
         {children}
         <ApplyReadingPreferences />
-        <ThemeToggle />
         <Scripts />
       </body>
     </html>

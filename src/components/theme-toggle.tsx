@@ -12,7 +12,7 @@ function applyTheme(theme: Theme) {
     ?.setAttribute('content', theme === 'dark' ? '#181b17' : '#f7f7f4')
 }
 
-export function ThemeToggle() {
+export function ThemeToggle({ inline = false }: { inline?: boolean }) {
   useEffect(() => {
     const colorScheme = window.matchMedia('(prefers-color-scheme: dark)')
     const followSystemTheme = (event: MediaQueryListEvent) => {
@@ -30,7 +30,7 @@ export function ThemeToggle() {
 
   return (
     <button
-      className="theme-toggle"
+      className={`theme-toggle ${inline ? 'theme-toggle-inline' : ''}`}
       type="button"
       aria-label="Toggle color theme"
       title="Toggle color theme"

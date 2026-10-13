@@ -31,11 +31,14 @@ function AccountSettings() {
       <main id="main-content" tabIndex={-1} className="dashboard-main">
         <div className="dashboard-intro">
           <div>
+            <div className="eyebrow">
+              <span className="status-dot" /> Ground control
+            </div>
             <h1>Integrations</h1>
             <p>Manage account access and deployment events.</p>
           </div>
         </div>
-        <nav className="console-actions" aria-label="Integration sections">
+        <nav className="section-jump" aria-label="Integration sections">
           <a href="#reading">Reading preferences</a>
           <a href="#sessions">Browser sessions</a>
           <a href="#api-keys">API keys</a>

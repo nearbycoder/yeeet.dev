@@ -338,7 +338,6 @@ function SiteVersions() {
                 className={`site-version-card ${version.current ? 'is-current' : ''}`}
               >
                 <div className="site-version-index">
-                  <span aria-hidden="true">↗</span>
                   <i className={`activity-status ${version.status}`}>
                     {version.status === 'ready'
                       ? '✓'
@@ -357,8 +356,8 @@ function SiteVersions() {
                     </span>
                   </div>
                   <p>
-                    {version.id.slice(0, 8)} · {version.source} ·{' '}
-                    {formatDate(version.createdAt)}
+                    {version.releaseLabel ? `${version.id.slice(0, 8)} · ` : ''}
+                    {version.source} · {formatDate(version.createdAt)}
                     {version.channel ? ` · ${version.channel} channel` : ''}
                   </p>
                   {version.releaseNotes ? (
@@ -375,7 +374,7 @@ function SiteVersions() {
                   </small>
                 </div>
                 <div className="site-version-actions">
-                  <label className="checkbox-label">
+                  <label className="checkbox-label compare-toggle">
                     <input
                       type="checkbox"
                       checked={compareIds.includes(version.id)}
@@ -385,7 +384,8 @@ function SiteVersions() {
                       }
                       onChange={() => toggleComparison(version.id)}
                     />
-                    Compare {version.id.slice(0, 8)}
+                    Compare
+                    <span className="sr-only"> {version.id.slice(0, 8)}</span>
                   </label>
                   <button
                     className="button button-paper"
@@ -442,7 +442,7 @@ function SiteVersions() {
                   {!version.current && version.status === 'ready' ? (
                     <button
                       type="button"
-                      className="button button-paper"
+                      className="button button-ink"
                       disabled={Boolean(busy)}
                       onClick={() =>
                         void previewActivation({
