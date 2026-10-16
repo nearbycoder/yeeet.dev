@@ -27,11 +27,11 @@
     "node": ">=20"
   },
   "dependencies": {
-    "@modelcontextprotocol/server": "^2.0.0",
+    "@modelcontextprotocol/server": "^2.3.1",
     "brace-expansion": "^5.0.12",
     "fdir": "^6.5.0",
     "mime-types": "^3.0.2",
     "picomatch": "^4.0.7",
-    "zod": "^4.6.5"
+    "zod": "^4.6.6"
   }
 }
