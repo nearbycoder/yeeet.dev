@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Yeeet todos</title>
+    <style>
+      body {
+        font:
+          16px system-ui,
+          sans-serif;
+        max-width: 32rem;
+        margin: 3rem auto;
+        padding: 0 1rem;
+      }
+      li {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+        padding: 0.25rem 0;
+      }
+      li.done span {
+        text-decoration: line-through;
+        opacity: 0.6;
+      }
+      form {
+        display: flex;
+        gap: 0.5rem;
+      }
+      input[type='text'] {
+        flex: 1;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Todos</h1>
+    <form id="add">
+      <input
+        type="text"
+        name="title"
+        placeholder="What needs doing?"
+        required
+        maxlength="200"
+      /><button>Add</button>
+    </form>
+    <ul id="list"></ul>
+    <script type="module">
+      const list = document.querySelector('#list')
+      async function load() {
+        const todos = await (await fetch('/api/todos')).json()
+        list.replaceChildren(
+          ...todos.map((todo) => {
+            const item = document.createElement('li')
+            item.className = todo.done ? 'done' : ''
+            const box = Object.assign(document.createElement('input'), {
+              type: 'checkbox',
+              checked: !!todo.done,
+            })
+            box.onchange = async () => {
+              await fetch(`/api/todos/${todo.id}`, {
+                method: 'PATCH',
+                body: JSON.stringify({ done: box.checked }),
+              })
+              load()
+            }
+            const label = Object.assign(document.createElement('span'), {
+              textContent: todo.title,
+            })
+            const remove = Object.assign(document.createElement('button'), {
+              textContent: '×',
+              ariaLabel: `Delete ${todo.title}`,
+            })
+            remove.onclick = async () => {
+              await fetch(`/api/todos/${todo.id}`, { method: 'DELETE' })
+              load()
+            }
+            item.append(box, label, remove)
+            return item
+          }),
+        )
+      }
+      document.querySelector('#add').onsubmit = async (event) => {
+        event.preventDefault()
+        const form = event.target
+        await fetch('/api/todos', {
+          method: 'POST',
+          body: JSON.stringify({ title: form.title.value }),
+        })
+        form.reset()
+        load()
+      }
+      load()
+    </script>
+  </body>
+</html>

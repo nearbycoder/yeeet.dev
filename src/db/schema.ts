@@ -70,6 +70,8 @@ export const deployments = pgTable(
     releaseLabel: text('release_label').default('').notNull(),
     releaseNotes: text('release_notes').default('').notNull(),
     retentionPinned: boolean('retention_pinned').default(false).notNull(),
+    // JSON description of the _server.ts backend, or null for static deployments.
+    backend: text('backend'),
   },
   (table) => [
     index('deployments_site_id_idx').on(table.siteId),

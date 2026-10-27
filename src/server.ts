@@ -4,6 +4,7 @@ import handler, { createServerEntry } from '@tanstack/react-start/server-entry'
 import { recordSiteResponse, startAnalyticsWorker } from '#/server/analytics'
 import { maybeServeDocs } from '#/server/docs-site'
 import { maybeServeSite } from '#/server/site-gateway'
+import { maybeServeRuntimeBundle } from '#/server/backend-runtime'
 import { requireTrustedMutation } from '#/server/request-security'
 import { errorResponse } from '#/server/http'
 import { startWebhookWorker } from '#/server/webhooks'
@@ -15,6 +16,8 @@ startRetentionWorker()
 
 export default createServerEntry({
   async fetch(request) {
+    const bundleResponse = await maybeServeRuntimeBundle(request)
+    if (bundleResponse) return bundleResponse
     const docsResponse = maybeServeDocs(request)
     if (docsResponse) return docsResponse
     const siteResponse = await maybeServeSite(request)

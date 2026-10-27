@@ -20,3 +20,6 @@ dogfood-output/
 .cta.json
 __unconfig*
 todos.json
+
+# Local Yeeet dev state (yeeet dev)
+.yeeet/

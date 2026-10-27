@@ -31,6 +31,7 @@ export async function inspectDeployment(
       spaFallback: true,
       headerRules: true,
       redirectRules: true,
+      backend: true,
     },
     with: {
       files: {

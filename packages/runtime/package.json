@@ -1,0 +1,13 @@
+{
+  "name": "@yeeet.dev/runtime",
+  "version": "0.1.0",
+  "private": true,
+  "description": "On-demand Bun runtime for Yeeet site backends (_server.ts + SQLite).",
+  "type": "module",
+  "license": "MIT",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "bun src/server.js",
+    "test": "bun test"
+  }
+}

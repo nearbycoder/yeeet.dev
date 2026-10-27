@@ -76,6 +76,11 @@ export function RouteSimulator({
               Generated social image endpoint; image rendering is outside this
               simulation.
             </p>
+          ) : result.backend ? (
+            <p>
+              Handled by the site backend (<code>_server.ts</code>). The
+              response comes from the backend at request time.
+            </p>
           ) : result.redirect ? (
             <p>
               Redirect to{' '}

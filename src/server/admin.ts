@@ -19,6 +19,7 @@ import {
   revokeInvitation,
 } from './invitations'
 import { deleteStoredPrefix } from './storage'
+import { purgeBackendForPrefix } from './backend-runtime'
 
 async function audit(input: {
   actorId: string
@@ -200,6 +201,7 @@ export async function deleteSite(actor: Actor, siteId: string) {
     domains.map((domain) => removeRailwayCustomDomain(domain.railwayDomainId)),
   )
   const deletedObjects = await deleteStoredPrefix(`sites/${site.id}/`)
+  await purgeBackendForPrefix(`sites/${site.id}/`)
   await db.delete(sites).where(eq(sites.id, site.id))
   await audit({
     actorId: actor.userId,

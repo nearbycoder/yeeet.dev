@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import { BACKEND_LLM_GUIDE, BACKEND_LLM_SUMMARY } from './backend-docs'
 import {
   controlPlaneUrl,
   docsHost,
@@ -1107,7 +1108,7 @@ const CONTENT_SECURITY_POLICY = [
 
 const LLMS_TXT = String.raw`# Yeeet CLI documentation
 
-> Yeeet publishes a file or folder as an atomic static deployment with managed HTTPS and CDN caching. A site receives either a generated or chosen https://<name>.site.yeeet.dev URL.
+> Yeeet publishes static files with an optional on-demand Bun API and persistent SQLite database, managed HTTPS, and CDN caching. A site receives either a generated or chosen https://<name>.site.yeeet.dev URL.
 
 Canonical human docs: https://docs.yeeet.dev/
 Complete plain-text docs: https://docs.yeeet.dev/llms-full.txt
@@ -1177,6 +1178,8 @@ Exit codes are 0 for success, 2 when authentication is required, and 1 for valid
 - Never log or commit YEEET_TOKEN.
 - Webhook requests use X-Yeeet-Signature: t=<unix>,v1=<HMAC-SHA256> over <unix>.<raw body>. Reject stale timestamps and deduplicate X-Yeeet-Delivery.
 - Analytics store only aggregate UTC day, normalized path, response status, and count. They never store IPs, cookies, user agents, referrers, or visitor IDs, and do not report unique visitors.
+
+${BACKEND_LLM_SUMMARY}
 `
 
 const LLMS_FULL_TXT = String.raw`# Yeeet CLI Guide
@@ -1368,6 +1371,11 @@ Yeeet and Railway manage certificate issuance after DNS verification. Remove a m
     yeeet login
     yeeet logout
     yeeet whoami [--json]
+    yeeet check [path] [--strict] [--json]
+    yeeet dev [path] [--port 8787] [--database dev] [--reset] [--static]
+    yeeet backend status <site> [--json]
+    yeeet backend logs <site> [--database live] [--json]
+    yeeet backend restore <site> <backup> [--database live] --yes [--json]
     yeeet sites [--json]
     yeeet deploy|up [path] [--name <slug>] [--channel <name>] [--dry-run] [--idempotency-key <key>] [--spa|--static] [--password <password>] [--json]
     yeeet versions <site> [--json]
@@ -1406,6 +1414,8 @@ Manage releases through /api/v1/sites/{slug}/versions, privacy through the versi
 - Failed or partial uploads never replace the live release.
 - A generated subdomain is returned when no name or project default is supplied.
 - Registration is invitation-only. Administrators manage invitations and account access from /admin.
+
+${BACKEND_LLM_GUIDE}
 `
 
 const DOCS_HTML = String.raw`<!doctype html>
@@ -1486,6 +1496,7 @@ const DOCS_HTML = String.raw`<!doctype html>
           <a href="#overview">What Yeeet Is</a>
           <a href="#quick-start">Quick Start</a>
           <a href="#deploy">Deploy</a>
+          <a href="#backends">Bun & SQLite Backends</a>
           <a href="#versions">Versions & Rollback</a>
           <a href="#private-sharing">Private Sharing</a>
           <a href="#domains">Custom Domains</a>
@@ -1498,7 +1509,7 @@ const DOCS_HTML = String.raw`<!doctype html>
         <article class="docs-content">
           <section class="docs-section" id="overview">
             <span class="section-label">00 / Mission Control</span>
-            <h2>A Small Deployment Plane for Static Sites</h2>
+            <h2>Static Sites with Optional Bun Backends</h2>
             <p>Yeeet takes an already-built file or folder and publishes it as an atomic HTTPS release. It combines direct-to-bucket uploads, immutable versions, a movable live alias, SPA refresh support, private review links, custom domains, automatic social cards, and edge-aware caching behind one browser workflow and one CLI.</p>
             <p>It is intentionally focused: Yeeet serves static output and never executes an untrusted build. Run your framework's build locally or in CI, then hand Yeeet the resulting <span class="inline-code" translate="no">dist</span>, <span class="inline-code" translate="no">build</span>, <span class="inline-code" translate="no">out</span>, or <span class="inline-code" translate="no">public</span> directory.</p>
             <div class="workflow-grid">
@@ -1591,6 +1602,34 @@ yeeet deploy ./dist</code></pre><button class="copy-button" type="button" data-c
 # _redirects
 /old/:page /new/:page 308
 /app/* /index.html 200</code></pre><button class="copy-button" type="button" data-copy="code-rules">Copy</button></div>
+          </section>
+
+          <section class="docs-section" id="backends">
+            <span class="section-label">Server-side State</span>
+            <h2>One Handler. A Durable Database.</h2>
+            <p>Add <code translate="no">_server.ts</code> to your deployment folder to handle <code translate="no">/api</code> and <code translate="no">/api/*</code> on Bun. Your static front end can call these routes with relative URLs. Workers start on demand and stop when idle; SQLite keeps your data between requests and releases.</p>
+            <div class="code-block"><pre><code id="code-backend">// _server.ts
+export default {
+  fetch(request, { db }) {
+    return Response.json(db.query('SELECT * FROM todos').all())
+  },
+}
+
+-- _migrations/0001_create_todos.sql
+CREATE TABLE todos (id INTEGER PRIMARY KEY, title TEXT NOT NULL);</code></pre><button class="copy-button" type="button" data-copy="code-backend">Copy</button></div>
+            <p>Backend source and migrations stay private. Put helper modules in <code translate="no">_server/</code>. Each channel and version URL has a separate database; production and custom domains share live data.</p>
+            <h3>Test Before Deploying</h3>
+            <div class="code-block"><pre><code id="code-backend-test">bun test ./_server
+yeeet check . --json
+yeeet dev . --port 8787
+# In another terminal:
+curl http://127.0.0.1:8787/api/todos
+yeeet deploy . --name comet
+yeeet backend status comet
+yeeet backend logs comet</code></pre><button class="copy-button" type="button" data-copy="code-backend-test">Copy</button></div>
+            <h3>Migrate Safely</h3>
+            <p>Add numbered SQL files under <code translate="no">_migrations/</code>. Deploys rehearse migrations on a copy of the target database and boot the new code before moving the URL. The first request backs up the real database and applies pending migrations. Applied migrations are immutable and forward-only: keep schema changes compatible with the previous release so code rollback works.</p>
+            <p>Bun is required for local backend testing. Self-hosted instances need the optional runtime service and a persistent volume. See the <a href="/llms-full.txt">complete backend guide, including handler tests, recovery, and limits</a>, or start with the <a href="https://github.com/nearbycoder/yeeet.dev/tree/main/examples/todo-backend">runnable todo example</a>.</p>
           </section>
 
           <section class="docs-section" id="versions">
@@ -1710,6 +1749,9 @@ yeeet webhook rotate-secret &lt;id&gt;</code></pre><button class="copy-button" t
                 <tbody>
                   <tr><td>login / logout / whoami</td><td>Manage the local device session and verify identity.</td></tr>
                   <tr><td>deploy|up [path]</td><td>Upload a file or folder and atomically activate the ready release.</td></tr>
+                  <tr><td>check [path]</td><td>Check files, rehearse migrations, and boot the backend locally.</td></tr>
+                  <tr><td>dev [path]</td><td>Serve static files and a Bun API with persistent local SQLite.</td></tr>
+                  <tr><td>backend status / logs / restore</td><td>Inspect databases, debug workers, and recover a backup.</td></tr>
                   <tr><td>sites</td><td>List live sites owned by the current account.</td></tr>
                   <tr><td>versions &lt;site&gt;</td><td>List immutable releases, preview URLs, status, routing mode, and privacy.</td></tr>
                   <tr><td>rollback &lt;site&gt; [version]</td><td>Promote an older ready release, or the previous release when omitted.</td></tr>

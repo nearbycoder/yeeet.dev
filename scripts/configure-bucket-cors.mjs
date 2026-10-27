@@ -14,7 +14,7 @@ function env(primary, fallback) {
 const bucket = env('S3_BUCKET', 'BUCKET')
 const client = new S3Client({
   endpoint: env('S3_ENDPOINT', 'ENDPOINT'),
-  region: process.env.S3_REGION || process.env.REGION || 'auto',
+  region: process.env.S3_REGION || 'auto',
   forcePathStyle: process.env.S3_FORCE_PATH_STYLE === 'true',
   credentials: {
     accessKeyId: env('S3_ACCESS_KEY_ID', 'ACCESS_KEY_ID'),

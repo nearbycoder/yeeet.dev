@@ -22,6 +22,7 @@ export default [
       'node_modules/**',
       'src/routeTree.gen.ts',
       'drizzle/meta/**',
+      'examples/**',
     ],
   },
 ]

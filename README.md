@@ -1,6 +1,7 @@
 # Yeeet
 
-Yeeet is an open-source static-site deployment platform for humans, command-line
+Yeeet is an open-source deployment platform for static sites with optional Bun
+backends and SQLite state, built for humans, command-line
 workflows, CI, and coding agents. Give it a file or build directory and it
 publishes an atomic, CDN-cached HTTPS deployment on a generated or chosen
 subdomain.
@@ -65,6 +66,8 @@ builds or replace a framework's build command.
 ## What you get
 
 - Browser uploads and a Node.js CLI with the same deployment model.
+- On-demand `_server.ts` APIs under `/api`, persistent per-site SQLite, numbered
+  SQL migrations, backup recovery, and local Bun testing.
 - Random readable subdomains or stable names such as
   `comet.site.example.com`.
 - Atomic releases: a live pointer moves only after every object is verified.
@@ -288,6 +291,48 @@ does not store IP addresses, cookies, user agents, referrers, or visitor IDs,
 and deliberately does not claim unique-visitor metrics. Dynamic path segments
 are collapsed and path cardinality is capped before data reaches Postgres.
 
+## Bun APIs and persistent state
+
+Include `_server.ts` in your deployed folder to handle `/api` requests alongside
+static files. The handler receives a standard `Request` and `{ db, site }`, and
+returns a `Response`. Keep state in SQLite: workers start on demand and stop
+when idle.
+
+```ts
+// _server.ts
+export default {
+  fetch(request, { db }) {
+    return Response.json(db.query('SELECT * FROM todos').all())
+  },
+}
+```
+
+Create the schema in `_migrations/0001_create_todos.sql`, then add new numbered
+files for later changes. Deploys rehearse migrations and startup against a copy
+of the target database before moving the URL. An existing database is backed up
+before pending migrations run on the first request. Migrations are forward-only;
+code rollbacks keep the current schema and data. Channels and immutable version
+URLs each have their own database.
+
+```sh
+bun test ./examples/todo-backend/_server
+yeeet check examples/todo-backend --json
+yeeet dev examples/todo-backend
+yeeet deploy examples/todo-backend --name todo
+yeeet backend status todo
+yeeet backend logs todo
+```
+
+Read the [backend guide](docs/backend.md) for the handler contract, local tests,
+migration strategy, and recovery. Start from the
+[runnable todo example](examples/todo-backend). Agents receive the same guidance
+in `/llms.txt` and `/llms-full.txt`.
+
+Self-hosted instances must configure the separate
+[runtime service and persistent volume](docs/backend-runtime.md). Enable it for
+trusted authors; the runtime uses OS users and does not provide a hostile-code
+sandbox.
+
 ## One-click Railway deploy
 
 [![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/new/template/yeeet?utm_medium=integration&utm_source=button&utm_campaign=yeeet)
@@ -380,19 +425,20 @@ the first bootstrap invitation idempotently.
 
 All deployment-specific values live in environment variables. Important ones:
 
-| Variable                                    | Purpose                                                 |
-| ------------------------------------------- | ------------------------------------------------------- |
-| `BETTER_AUTH_URL`                           | Public origin of the control plane                      |
-| `BETTER_AUTH_SECRET`                        | Random signing secret, at least 32 characters           |
-| `DATABASE_URL`                              | PostgreSQL connection string                            |
-| `SITE_DOMAIN`                               | Wildcard suffix used for sites and immutable versions   |
-| `DOCS_HOST`                                 | Hostname that serves the built-in human and LLM docs    |
-| `ADMIN_EMAILS`                              | Comma-separated bootstrap administrator emails          |
-| `INITIAL_INVITATION_CODE`                   | Optional first invitation code                          |
-| `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | Optional GitHub OAuth app                               |
-| `S3_*`                                      | Private S3-compatible bucket connection and credentials |
-| `RAILWAY_TOKEN`                             | Optional project token for user custom domains          |
-| `MAX_DEPLOY_BYTES`                          | Per-deployment byte limit; defaults to 500 MB           |
+| Variable                                         | Purpose                                                           |
+| ------------------------------------------------ | ----------------------------------------------------------------- |
+| `BETTER_AUTH_URL`                                | Public origin of the control plane                                |
+| `BETTER_AUTH_SECRET`                             | Random signing secret, at least 32 characters                     |
+| `DATABASE_URL`                                   | PostgreSQL connection string                                      |
+| `SITE_DOMAIN`                                    | Wildcard suffix used for sites and immutable versions             |
+| `DOCS_HOST`                                      | Hostname that serves the built-in human and LLM docs              |
+| `ADMIN_EMAILS`                                   | Comma-separated bootstrap administrator emails                    |
+| `INITIAL_INVITATION_CODE`                        | Optional first invitation code                                    |
+| `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET`      | Optional GitHub OAuth app                                         |
+| `S3_*`                                           | Private S3-compatible bucket connection and credentials           |
+| `RAILWAY_TOKEN`                                  | Optional project token for user custom domains                    |
+| `MAX_DEPLOY_BYTES`                               | Per-deployment byte limit; defaults to 500 MB                     |
+| `BACKEND_RUNTIME_URL` / `BACKEND_RUNTIME_SECRET` | Optional private Bun runtime connection and shared signing secret |
 
 See [`.env.example`](.env.example) for the complete list and safe development
 defaults. Never commit `.env.local`, Railway tokens, OAuth secrets, database
@@ -408,6 +454,7 @@ src/db/              Drizzle schemas
 drizzle/             committed SQL migrations and migration metadata
 packages/cli/        publishable Node.js CLI
 packages/mcp/        first-party stdio MCP server for coding agents
+packages/runtime/    on-demand Bun workers, SQLite, migrations, and backups
 public/              OpenAPI and agent-readable entry points
 docs/                operator documentation
 scripts/             migrations, admin bootstrap, and bucket CORS helpers
@@ -421,6 +468,8 @@ npm run check
 npm run lint
 npm run typecheck
 npm test
+npm run test:runtime
+bun test ./examples/todo-backend/_server
 npm run build
 ```
 

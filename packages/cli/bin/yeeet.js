@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 
+import { spawn, spawnSync } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
 import { createReadStream } from 'node:fs'
 import { chmod, mkdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import process from 'node:process'
 import { Command } from 'commander'
 import { scanDeploymentFiles } from './deployment-files.js'
@@ -12,7 +14,7 @@ import mime from 'mime-types'
 import open from 'open'
 import { localPreflight } from './preflight.js'
 
-const VERSION = '0.1.0'
+const VERSION = '0.2.0'
 const CLIENT_ID = 'yeeet-cli'
 const DEFAULT_API = 'https://yeeet.dev'
 const GRANT_TYPE = 'urn:ietf:params:oauth:grant-type:device_code'
@@ -210,6 +212,7 @@ async function findFiles(target) {
   const ignore = [
     '.git/**',
     'node_modules/**',
+    '.yeeet/**',
     '.DS_Store',
     '.yeeetignore',
     ...ignoreFile
@@ -272,21 +275,197 @@ function printDeploymentDiff(plan) {
   console.log('')
 }
 
+const DEV_SERVER = fileURLToPath(
+  new URL('../runtime/dev-server.js', import.meta.url),
+)
+const BACKEND_PATH = /^(?:_server\.(?:ts|js)|_server\/|_migrations\/)/
+
+function bunExecutable() {
+  const bun = process.env.YEEET_BUN || 'bun'
+  const probe = spawnSync(bun, ['--version'], { encoding: 'utf8' })
+  return probe.status === 0 ? bun : null
+}
+
+function bunRequiredError() {
+  const error = new Error(
+    'Site backends run on Bun. Install it with `curl -fsSL https://bun.sh/install | bash` (or set YEEET_BUN to its path).',
+  )
+  error.code = 'bun_required'
+  return error
+}
+
+function hasBackendFiles(files) {
+  return files.some((file) => BACKEND_PATH.test(file.path))
+}
+
+async function checkBackend(targetPath) {
+  const bun = bunExecutable()
+  if (!bun)
+    return {
+      status: 'skipped',
+      warning: {
+        code: 'backend_unchecked',
+        message:
+          'Install Bun to rehearse the backend locally (migrations and startup). It will still be checked on deploy.',
+      },
+    }
+  const result = spawnSync(bun, [DEV_SERVER, 'check', targetPath], {
+    encoding: 'utf8',
+    maxBuffer: 10 * 1024 * 1024,
+  })
+  try {
+    return JSON.parse(result.stdout.trim().split('\n').at(-1))
+  } catch {
+    return {
+      status: 'failed',
+      errors: [
+        {
+          code: 'backend_check_failed',
+          message: (result.stderr || result.stdout || 'Backend check failed.')
+            .trim()
+            .slice(0, 2000),
+        },
+      ],
+      warnings: [],
+    }
+  }
+}
+
+async function devServer(target, options) {
+  const targetPath = resolve(target)
+  if (!(await stat(targetPath)).isDirectory())
+    throw new Error(`${target} is not a directory.`)
+  const bun = bunExecutable()
+  if (!bun) throw bunRequiredError()
+  const args = [DEV_SERVER, 'serve', targetPath, '--port', String(options.port)]
+  if (options.host) args.push('--host', options.host)
+  if (options.database) args.push('--database', options.database)
+  if (options.reset) args.push('--reset')
+  if (options.static) args.push('--static')
+  const child = spawn(bun, args, { stdio: 'inherit' })
+  for (const signal of ['SIGINT', 'SIGTERM'])
+    process.on(signal, () => child.kill(signal))
+  await new Promise((resolvePromise) =>
+    child.on('exit', (code) => {
+      process.exitCode = code ?? 0
+      resolvePromise()
+    }),
+  )
+}
+
+async function backendStatus(site, options) {
+  const data = await apiRequest(
+    `/api/v1/sites/${encodeURIComponent(site)}/backend`,
+    {},
+    options,
+  )
+  if (options.json) return print(data, true)
+  if (!data.backend) {
+    console.log(
+      `\n  ${data.site} has no backend in its live release. Add _server.ts to deploy one.\n`,
+    )
+  } else {
+    console.log(
+      `\n  ${data.site} backend: ${data.backend.entry} → ${data.backend.routes}`,
+    )
+    console.log(
+      `  Migrations in live release: ${data.backend.migrations.join(', ') || 'none'}`,
+    )
+  }
+  for (const database of data.databases) {
+    console.log(
+      `\n  Database ${database.name} · ${formatBytes(database.sizeBytes)} · ${database.migrations.length} applied`,
+    )
+    console.log(
+      database.worker
+        ? `  Worker running ${database.worker.deploymentId.slice(0, 8)} since ${database.worker.startedAt}`
+        : '  Worker idle (starts on the next request)',
+    )
+    for (const backup of database.backups.slice(0, 5))
+      console.log(`  backup ${backup.name} (${formatBytes(backup.sizeBytes)})`)
+  }
+  console.log('')
+}
+
+async function backendLogs(site, options) {
+  const query = options.database
+    ? `?database=${encodeURIComponent(options.database)}`
+    : ''
+  const data = await apiRequest(
+    `/api/v1/sites/${encodeURIComponent(site)}/backend/logs${query}`,
+    {},
+    options,
+  )
+  if (options.json) return print(data, true)
+  if (!data.entries.length)
+    return console.log(
+      'No recent backend logs. Logs are kept in memory while the runtime is up.',
+    )
+  for (const entry of data.entries)
+    console.log(
+      `${entry.at} ${entry.database} ${entry.stream === 'stderr' ? '!' : ' '} ${entry.line}`,
+    )
+}
+
+async function backendRestore(site, backup, options) {
+  confirmationRequired(
+    options,
+    `Restoring ${backup} replaces the ${options.database} database of ${site}. Yeeet saves the current data as a backup first.`,
+  )
+  const data = await apiRequest(
+    `/api/v1/sites/${encodeURIComponent(site)}/backend/restore`,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ database: options.database, backup }),
+    },
+    options,
+  )
+  print(
+    options.json
+      ? data
+      : `✓ Restored ${data.restored} into ${data.database}${data.safetyBackup ? `. Previous data saved as ${data.safetyBackup}.` : '.'}`,
+    options.json,
+  )
+}
+
 async function checkBuild(target, options) {
   const maxBytes = Number(options.maxBytes)
   if (!Number.isSafeInteger(maxBytes) || maxBytes < 1)
     throw new Error('--max-bytes must be a positive whole number.')
   const files = await findFiles(resolve(target))
   const report = localPreflight(files, { maxBytes })
+  let backend = null
+  let backendChecked = false
+  if (hasBackendFiles(files) && (await stat(resolve(target))).isDirectory()) {
+    const backendReport = await checkBackend(resolve(target))
+    backend = backendReport.backend ?? null
+    backendChecked = backendReport.status === 'passed'
+    report.errors.push(...(backendReport.errors ?? []))
+    report.warnings.push(
+      ...(backendReport.warnings ?? []),
+      ...(backendReport.warning ? [backendReport.warning] : []),
+    )
+    if (backend)
+      report.warnings = report.warnings.filter(
+        (warning) => warning.code !== 'missing_index',
+      )
+  }
   const failed =
     report.errors.length > 0 ||
     Boolean(options.strict && report.warnings.length)
-  const result = { status: failed ? 'failed' : 'passed', ...report }
+  const result = { status: failed ? 'failed' : 'passed', ...report, backend }
   if (options.json) print(result, true)
   else {
     console.log(
       `\n  Local check: ${result.status} · ${report.fileCount} files · ${formatBytes(report.totalBytes)}`,
     )
+    if (backend)
+      console.log(
+        backendChecked
+          ? `  Backend: ${backend.entry} → /api/* · ${backend.migrations.length} migration${backend.migrations.length === 1 ? '' : 's'} applied to a fresh database and booted`
+          : `  Backend: ${backend.entry} → /api/* · not verified`,
+      )
     for (const [kind, items] of [
       ['Error', report.errors],
       ['Warning', report.warnings],
@@ -452,11 +631,21 @@ async function deploy(target, options) {
         reusedFiles: deployment.reusedFiles,
         diff: deployment.diff,
         idempotent: deployment.idempotent,
+        backend: completed.backend ?? null,
       },
       true,
     )
   } else {
     console.log(`  ✓ Live at ${completed.url}\n`)
+    if (completed.backend) {
+      const pending = completed.backend.migrations?.pending ?? []
+      console.log(
+        `  Backend ${completed.backend.entry} serves ${completed.url}/api/*${pending.length ? ` · applying ${pending.join(', ')} on the first request` : ''}`,
+      )
+      for (const warning of completed.backend.migrations?.warnings ?? [])
+        console.log(`  ! ${warning}`)
+      console.log('')
+    }
     if (completed.shareUrl) {
       console.log('  Private share link (no account or password required):')
       console.log(`  ${completed.shareUrl}\n`)
@@ -1042,6 +1231,21 @@ program
   )
 
 program
+  .command('dev')
+  .argument('[path]', 'site directory to serve', '.')
+  .option('-p, --port <number>', 'port to listen on', '8787')
+  .option('--host <host>', 'interface to bind', '127.0.0.1')
+  .option('--database <name>', 'local database name under .yeeet/dev', 'dev')
+  .option('--reset', 'delete the local database and re-run every migration')
+  .option('--static', 'return 404 for paths without a matching file')
+  .description(
+    'Serve static files and the _server.ts backend locally with SQLite (requires Bun)',
+  )
+  .action(async (target, options) =>
+    devServer(target, { ...program.opts(), ...options }),
+  )
+
+program
   .command('deploy')
   .alias('up')
   .argument('[path]', 'file or directory to deploy', '.')
@@ -1245,6 +1449,39 @@ webhookCommand
   .command('deliveries')
   .description('List recent webhook delivery attempts')
   .action(async () => webhookDeliveries(program.opts()))
+
+const backendCommand = program
+  .command('backend')
+  .description('Inspect a site backend: databases, migrations, logs, backups')
+
+backendCommand
+  .command('status')
+  .argument('<site>', 'site name')
+  .description('Show databases, applied migrations, workers, and backups')
+  .action(async (site) => backendStatus(site, program.opts()))
+
+backendCommand
+  .command('logs')
+  .argument('<site>', 'site name')
+  .option(
+    '--database <name>',
+    'live, channel-<name>, or version-<deployment-id>',
+  )
+  .description('Show recent backend stdout and stderr')
+  .action(async (site, options) =>
+    backendLogs(site, { ...program.opts(), ...options }),
+  )
+
+backendCommand
+  .command('restore')
+  .argument('<site>', 'site name')
+  .argument('<backup>', 'backup file name from `yeeet backend status`')
+  .option('--database <name>', 'database to restore', 'live')
+  .option('-y, --yes', 'confirm replacing the database')
+  .description('Restore a database backup (current data is backed up first)')
+  .action(async (site, backup, options) =>
+    backendRestore(site, backup, { ...program.opts(), ...options }),
+  )
 
 const domainCommand = program
   .command('domain')

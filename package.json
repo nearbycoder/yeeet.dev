@@ -43,6 +43,7 @@
     "media:render": "node --import tsx scripts/render-media.mjs",
     "typecheck": "tsc --noEmit",
     "test": "node --import tsx --test tests/**/*.test.ts",
+    "test:runtime": "bun test packages/runtime",
     "test:browser": "node tests/browser/action-feedback.mjs",
     "test:integration": "node --import tsx --test tests/integration/*.integration.ts",
     "audit:dependencies": "npm audit --audit-level=moderate"

@@ -505,7 +505,7 @@ test('serves configured human and machine-readable docs', async () => {
       assert.match(home.headers.get('content-type') ?? '', /^text\/html/)
       const html = await home.text()
       assert.match(html, /From folder to <span>HTTPS<\/span>/)
-      assert.match(html, /A Small Deployment Plane for Static Sites/)
+      assert.match(html, /Static Sites with Optional Bun Backends/)
       assert.match(html, /Open source and self-hostable/)
       assert.match(html, /https:\/\/deploy\.example\.com\/dashboard/)
       assert.match(html, /sites\.example\.com/)
@@ -515,7 +515,18 @@ test('serves configured human and machine-readable docs', async () => {
       )
       assert.ok(llms)
       assert.match(llms.headers.get('content-type') ?? '', /^text\/plain/)
-      assert.match(await llms.text(), /yeeet deploy \.\/dist --json/)
+      const agentDocs = await llms.text()
+      assert.match(agentDocs, /yeeet deploy \.\/dist --json/)
+      assert.match(agentDocs, /Backends: _server.ts \+ SQLite/)
+      assert.match(agentDocs, /yeeet check <dir> --json/)
+      const full = maybeServeDocs(
+        new Request('https://docs.example.com/llms-full.txt'),
+      )
+      assert.ok(full)
+      const fullText = await full.text()
+      assert.match(fullText, /bun:sqlite/)
+      assert.match(fullText, /testContext/)
+      assert.match(fullText, /Migrations and the migration strategy/)
 
       const openapi = maybeServeDocs(
         new Request('https://docs.example.com/openapi.json'),

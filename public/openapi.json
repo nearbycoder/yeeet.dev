@@ -3,22 +3,41 @@
   "info": {
     "title": "Yeeet API",
     "version": "1.0.0",
-    "description": "Atomic static-site deployments for humans, agents, and CI."
+    "description": "Atomic static-site deployments with optional on-demand Bun handlers and persistent SQLite for humans, agents, and CI."
   },
-  "servers": [{ "url": "/" }],
+  "servers": [
+    {
+      "url": "/"
+    }
+  ],
   "components": {
     "securitySchemes": {
-      "bearer": { "type": "http", "scheme": "bearer" },
-      "apiKey": { "type": "apiKey", "in": "header", "name": "X-API-Key" }
+      "bearer": {
+        "type": "http",
+        "scheme": "bearer"
+      },
+      "apiKey": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key"
+      }
     },
     "schemas": {
       "ManifestFile": {
         "type": "object",
         "required": ["path", "size"],
         "properties": {
-          "path": { "type": "string", "examples": ["index.html"] },
-          "size": { "type": "integer", "minimum": 0 },
-          "contentType": { "type": "string" },
+          "path": {
+            "type": "string",
+            "examples": ["index.html"]
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "contentType": {
+            "type": "string"
+          },
           "checksum": {
             "type": "string",
             "pattern": "^[a-fA-F0-9]{64}$",
@@ -32,8 +51,12 @@
           "error": {
             "type": "object",
             "properties": {
-              "code": { "type": "string" },
-              "message": { "type": "string" },
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              },
               "details": {}
             }
           }
@@ -41,14 +64,25 @@
       }
     }
   },
-  "security": [{ "bearer": [] }, { "apiKey": [] }],
+  "security": [
+    {
+      "bearer": []
+    },
+    {
+      "apiKey": []
+    }
+  ],
   "paths": {
     "/api/v1/me": {
       "get": {
         "operationId": "getCurrentUser",
         "responses": {
-          "200": { "description": "Current user" },
-          "401": { "description": "Unauthorized" }
+          "200": {
+            "description": "Current user"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
         }
       }
     },
@@ -56,8 +90,12 @@
       "get": {
         "operationId": "listSites",
         "responses": {
-          "200": { "description": "Live sites" },
-          "401": { "description": "Unauthorized" }
+          "200": {
+            "description": "Live sites"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
         }
       }
     },
@@ -69,14 +107,18 @@
             "name": "slug",
             "in": "path",
             "required": true,
-            "schema": { "type": "string" }
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
           "200": {
             "description": "Site, versions, domains, and objects deleted"
           },
-          "404": { "description": "Site not found or not owned by the actor" }
+          "404": {
+            "description": "Site not found or not owned by the actor"
+          }
         }
       }
     },
@@ -88,14 +130,18 @@
             "name": "slug",
             "in": "path",
             "required": true,
-            "schema": { "type": "string" }
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
           "200": {
             "description": "Immutable version history and preview URLs"
           },
-          "404": { "description": "Site not found" }
+          "404": {
+            "description": "Site not found"
+          }
         }
       }
     },
@@ -108,7 +154,9 @@
             "name": "slug",
             "in": "path",
             "required": true,
-            "schema": { "type": "string" }
+            "schema": {
+              "type": "string"
+            }
           },
           {
             "name": "days",
@@ -125,7 +173,9 @@
           "200": {
             "description": "Daily page-view totals, status classes, and normalized top paths"
           },
-          "404": { "description": "Site not found" }
+          "404": {
+            "description": "Site not found"
+          }
         }
       }
     },
@@ -137,18 +187,27 @@
             "name": "slug",
             "in": "path",
             "required": true,
-            "schema": { "type": "string" }
+            "schema": {
+              "type": "string"
+            }
           },
           {
             "name": "deploymentId",
             "in": "path",
             "required": true,
-            "schema": { "type": "string", "minLength": 8 }
+            "schema": {
+              "type": "string",
+              "minLength": 8
+            }
           }
         ],
         "responses": {
-          "200": { "description": "Version atomically made live" },
-          "409": { "description": "Version is ambiguous or not ready" }
+          "200": {
+            "description": "Version atomically made live"
+          },
+          "409": {
+            "description": "Version is ambiguous or not ready"
+          }
         }
       }
     },
@@ -160,20 +219,27 @@
             "name": "slug",
             "in": "path",
             "required": true,
-            "schema": { "type": "string" }
+            "schema": {
+              "type": "string"
+            }
           },
           {
             "name": "deploymentId",
             "in": "path",
             "required": true,
-            "schema": { "type": "string", "minLength": 8 }
+            "schema": {
+              "type": "string",
+              "minLength": 8
+            }
           }
         ],
         "responses": {
           "200": {
             "description": "Version and stored objects deleted; replacement live version returned"
           },
-          "404": { "description": "Version not found" }
+          "404": {
+            "description": "Version not found"
+          }
         }
       }
     },
@@ -185,13 +251,18 @@
             "name": "slug",
             "in": "path",
             "required": true,
-            "schema": { "type": "string" }
+            "schema": {
+              "type": "string"
+            }
           },
           {
             "name": "deploymentId",
             "in": "path",
             "required": true,
-            "schema": { "type": "string", "minLength": 8 }
+            "schema": {
+              "type": "string",
+              "minLength": 8
+            }
           }
         ],
         "requestBody": {
@@ -203,8 +274,14 @@
                 "properties": {
                   "password": {
                     "oneOf": [
-                      { "type": "string", "minLength": 8, "maxLength": 128 },
-                      { "type": "null" }
+                      {
+                        "type": "string",
+                        "minLength": 8,
+                        "maxLength": 128
+                      },
+                      {
+                        "type": "null"
+                      }
                     ],
                     "description": "Set/change a password, or null to make public."
                   },
@@ -218,8 +295,12 @@
           }
         },
         "responses": {
-          "200": { "description": "Updated privacy state and share URL" },
-          "400": { "description": "Invalid password or empty access update" }
+          "200": {
+            "description": "Updated privacy state and share URL"
+          },
+          "400": {
+            "description": "Invalid password or empty access update"
+          }
         }
       }
     },
@@ -255,7 +336,9 @@
           "201": {
             "description": "Domain attached; required DNS records returned"
           },
-          "409": { "description": "Domain unavailable or already attached" },
+          "409": {
+            "description": "Domain unavailable or already attached"
+          },
           "503": {
             "description": "Railway domain automation is not configured"
           }
@@ -266,7 +349,9 @@
       "post": {
         "operationId": "refreshCustomDomain",
         "responses": {
-          "200": { "description": "Current Railway DNS and certificate status" }
+          "200": {
+            "description": "Current Railway DNS and certificate status"
+          }
         }
       }
     },
@@ -274,7 +359,9 @@
       "delete": {
         "operationId": "deleteCustomDomain",
         "responses": {
-          "200": { "description": "Domain detached from Railway and Yeeet" }
+          "200": {
+            "description": "Domain detached from Railway and Yeeet"
+          }
         }
       }
     },
@@ -297,8 +384,14 @@
                 "type": "object",
                 "required": ["url"],
                 "properties": {
-                  "url": { "type": "string", "format": "uri" },
-                  "label": { "type": "string", "maxLength": 100 },
+                  "url": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "label": {
+                    "type": "string",
+                    "maxLength": 100
+                  },
                   "events": {
                     "type": "array",
                     "items": {
@@ -322,7 +415,9 @@
           "201": {
             "description": "Webhook created; signing secret shown once"
           },
-          "400": { "description": "Unsafe URL or unsupported event" }
+          "400": {
+            "description": "Unsafe URL or unsupported event"
+          }
         }
       }
     },
@@ -332,7 +427,10 @@
           "name": "webhookId",
           "in": "path",
           "required": true,
-          "schema": { "type": "string", "format": "uuid" }
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
         }
       ],
       "patch": {
@@ -346,7 +444,9 @@
       "delete": {
         "operationId": "deleteWebhookEndpoint",
         "responses": {
-          "200": { "description": "Webhook and delivery history deleted" }
+          "200": {
+            "description": "Webhook and delivery history deleted"
+          }
         }
       }
     },
@@ -354,7 +454,9 @@
       "get": {
         "operationId": "listWebhookDeliveries",
         "responses": {
-          "200": { "description": "Recent durable webhook delivery attempts" }
+          "200": {
+            "description": "Recent durable webhook delivery attempts"
+          }
         }
       }
     },
@@ -388,7 +490,11 @@
     "/api/v1/deployments": {
       "get": {
         "operationId": "listDeployments",
-        "responses": { "200": { "description": "Recent deployments" } }
+        "responses": {
+          "200": {
+            "description": "Recent deployments"
+          }
+        }
       },
       "post": {
         "operationId": "createDeployment",
@@ -397,7 +503,10 @@
             "name": "Idempotency-Key",
             "in": "header",
             "required": false,
-            "schema": { "type": "string", "maxLength": 128 },
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            },
             "description": "Returns or resumes the same deployment for identical input; conflicting reuse returns 409."
           }
         ],
@@ -440,12 +549,16 @@
                     "maxLength": 128,
                     "description": "Body alternative to the Idempotency-Key header."
                   },
-                  "source": { "enum": ["web", "cli", "api"] },
+                  "source": {
+                    "enum": ["web", "cli", "api"]
+                  },
                   "files": {
                     "type": "array",
                     "minItems": 1,
                     "maxItems": 5000,
-                    "items": { "$ref": "#/components/schemas/ManifestFile" }
+                    "items": {
+                      "$ref": "#/components/schemas/ManifestFile"
+                    }
                   }
                 }
               }
@@ -453,15 +566,20 @@
           }
         },
         "responses": {
-          "200": { "description": "Dry-run deployment diff" },
+          "200": {
+            "description": "Dry-run deployment diff"
+          },
           "201": {
             "description": "Deployment plan created. uploadUrls contains only content that was not reused inside storage."
           },
-          "400": { "description": "Invalid manifest" },
+          "400": {
+            "description": "Invalid manifest"
+          },
           "409": {
             "description": "Site name conflict or idempotency key reused with different input"
           }
-        }
+        },
+        "description": "A root _server.ts or _server.js enables a Bun backend under /api; helpers in _server/ and SQL files in _migrations/ are private. Backend deployments require the instance runtime to be configured. Dry runs report backend entry and migration names."
       }
     },
     "/api/v1/sites/{slug}/channels": {
@@ -472,11 +590,15 @@
             "name": "slug",
             "in": "path",
             "required": true,
-            "schema": { "type": "string" }
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
-          "200": { "description": "Mutable no-index deployment channels" }
+          "200": {
+            "description": "Mutable no-index deployment channels"
+          }
         }
       }
     },
@@ -488,13 +610,17 @@
             "name": "slug",
             "in": "path",
             "required": true,
-            "schema": { "type": "string" }
+            "schema": {
+              "type": "string"
+            }
           },
           {
             "name": "channel",
             "in": "path",
             "required": true,
-            "schema": { "type": "string" }
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -504,19 +630,27 @@
               "schema": {
                 "type": "object",
                 "required": ["version"],
-                "properties": { "version": { "type": "string" } }
+                "properties": {
+                  "version": {
+                    "type": "string"
+                  }
+                }
               }
             }
           }
         },
         "responses": {
-          "200": { "description": "Channel assigned to a ready version" }
+          "200": {
+            "description": "Channel assigned to a ready version"
+          }
         }
       },
       "delete": {
         "operationId": "deleteSiteChannel",
         "responses": {
-          "200": { "description": "Channel alias removed; version retained" }
+          "200": {
+            "description": "Channel alias removed; version retained"
+          }
         }
       }
     },
@@ -528,7 +662,10 @@
             "name": "deploymentId",
             "in": "path",
             "required": true,
-            "schema": { "type": "string", "format": "uuid" }
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
           }
         ],
         "responses": {
@@ -536,9 +673,10 @@
             "description": "Deployment verified and atomically published"
           },
           "422": {
-            "description": "One or more objects are missing or incomplete"
+            "description": "Missing/incomplete objects, migration_failed, migration_changed, or backend_start_failed. The live pointer does not move."
           }
-        }
+        },
+        "description": "Verifies uploads and rehearses backend migrations and startup on a snapshot before moving the target alias. Backend results include entry, database, and migration rehearsal results; migrations is null on an already-ready completion retry. Real migrations apply on the first backend request."
       }
     },
     "/api/v1/admin": {
@@ -548,7 +686,9 @@
           "200": {
             "description": "Users, sites, invitations, counts, and audit events"
           },
-          "403": { "description": "Administrator access required" }
+          "403": {
+            "description": "Administrator access required"
+          }
         }
       }
     },
@@ -565,34 +705,168 @@
     "/api/v1/admin/invitations/{invitationId}/revoke": {
       "post": {
         "operationId": "revokeInvitation",
-        "responses": { "200": { "description": "Invitation revoked" } }
+        "responses": {
+          "200": {
+            "description": "Invitation revoked"
+          }
+        }
       }
     },
     "/api/v1/admin/users/{userId}/ban": {
       "post": {
         "operationId": "suspendUser",
         "responses": {
-          "200": { "description": "User suspended and active sessions revoked" }
+          "200": {
+            "description": "User suspended and active sessions revoked"
+          }
         }
       }
     },
     "/api/v1/admin/users/{userId}/unban": {
       "post": {
         "operationId": "reinstateUser",
-        "responses": { "200": { "description": "User reinstated" } }
+        "responses": {
+          "200": {
+            "description": "User reinstated"
+          }
+        }
       }
     },
     "/api/v1/admin/users/{userId}/role": {
       "post": {
         "operationId": "setUserRole",
-        "responses": { "200": { "description": "User role changed" } }
+        "responses": {
+          "200": {
+            "description": "User role changed"
+          }
+        }
       }
     },
     "/api/v1/admin/sites/{siteId}": {
       "delete": {
         "operationId": "deleteSite",
         "responses": {
-          "200": { "description": "Site, versions, and stored objects deleted" }
+          "200": {
+            "description": "Site, versions, and stored objects deleted"
+          }
+        }
+      }
+    },
+    "/api/v1/sites/{slug}/backend": {
+      "get": {
+        "operationId": "getSiteBackend",
+        "description": "Inspect the active backend, runtime availability, per-hostname SQLite databases, applied migrations, backups, and running workers. Requires the site owner.",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Backend summary and database status"
+          },
+          "404": {
+            "description": "Site not found"
+          },
+          "503": {
+            "description": "Configured runtime is unreachable"
+          }
+        }
+      }
+    },
+    "/api/v1/sites/{slug}/backend/logs": {
+      "get": {
+        "operationId": "getSiteBackendLogs",
+        "description": "Recent in-memory stdout and stderr, including errors and migrations. Requires the site owner.",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "database",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Optional filter: live, channel-<name>, or version-<full-deployment-uuid>. Omit to return all database logs."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Site and entries: database, at, stream (stdout or stderr), line"
+          },
+          "400": {
+            "description": "Invalid database name"
+          },
+          "404": {
+            "description": "Site not found"
+          },
+          "503": {
+            "description": "Runtime unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/sites/{slug}/backend/restore": {
+      "post": {
+        "operationId": "restoreSiteBackend",
+        "description": "Restore a selected backup after stopping the worker; save current data as a safety backup first. Requires the site owner. Roll back incompatible code before restoring an older schema.",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["backup"],
+                "properties": {
+                  "backup": {
+                    "type": "string",
+                    "description": "Exact backup name returned by backend status"
+                  },
+                  "database": {
+                    "type": "string",
+                    "default": "live",
+                    "description": "live, channel-<name>, or version-<full-deployment-uuid>"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "site, restored backup name, database, and safetyBackup"
+          },
+          "400": {
+            "description": "Invalid backup or database name"
+          },
+          "404": {
+            "description": "Site or backup not found"
+          },
+          "503": {
+            "description": "Runtime unavailable"
+          }
         }
       }
     }

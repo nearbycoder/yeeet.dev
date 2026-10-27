@@ -1,6 +1,7 @@
 # @yeeet.dev/cli
 
-Deploy a folder of static assets to a globally cached `*.site.yeeet.dev` URL.
+Deploy static assets with an optional Bun API and SQLite database to a
+`*.site.yeeet.dev` URL.
 
 Requires Node.js 22.12 or newer.
 
@@ -97,6 +98,53 @@ source maps, and empty files without hashing, uploading, or requiring login.
 Empty builds, private files, and standard count/size limit violations fail with
 exit code 1; `--strict` also fails on warnings. Self-hosted users can set
 `--max-bytes` to match their server. The server still validates every deployment.
+
+## Bun backends and SQLite
+
+Add `_server.ts` (or `_server.js`) to the folder you deploy. Export
+`default { fetch(request, { db, site }) { return Response.json(...) } }` to
+handle `/api` and `/api/*`; other paths remain static. `db` is a `bun:sqlite`
+database that survives worker shutdown and releases. Put helper modules in
+`_server/` and numbered SQL files in `_migrations/0001_name.sql`. All three paths
+are private and never served as assets.
+
+Install Bun for local tests, then run:
+
+```sh
+bun test ./my-site/_server
+yeeet check ./my-site --json
+yeeet dev ./my-site --port 8787
+# In another terminal:
+curl http://127.0.0.1:8787/api/health
+yeeet deploy ./my-site --name my-site --dry-run --json
+yeeet deploy ./my-site --name my-site --json
+yeeet backend status my-site --json
+yeeet backend logs my-site --database live
+```
+
+`check` applies migrations to a fresh database and boots the handler without
+uploading or requiring login. Without Bun, it reports `backend_unchecked`;
+`--strict` makes that warning fail. `dev` stores state in `.yeeet/dev/`, reloads
+backend changes, and accepts `--reset` to rebuild the local database. It does
+not emulate `_headers`, `_redirects`, password protection, or custom domains.
+
+Deploys rehearse migrations against a copy of the target database before
+activation. Applied migrations must not be edited or renamed. Add new files,
+keep changes compatible with the previous code, and test them with existing
+data: rollback moves code while preserving schema and data. Production and
+custom domains share live data; channels and version URLs have separate data.
+
+Recover a database using a backup listed by `backend status`:
+
+```sh
+yeeet rollback my-site <previous-version>
+yeeet backend restore my-site <backup-file>.sqlite --database live --yes
+```
+
+Restore takes a safety backup first. Backend support requires the optional
+runtime to be configured on the instance. Read the
+[complete backend guide](https://github.com/nearbycoder/yeeet.dev/blob/main/docs/backend.md)
+for handler tests, migration strategy, limits, and recovery details.
 
 ## Open a site or version
 

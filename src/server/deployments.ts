@@ -47,6 +47,15 @@ import {
   parseRedirectRules,
 } from './site-rules'
 import { queueWebhookEvent } from './webhooks'
+import {
+  backendDatabase,
+  backendFromManifest,
+  backendSummary,
+  parseBackend,
+  prepareBackend,
+  prepareDeploymentBackend,
+} from './backend-runtime'
+import type { BackendPreparation } from './backend-runtime'
 
 async function emitDeploymentEvent(
   userId: string,
@@ -369,10 +378,12 @@ export async function planDeployment(input: {
   if (site && site.userId !== input.actor.userId) {
     throw new HttpError(409, 'That site name is already flying.', 'slug_taken')
   }
+  const backend = backendFromManifest(manifest.files)
   return {
     dryRun: true as const,
     site: slug,
     channel,
+    backend: backendSummary(backend),
     targetUrl: slug
       ? channel
         ? channelUrl(slug, channel)
@@ -454,6 +465,7 @@ async function resumeIdempotentDeployment(
     spaFallback: deployment.spaFallback,
     protected: Boolean(deployment.passwordHash),
     channel: deployment.channel,
+    backend: backendSummary(parseBackend(deployment.backend)),
     reusedFiles: deployment.files.length - missingFiles.length,
     uploadedFiles: missingFiles.length,
     uploadUrls,
@@ -477,6 +489,7 @@ export async function createDeployment(input: {
     actor: await actorForWorkspaceSite(input.actor, input.slug),
   }
   const manifest = validateManifest(input.files)
+  const backend = backendFromManifest(manifest.files)
   const channel = input.channel ? normalizeChannelName(input.channel) : null
   const requestedSlug = input.slug?.trim()
     ? normalizeSlug(input.slug.trim())
@@ -610,6 +623,7 @@ export async function createDeployment(input: {
         requestFingerprint: fingerprint,
         passwordHash,
         shareNonce,
+        backend: backend ? JSON.stringify(backend) : null,
       })
       for (let index = 0; index < fileRows.length; index += 500) {
         await tx
@@ -680,6 +694,7 @@ export async function createDeployment(input: {
       spaFallback: input.spaFallback ?? true,
       protected: Boolean(passwordHash),
       channel,
+      backend: backendSummary(backend),
       reusedFiles: copiedPaths.size,
       uploadedFiles: uploadFiles.length,
       diff,
@@ -714,15 +729,32 @@ export async function completeDeployment(actor: Actor, deploymentId: string) {
   if (!deployment) {
     throw new HttpError(404, 'Deployment not found.', 'not_found')
   }
+  const backend = parseBackend(deployment.backend)
   if (deployment.status === 'ready') {
-    return deploymentResult(
-      deployment.site.slug,
-      deployment.id,
-      deployment.spaFallback,
-      deployment.passwordHash,
-      deployment.shareNonce,
-      deployment.channel,
-    )
+    return {
+      ...deploymentResult(
+        deployment.site.slug,
+        deployment.id,
+        deployment.spaFallback,
+        deployment.passwordHash,
+        deployment.shareNonce,
+        deployment.channel,
+      ),
+      backend: backend
+        ? {
+            ...backendSummary(backend),
+            entry: backend.entry,
+            database: deployment.channel
+              ? backendDatabase({
+                  kind: 'channel',
+                  channel: deployment.channel,
+                })
+              : 'live',
+            // Completion retries do not rehearse again or claim migrations ran.
+            migrations: null,
+          }
+        : null,
+    }
   }
   if (deployment.status === 'failed') {
     throw new HttpError(409, 'This deployment has failed.', 'deployment_failed')
@@ -763,6 +795,34 @@ export async function completeDeployment(actor: Actor, deploymentId: string) {
     readRuleFile(HEADERS_FILE).then(parseHeaderRules),
     readRuleFile(REDIRECTS_FILE).then(parseRedirectRules),
   ])
+
+  // Rehearse the backend's migrations and startup before any hostname moves.
+  let backendPreparation: BackendPreparation | null = null
+  if (backend) {
+    try {
+      backendPreparation = await prepareBackend({
+        siteId: deployment.siteId,
+        slug: deployment.site.slug,
+        deploymentId: deployment.id,
+        database: deployment.channel
+          ? backendDatabase({ kind: 'channel', channel: deployment.channel })
+          : backendDatabase({ kind: 'live' }),
+      })
+    } catch (error) {
+      if (error instanceof HttpError && error.status === 422) {
+        await db
+          .update(deployments)
+          .set({ status: 'failed', error: error.message.slice(0, 2000) })
+          .where(
+            and(
+              eq(deployments.id, deployment.id),
+              eq(deployments.status, 'uploading'),
+            ),
+          )
+      }
+      throw error
+    }
+  }
 
   const completed = await withSiteLock(
     deployment.siteId,
@@ -851,14 +911,19 @@ export async function completeDeployment(actor: Actor, deploymentId: string) {
       `deployment.ready:${deployment.id}`,
     )
 
-  return deploymentResult(
-    deployment.site.slug,
-    deployment.id,
-    deployment.spaFallback,
-    completed.fresh.passwordHash,
-    completed.fresh.shareNonce,
-    deployment.channel,
-  )
+  return {
+    ...deploymentResult(
+      deployment.site.slug,
+      deployment.id,
+      deployment.spaFallback,
+      completed.fresh.passwordHash,
+      completed.fresh.shareNonce,
+      deployment.channel,
+    ),
+    backend: backendPreparation
+      ? { ...backendSummary(backend), ...backendPreparation }
+      : null,
+  }
 }
 
 function deploymentResult(
@@ -1034,6 +1099,10 @@ export async function setSiteChannel(
     )
   }
 
+  const backend = await prepareDeploymentBackend(
+    version.id,
+    backendDatabase({ kind: 'channel', channel }),
+  )
   const updatedAt = new Date()
   const hostnameLabel = channelHostnameLabel(history.site.slug, channel)
   const rows = await withSiteLock(history.site.id, userId, async (tx) => {
@@ -1072,6 +1141,7 @@ export async function setSiteChannel(
     url: siteUrl(hostnameLabel),
     versionUrl: versionUrl(version.id),
     updatedAt: updatedAt.toISOString(),
+    backend,
   }
 }
 
@@ -1131,6 +1201,10 @@ export async function activateSiteVersion(
       'Extend this preview’s expiry before promoting it.',
       'preview_expired',
     )
+  const backend = await prepareDeploymentBackend(
+    version.id,
+    backendDatabase({ kind: 'live' }),
+  )
   const activatedAt = new Date()
   await withSiteLock(history.site.id, userId, async (tx, currentSite) => {
     const fresh = await tx
@@ -1187,6 +1261,7 @@ export async function activateSiteVersion(
     url: history.site.url,
     versionUrl: version.previewUrl,
     activatedAt: activatedAt.toISOString(),
+    backend,
   }
 }
 

@@ -12,7 +12,7 @@ import { scanDeploymentFiles } from './deployment-files.js'
 import mime from 'mime-types'
 import * as z from 'zod/v4'
 
-const VERSION = '0.0.2'
+const VERSION = '0.1.0'
 const DEFAULT_API = 'https://yeeet.dev'
 
 function apiOrigin() {
@@ -92,6 +92,7 @@ async function deploymentFiles(target) {
     const matches = await scanDeploymentFiles(targetPath, [
       '.git/**',
       'node_modules/**',
+      '.yeeet/**',
       '.DS_Store',
       '.yeeetignore',
       ...ignoreFile
@@ -474,6 +475,38 @@ export function createYeeetMcpServer() {
     ({ site, days }) =>
       apiRequest(
         `/api/v1/sites/${encodeURIComponent(site)}/analytics?days=${days ?? 30}`,
+      ),
+  )
+  register(
+    server,
+    'backend_status',
+    {
+      description:
+        'Inspect a site backend (_server.ts): its routes, SQLite databases, applied migrations, running workers, and backups.',
+      inputSchema: z.object({ site: z.string().min(1) }),
+      annotations: { readOnlyHint: true },
+    },
+    ({ site }) =>
+      apiRequest(`/api/v1/sites/${encodeURIComponent(site)}/backend`),
+  )
+  register(
+    server,
+    'backend_logs',
+    {
+      description:
+        'Return recent stdout/stderr from a site backend, including uncaught errors and migration messages. Use after a deploy to debug /api responses.',
+      inputSchema: z.object({
+        site: z.string().min(1),
+        database: z
+          .string()
+          .regex(/^(?:live|channel-[a-z0-9-]+|version-[0-9a-f-]{36})$/)
+          .optional(),
+      }),
+      annotations: { readOnlyHint: true },
+    },
+    ({ site, database }) =>
+      apiRequest(
+        `/api/v1/sites/${encodeURIComponent(site)}/backend/logs${database ? `?database=${encodeURIComponent(database)}` : ''}`,
       ),
   )
   register(

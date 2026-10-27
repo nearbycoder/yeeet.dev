@@ -67,12 +67,16 @@ S3_ENDPOINT=${{Assets.ENDPOINT}}
 S3_BUCKET=${{Assets.BUCKET}}
 S3_ACCESS_KEY_ID=${{Assets.ACCESS_KEY_ID}}
 S3_SECRET_ACCESS_KEY=${{Assets.SECRET_ACCESS_KEY}}
-S3_REGION=${{Assets.REGION}}
+S3_REGION=auto
 S3_FORCE_PATH_STYLE=false
 
 MAX_DEPLOY_BYTES=524288000
 DB_POOL_SIZE=10
 ```
+
+Set `S3_REGION` to the bucket's signing region (`auto` for Railway buckets).
+The app defaults to `auto` when it is unset or empty; the host's generic `REGION`
+variable is never used for S3 signing.
 
 Use `VITE_GITHUB_AUTH_ENABLED=true` only after both GitHub OAuth variables are
 present. `ADMIN_EMAILS` is a comma-separated bootstrap allowlist. The
@@ -190,6 +194,16 @@ Look for `etag`, `cache-control`, `x-yeeet-deployment`, and the expected content
 type. Test a client-side SPA route and a missing asset separately.
 
 ## 7. Caching and operational notes
+
+### Optional Bun backends
+
+To support `_server.ts` handlers with persistent SQLite, add the separate
+[Bun runtime service](backend-runtime.md). It needs a `/data` volume, private
+network connectivity to the app, and matching `BACKEND_RUNTIME_SECRET` values.
+Set `BACKEND_RUNTIME_URL` on the app only after the runtime is healthy. The
+static-hosting template does not configure this optional service automatically.
+The runtime is intended for trusted deployment authors; review its documented
+isolation limits before enabling it.
 
 - Live aliases revalidate quickly so overwrites, rollbacks, and moderation
   deletions propagate.

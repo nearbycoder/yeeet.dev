@@ -31,6 +31,12 @@ import {
 } from './site-rules'
 import type { SiteHeaderRule, SiteRedirectRule } from './site-rules'
 import { getStoredObject } from './storage'
+import {
+  backendDatabase,
+  parseBackend,
+  proxyBackendRequest,
+} from './backend-runtime'
+import { isBackendRoute, isPrivateBackendPath } from '#/lib/backend-layout'
 
 export { shouldUseSpaFallback } from '#/lib/route-resolution'
 
@@ -253,12 +259,12 @@ export async function maybeServeSite(
   const requestUrl = new URL(request.url)
   const isUnlock =
     request.method === 'POST' && requestUrl.pathname === '/_yeeet/unlock'
-  if (request.method !== 'GET' && request.method !== 'HEAD' && !isUnlock) {
-    return new Response('Method not allowed', { status: 405 })
-  }
+  const readOnlyMethod = request.method === 'GET' || request.method === 'HEAD'
+  // Resolve rewrites before deciding whether this method can reach a backend.
 
   let deploymentId: string | null = null
   let siteSlug: string | null = null
+  let channelName: string | null = null
   if (target.kind === 'version') {
     deploymentId = target.deploymentId
   } else if (target.kind === 'live') {
@@ -272,6 +278,7 @@ export async function maybeServeSite(
       .select({
         deploymentId: siteChannels.deploymentId,
         slug: sites.slug,
+        name: siteChannels.name,
       })
       .from(siteChannels)
       .innerJoin(sites, eq(siteChannels.siteId, sites.id))
@@ -279,6 +286,7 @@ export async function maybeServeSite(
       .limit(1)
     deploymentId = mappedRows.at(0)?.deploymentId ?? null
     siteSlug = mappedRows.at(0)?.slug ?? null
+    channelName = mappedRows.at(0)?.name ?? null
   } else {
     const mappedRows = await db
       .select({
@@ -463,6 +471,34 @@ export async function maybeServeSite(
     redirect?.status === 200
       ? new URL(redirect.to, 'https://rewrite.yeeet.invalid').pathname
       : requestUrl.pathname
+  const backend = parseBackend(deployment.backend)
+  if (backend && isBackendRoute(effectivePath)) {
+    const publicUrl = new URL(
+      `${effectivePath}${requestUrl.search}`,
+      publicSiteOrigin(request),
+    )
+    return proxyBackendRequest({
+      request,
+      publicUrl,
+      siteId: deployment.siteId,
+      slug: siteSlug,
+      deploymentId: deployment.id,
+      database:
+        target.kind === 'channel'
+          ? backendDatabase({ kind: 'channel', channel: channelName ?? '' })
+          : target.kind === 'version'
+            ? backendDatabase({
+                kind: 'version',
+                deploymentId: deployment.id,
+              })
+            : backendDatabase({ kind: target.kind }),
+      protectedDeployment,
+      noCrawl: noCrawlTarget,
+    })
+  }
+  if (!readOnlyMethod) {
+    return new Response('Method not allowed', { status: 405 })
+  }
   if (
     effectivePath === `/${HEADERS_FILE}` ||
     effectivePath === `/${REDIRECTS_FILE}`
@@ -470,7 +506,10 @@ export async function maybeServeSite(
     return notFound(target.label, noCrawlTarget || protectedDeployment)
   }
 
-  const candidates = candidatePaths(effectivePath)
+  // Backend source and migrations are private even if a path names them.
+  const candidates = candidatePaths(effectivePath).filter(
+    (path) => !isPrivateBackendPath(path),
+  )
   if (!candidates.length)
     return notFound(
       target.label,

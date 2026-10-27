@@ -10,6 +10,7 @@ import {
 } from './site-rules'
 import type { SiteHeaderRule, SiteRedirectRule } from './site-rules'
 import { GENERATED_SOCIAL_IMAGE_PATH } from './site-social-metadata'
+import { isBackendRoute, isPrivateBackendPath } from '#/lib/backend-layout'
 
 const schema = z.object({
   slug: z.string().min(1).max(63),
@@ -35,6 +36,7 @@ type RoutingVersion = {
   spaFallback: boolean
   headerRules: string
   redirectRules: string
+  backend?: string | null
 }
 export function simulateRoute(version: RoutingVersion, path: string) {
   const request = new Request(new URL(path, 'https://simulation.invalid'), {
@@ -56,6 +58,7 @@ export function simulateRoute(version: RoutingVersion, path: string) {
     redirect: null as { to: string; status: number } | null,
     headers: [] as Array<{ name: string; value: string }>,
     special: false,
+    backend: false,
   }
   if (pathname === GENERATED_SOCIAL_IMAGE_PATH)
     return { ...result, status: 200, special: true }
@@ -70,12 +73,16 @@ export function simulateRoute(version: RoutingVersion, path: string) {
       ? new URL(redirect.to, 'https://rewrite.yeeet.invalid').pathname
       : pathname
   result.effectivePath = effectivePath
+  if (version.backend && isBackendRoute(effectivePath))
+    return { ...result, status: 200, backend: true }
   if (
     effectivePath === `/${HEADERS_FILE}` ||
     effectivePath === `/${REDIRECTS_FILE}`
   )
     return result
-  const candidates = candidatePaths(effectivePath)
+  const candidates = candidatePaths(effectivePath).filter(
+    (candidate) => !isPrivateBackendPath(candidate),
+  )
   if (!candidates.length) return result
   const files = new Set(version.files.map((file) => file.path))
   let file = candidates.find((candidate) => files.has(candidate))

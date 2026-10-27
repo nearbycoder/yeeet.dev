@@ -18,6 +18,7 @@ import {
 import { ownedLifecycleSite } from './lifecycle'
 import { HttpError } from './http'
 import { deleteStoredPrefix } from './storage'
+import { purgeBackendForPrefix } from './backend-runtime'
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0]
 async function plan(
@@ -219,6 +220,7 @@ export async function processStorageCleanup() {
       .returning({ id: storageCleanupJobs.id })
     if (!claimed.length) continue
     try {
+      await purgeBackendForPrefix(job.prefix)
       await deleteStoredPrefix(job.prefix)
       await db
         .delete(storageCleanupJobs)

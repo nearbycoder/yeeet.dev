@@ -51,6 +51,9 @@ import { Route as ApiV1AdminInvitationsInvitationIdRevokeRouteImport } from './r
 import { Route as ApiV1AdminUsersUserIdBanRouteImport } from './routes/api/v1/admin/users/$userId/ban'
 import { Route as ApiV1AdminUsersUserIdRoleRouteImport } from './routes/api/v1/admin/users/$userId/role'
 import { Route as ApiV1AdminUsersUserIdUnbanRouteImport } from './routes/api/v1/admin/users/$userId/unban'
+import { Route as ApiV1SitesSlugBackendIndexRouteImport } from './routes/api/v1/sites/$slug/backend/index'
+import { Route as ApiV1SitesSlugBackendLogsRouteImport } from './routes/api/v1/sites/$slug/backend/logs'
+import { Route as ApiV1SitesSlugBackendRestoreRouteImport } from './routes/api/v1/sites/$slug/backend/restore'
 import { Route as ApiV1SitesSlugChannelsChannelRouteImport } from './routes/api/v1/sites/$slug/channels/$channel'
 import { Route as ApiV1SitesSlugDomainsIndexRouteImport } from './routes/api/v1/sites/$slug/domains/index'
 import { Route as ApiV1SitesSlugVersionsDeploymentIdRouteImport } from './routes/api/v1/sites/$slug/versions/$deploymentId'
@@ -286,6 +289,24 @@ const ApiV1AdminUsersUserIdUnbanRoute =
     path: '/api/v1/admin/users/$userId/unban',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiV1SitesSlugBackendIndexRoute =
+  ApiV1SitesSlugBackendIndexRouteImport.update({
+    id: '/backend/',
+    path: '/backend/',
+    getParentRoute: () => ApiV1SitesSlugRoute,
+  } as any)
+const ApiV1SitesSlugBackendLogsRoute =
+  ApiV1SitesSlugBackendLogsRouteImport.update({
+    id: '/backend/logs',
+    path: '/backend/logs',
+    getParentRoute: () => ApiV1SitesSlugRoute,
+  } as any)
+const ApiV1SitesSlugBackendRestoreRoute =
+  ApiV1SitesSlugBackendRestoreRouteImport.update({
+    id: '/backend/restore',
+    path: '/backend/restore',
+    getParentRoute: () => ApiV1SitesSlugRoute,
+  } as any)
 const ApiV1SitesSlugChannelsChannelRoute =
   ApiV1SitesSlugChannelsChannelRouteImport.update({
     id: '/$channel',
@@ -384,9 +405,12 @@ export interface FileRoutesByFullPath {
   '/api/v1/admin/users/$userId/ban': typeof ApiV1AdminUsersUserIdBanRoute
   '/api/v1/admin/users/$userId/role': typeof ApiV1AdminUsersUserIdRoleRoute
   '/api/v1/admin/users/$userId/unban': typeof ApiV1AdminUsersUserIdUnbanRoute
+  '/api/v1/sites/$slug/backend/logs': typeof ApiV1SitesSlugBackendLogsRoute
+  '/api/v1/sites/$slug/backend/restore': typeof ApiV1SitesSlugBackendRestoreRoute
   '/api/v1/sites/$slug/channels/$channel': typeof ApiV1SitesSlugChannelsChannelRoute
   '/api/v1/sites/$slug/versions/$deploymentId': typeof ApiV1SitesSlugVersionsDeploymentIdRouteWithChildren
   '/api/v1/webhooks/deliveries/$deliveryId/retry': typeof ApiV1WebhooksDeliveriesDeliveryIdRetryRoute
+  '/api/v1/sites/$slug/backend/': typeof ApiV1SitesSlugBackendIndexRoute
   '/api/v1/sites/$slug/domains/': typeof ApiV1SitesSlugDomainsIndexRoute
   '/api/v1/sites/$slug/domains/$domainId/refresh': typeof ApiV1SitesSlugDomainsDomainIdRefreshRoute
   '/api/v1/sites/$slug/versions/$deploymentId/access': typeof ApiV1SitesSlugVersionsDeploymentIdAccessRoute
@@ -436,9 +460,12 @@ export interface FileRoutesByTo {
   '/api/v1/admin/users/$userId/ban': typeof ApiV1AdminUsersUserIdBanRoute
   '/api/v1/admin/users/$userId/role': typeof ApiV1AdminUsersUserIdRoleRoute
   '/api/v1/admin/users/$userId/unban': typeof ApiV1AdminUsersUserIdUnbanRoute
+  '/api/v1/sites/$slug/backend/logs': typeof ApiV1SitesSlugBackendLogsRoute
+  '/api/v1/sites/$slug/backend/restore': typeof ApiV1SitesSlugBackendRestoreRoute
   '/api/v1/sites/$slug/channels/$channel': typeof ApiV1SitesSlugChannelsChannelRoute
   '/api/v1/sites/$slug/versions/$deploymentId': typeof ApiV1SitesSlugVersionsDeploymentIdRouteWithChildren
   '/api/v1/webhooks/deliveries/$deliveryId/retry': typeof ApiV1WebhooksDeliveriesDeliveryIdRetryRoute
+  '/api/v1/sites/$slug/backend': typeof ApiV1SitesSlugBackendIndexRoute
   '/api/v1/sites/$slug/domains': typeof ApiV1SitesSlugDomainsIndexRoute
   '/api/v1/sites/$slug/domains/$domainId/refresh': typeof ApiV1SitesSlugDomainsDomainIdRefreshRoute
   '/api/v1/sites/$slug/versions/$deploymentId/access': typeof ApiV1SitesSlugVersionsDeploymentIdAccessRoute
@@ -490,9 +517,12 @@ export interface FileRoutesById {
   '/api/v1/admin/users/$userId/ban': typeof ApiV1AdminUsersUserIdBanRoute
   '/api/v1/admin/users/$userId/role': typeof ApiV1AdminUsersUserIdRoleRoute
   '/api/v1/admin/users/$userId/unban': typeof ApiV1AdminUsersUserIdUnbanRoute
+  '/api/v1/sites/$slug/backend/logs': typeof ApiV1SitesSlugBackendLogsRoute
+  '/api/v1/sites/$slug/backend/restore': typeof ApiV1SitesSlugBackendRestoreRoute
   '/api/v1/sites/$slug/channels/$channel': typeof ApiV1SitesSlugChannelsChannelRoute
   '/api/v1/sites/$slug/versions/$deploymentId': typeof ApiV1SitesSlugVersionsDeploymentIdRouteWithChildren
   '/api/v1/webhooks/deliveries/$deliveryId/retry': typeof ApiV1WebhooksDeliveriesDeliveryIdRetryRoute
+  '/api/v1/sites/$slug/backend/': typeof ApiV1SitesSlugBackendIndexRoute
   '/api/v1/sites/$slug/domains/': typeof ApiV1SitesSlugDomainsIndexRoute
   '/api/v1/sites/$slug/domains/$domainId/refresh': typeof ApiV1SitesSlugDomainsDomainIdRefreshRoute
   '/api/v1/sites/$slug/versions/$deploymentId/access': typeof ApiV1SitesSlugVersionsDeploymentIdAccessRoute
@@ -545,9 +575,12 @@ export interface FileRouteTypes {
     | '/api/v1/admin/users/$userId/ban'
     | '/api/v1/admin/users/$userId/role'
     | '/api/v1/admin/users/$userId/unban'
+    | '/api/v1/sites/$slug/backend/logs'
+    | '/api/v1/sites/$slug/backend/restore'
     | '/api/v1/sites/$slug/channels/$channel'
     | '/api/v1/sites/$slug/versions/$deploymentId'
     | '/api/v1/webhooks/deliveries/$deliveryId/retry'
+    | '/api/v1/sites/$slug/backend/'
     | '/api/v1/sites/$slug/domains/'
     | '/api/v1/sites/$slug/domains/$domainId/refresh'
     | '/api/v1/sites/$slug/versions/$deploymentId/access'
@@ -597,9 +630,12 @@ export interface FileRouteTypes {
     | '/api/v1/admin/users/$userId/ban'
     | '/api/v1/admin/users/$userId/role'
     | '/api/v1/admin/users/$userId/unban'
+    | '/api/v1/sites/$slug/backend/logs'
+    | '/api/v1/sites/$slug/backend/restore'
     | '/api/v1/sites/$slug/channels/$channel'
     | '/api/v1/sites/$slug/versions/$deploymentId'
     | '/api/v1/webhooks/deliveries/$deliveryId/retry'
+    | '/api/v1/sites/$slug/backend'
     | '/api/v1/sites/$slug/domains'
     | '/api/v1/sites/$slug/domains/$domainId/refresh'
     | '/api/v1/sites/$slug/versions/$deploymentId/access'
@@ -650,9 +686,12 @@ export interface FileRouteTypes {
     | '/api/v1/admin/users/$userId/ban'
     | '/api/v1/admin/users/$userId/role'
     | '/api/v1/admin/users/$userId/unban'
+    | '/api/v1/sites/$slug/backend/logs'
+    | '/api/v1/sites/$slug/backend/restore'
     | '/api/v1/sites/$slug/channels/$channel'
     | '/api/v1/sites/$slug/versions/$deploymentId'
     | '/api/v1/webhooks/deliveries/$deliveryId/retry'
+    | '/api/v1/sites/$slug/backend/'
     | '/api/v1/sites/$slug/domains/'
     | '/api/v1/sites/$slug/domains/$domainId/refresh'
     | '/api/v1/sites/$slug/versions/$deploymentId/access'
@@ -987,6 +1026,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiV1AdminUsersUserIdUnbanRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/v1/sites/$slug/backend/': {
+      id: '/api/v1/sites/$slug/backend/'
+      path: '/backend'
+      fullPath: '/api/v1/sites/$slug/backend/'
+      preLoaderRoute: typeof ApiV1SitesSlugBackendIndexRouteImport
+      parentRoute: typeof ApiV1SitesSlugRoute
+    }
+    '/api/v1/sites/$slug/backend/logs': {
+      id: '/api/v1/sites/$slug/backend/logs'
+      path: '/backend/logs'
+      fullPath: '/api/v1/sites/$slug/backend/logs'
+      preLoaderRoute: typeof ApiV1SitesSlugBackendLogsRouteImport
+      parentRoute: typeof ApiV1SitesSlugRoute
+    }
+    '/api/v1/sites/$slug/backend/restore': {
+      id: '/api/v1/sites/$slug/backend/restore'
+      path: '/backend/restore'
+      fullPath: '/api/v1/sites/$slug/backend/restore'
+      preLoaderRoute: typeof ApiV1SitesSlugBackendRestoreRouteImport
+      parentRoute: typeof ApiV1SitesSlugRoute
+    }
     '/api/v1/sites/$slug/channels/$channel': {
       id: '/api/v1/sites/$slug/channels/$channel'
       path: '/$channel'
@@ -1137,6 +1197,9 @@ interface ApiV1SitesSlugRouteChildren {
   ApiV1SitesSlugAnalyticsRoute: typeof ApiV1SitesSlugAnalyticsRoute
   ApiV1SitesSlugChannelsRoute: typeof ApiV1SitesSlugChannelsRouteWithChildren
   ApiV1SitesSlugVersionsRoute: typeof ApiV1SitesSlugVersionsRouteWithChildren
+  ApiV1SitesSlugBackendLogsRoute: typeof ApiV1SitesSlugBackendLogsRoute
+  ApiV1SitesSlugBackendRestoreRoute: typeof ApiV1SitesSlugBackendRestoreRoute
+  ApiV1SitesSlugBackendIndexRoute: typeof ApiV1SitesSlugBackendIndexRoute
   ApiV1SitesSlugDomainsIndexRoute: typeof ApiV1SitesSlugDomainsIndexRoute
   ApiV1SitesSlugDomainsDomainIdRefreshRoute: typeof ApiV1SitesSlugDomainsDomainIdRefreshRoute
   ApiV1SitesSlugDomainsDomainIdIndexRoute: typeof ApiV1SitesSlugDomainsDomainIdIndexRoute
@@ -1146,6 +1209,9 @@ const ApiV1SitesSlugRouteChildren: ApiV1SitesSlugRouteChildren = {
   ApiV1SitesSlugAnalyticsRoute: ApiV1SitesSlugAnalyticsRoute,
   ApiV1SitesSlugChannelsRoute: ApiV1SitesSlugChannelsRouteWithChildren,
   ApiV1SitesSlugVersionsRoute: ApiV1SitesSlugVersionsRouteWithChildren,
+  ApiV1SitesSlugBackendLogsRoute: ApiV1SitesSlugBackendLogsRoute,
+  ApiV1SitesSlugBackendRestoreRoute: ApiV1SitesSlugBackendRestoreRoute,
+  ApiV1SitesSlugBackendIndexRoute: ApiV1SitesSlugBackendIndexRoute,
   ApiV1SitesSlugDomainsIndexRoute: ApiV1SitesSlugDomainsIndexRoute,
   ApiV1SitesSlugDomainsDomainIdRefreshRoute:
     ApiV1SitesSlugDomainsDomainIdRefreshRoute,

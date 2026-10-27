@@ -35,7 +35,8 @@ export function getStorage(): StorageContext {
   const bucket = required('S3_BUCKET', 'BUCKET')
   const accessKeyId = required('S3_ACCESS_KEY_ID', 'ACCESS_KEY_ID')
   const secretAccessKey = required('S3_SECRET_ACCESS_KEY', 'SECRET_ACCESS_KEY')
-  const region = process.env.S3_REGION ?? process.env.REGION ?? 'auto'
+  // REGION describes the app's location, not the S3 signing region.
+  const region = process.env.S3_REGION || 'auto'
   const forcePathStyle = process.env.S3_FORCE_PATH_STYLE === 'true'
   const cacheKey = [endpoint, bucket, accessKeyId, region, forcePathStyle].join(
     '|',
