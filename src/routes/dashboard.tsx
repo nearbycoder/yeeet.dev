@@ -36,13 +36,14 @@ import { DashboardHeader } from '#/components/dashboard-header'
 import { Yeeetling, getYeeetlingDesign } from '#/components/yeeetling'
 import type { YeeetlingPhase } from '#/components/yeeetling'
 import { authClient } from '#/lib/auth-client'
+import { formatBytes, formatNumber, formatShortDate } from '#/lib/format'
 import { getDashboardData, getSession } from '#/server/functions'
 import { siteSearchSchema } from '#/lib/pagination'
 
 export const Route = createFileRoute('/dashboard')({
   validateSearch: siteSearchSchema.extend({
-    site: z.string().optional(),
-    channel: z.string().optional(),
+    site: z.string().optional().catch(undefined),
+    channel: z.string().optional().catch(undefined),
   }),
   beforeLoad: async () => {
     const session = await getSession()
@@ -85,18 +86,11 @@ type FileSystemDirectoryEntryLike = FileSystemEntryLike & {
   }
 }
 
-function formatBytes(value: number | null) {
-  if (!value) return '0 B'
-  const units = ['B', 'KB', 'MB', 'GB']
-  const rank = Math.min(
-    Math.floor(Math.log(value) / Math.log(1024)),
-    units.length - 1,
+function timeAgo(value: string, now: number) {
+  const seconds = Math.max(
+    0,
+    Math.floor((now - new Date(value).getTime()) / 1000),
   )
-  return `${(value / 1024 ** rank).toFixed(rank ? 1 : 0)} ${units[rank]}`
-}
-
-function timeAgo(value: string) {
-  const seconds = Math.floor((Date.now() - new Date(value).getTime()) / 1000)
   if (seconds < 60) return 'just now'
   if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`
   if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`
@@ -175,7 +169,7 @@ async function filesFromDrop(dataTransfer: DataTransfer) {
 
 function Dashboard() {
   const { user } = Route.useRouteContext()
-  const destination = Route.useSearch()
+  const filters = Route.useSearch()
   const data = Route.useLoaderData()
   const router = useRouter()
   const fileInput = useRef<HTMLInputElement>(null)
@@ -190,8 +184,10 @@ function Dashboard() {
   const [recovery, setRecovery] = useState<UploadRecovery | null>(null)
   const [recoveryWarning, setRecoveryWarning] = useState('')
   const [hashedCount, setHashedCount] = useState(0)
+  const [hydratedNow, setHydratedNow] = useState<number | null>(null)
   const storageKey = recoveryStorageKey(user.id)
   useEffect(() => {
+    setHydratedNow(Date.now())
     try {
       const saved = parseRecovery(localStorage.getItem(storageKey))
       recoveryRef.current = saved
@@ -203,6 +199,8 @@ function Dashboard() {
     }
     return () => uploadController.current?.abort()
   }, [storageKey])
+  const formatRelativeTime = (value: string) =>
+    hydratedNow === null ? formatShortDate(value) : timeAgo(value, hydratedNow)
   function saveRecovery(saved: UploadRecovery | null) {
     recoveryRef.current = saved
     setRecovery(saved)
@@ -223,8 +221,8 @@ function Dashboard() {
     [sourceFiles],
   )
   const [originalFiles, setOriginalFiles] = useState<Array<UploadFile>>([])
-  const [slug, setSlug] = useState(destination.site ?? '')
-  const [channel, setChannel] = useState(destination.channel ?? '')
+  const [slug, setSlug] = useState(filters.site ?? '')
+  const [channel, setChannel] = useState(filters.channel ?? '')
   const [spaFallback, setSpaFallback] = useState(
     data.destinationSite?.spaFallback ?? true,
   )
@@ -247,7 +245,6 @@ function Dashboard() {
   const [keyBusy, setKeyBusy] = useState(false)
   const [keyError, setKeyError] = useState('')
   const [siteBusy, setSiteBusy] = useState('')
-  const filters = Route.useSearch()
   const navigate = Route.useNavigate()
   const projectGroup = filters.group ?? ''
   const favoritesOnly = filters.favorites ?? false
@@ -258,6 +255,20 @@ function Dashboard() {
   useEffect(() => {
     setSiteSearch(filters.q ?? '')
   }, [filters.q])
+  useEffect(() => {
+    if (filters.site !== undefined) setSlug(filters.site)
+    if (filters.channel !== undefined) setChannel(filters.channel)
+    if (data.destinationSite) {
+      setSpaFallback(data.destinationSite.spaFallback ?? true)
+      setPrivateDeploy(data.destinationSite.protected)
+    }
+  }, [
+    filters.site,
+    filters.channel,
+    data.destinationSite?.slug,
+    data.destinationSite?.spaFallback,
+    data.destinationSite?.protected,
+  ])
   const changeFilters = (next: Partial<typeof filters>) =>
     void navigate({
       search: { ...filters, ...next, cursor: undefined },
@@ -412,7 +423,7 @@ function Dashboard() {
             dryRun: true,
           }),
         })
-        const plan = await response.json()
+        const plan = await response.json().catch(() => ({}))
         if (!response.ok)
           throw new Error(plan.error?.message || 'Could not preview changes.')
         setReview({
@@ -457,7 +468,7 @@ function Dashboard() {
         body: JSON.stringify(deploymentInput),
         signal,
       })
-      const deployment = await response.json()
+      const deployment = await response.json().catch(() => ({}))
       if (!response.ok)
         throw new Error(
           deployment.error?.message || 'Could not start deployment.',
@@ -471,11 +482,14 @@ function Dashboard() {
         deployment.uploadUrls,
         6,
         signal,
-        async (upload: {
-          path: string
-          url: string
-          headers: Record<string, string>
-        }) => {
+        async (
+          upload: {
+            path: string
+            url: string
+            headers: Record<string, string>
+          },
+          itemSignal: AbortSignal,
+        ) => {
           const file = localFiles.get(upload.path)
           if (!file)
             throw new Error(`Select the original file: ${upload.path}.`)
@@ -484,13 +498,13 @@ function Dashboard() {
               method: 'PUT',
               headers: upload.headers,
               body: file,
-              signal: AbortSignal.any([signal, AbortSignal.timeout(60000)]),
+              signal: AbortSignal.any([itemSignal, AbortSignal.timeout(60000)]),
             })
             if (!uploadResponse.ok)
               throw new Error(
                 `Upload failed for ${upload.path}. Resume to refresh upload links and retry missing files.`,
               )
-          }, signal)
+          }, itemSignal)
           setUploaded((count) => count + 1)
         },
       )
@@ -501,7 +515,7 @@ function Dashboard() {
         method: 'POST',
         signal,
       })
-      const completed = await completeResponse.json()
+      const completed = await completeResponse.json().catch(() => ({}))
       if (!completeResponse.ok)
         throw new Error(
           completed.error?.message || 'Could not publish deployment.',
@@ -518,7 +532,9 @@ function Dashboard() {
       setPhase('idle')
       setError(
         signal.aborted
-          ? 'Upload paused. Select Resume upload when you are ready.'
+          ? previewOnly
+            ? 'Preview canceled.'
+            : 'Upload paused. Select Resume upload when you are ready.'
           : uploadError instanceof Error
             ? uploadError.message
             : 'Deployment failed.',
@@ -563,7 +579,7 @@ function Dashboard() {
         `/api/v1/sites/${encodeURIComponent(siteSlug)}`,
         { method: 'DELETE' },
       )
-      const body = await response.json()
+      const body = await response.json().catch(() => ({}))
       if (!response.ok)
         throw new Error(body.error?.message || 'Could not delete site.')
       await router.invalidate()
@@ -593,6 +609,16 @@ function Dashboard() {
   const deleteDialogBusy = deleteTarget
     ? siteBusy === deleteTarget.siteSlug
     : false
+  const cliCommand = deployCommand(data.platform.controlPlaneUrl, {
+    slug,
+    channel,
+    spaFallback,
+    privateDeploy,
+  })
+  const progressPercent =
+    phase === 'finalizing' || uploadTotal === 0
+      ? 100
+      : Math.min(100, Math.round((uploaded / uploadTotal) * 100))
   const mascotSeed = slug || files.at(0)?.path || 'launchpad'
   const mascot = getYeeetlingDesign(mascotSeed)
   const mascotPhase: YeeetlingPhase = error
@@ -655,21 +681,24 @@ function Dashboard() {
             </p>
             <div className="console-actions">
               <button
+                type="button"
                 className="button button-paper"
-                disabled={phase !== 'idle'}
+                disabled={busy}
                 onClick={() => {
                   setSlug(recovery.slug)
                   setChannel(recovery.channel)
                   setSpaFallback(recovery.spaFallback)
                   setPrivateDeploy(recovery.privateDeploy)
                   setReview(null)
+                  if (phase === 'done') setPhase('idle')
                 }}
               >
                 Restore destination settings
               </button>
               <button
+                type="button"
                 className="button danger-link"
-                disabled={phase !== 'idle'}
+                disabled={busy}
                 onClick={() => saveRecovery(null)}
               >
                 Forget saved attempt
@@ -744,7 +773,7 @@ function Dashboard() {
             {files.length ? (
               <>
                 <h2>
-                  {files.length.toLocaleString()} file
+                  {formatNumber(files.length)} file
                   {files.length === 1 ? '' : 's'} cleared for takeoff
                 </h2>
                 <p>
@@ -902,15 +931,16 @@ function Dashboard() {
                   <div className="slug-input">
                     <input
                       name="site-slug"
-                      disabled={phase !== 'idle'}
+                      disabled={busy}
                       value={slug}
-                      onChange={(event) =>
+                      onChange={(event) => {
                         setSlug(
                           event.target.value
                             .toLowerCase()
                             .replace(/[^a-z0-9-]/g, ''),
                         )
-                      }
+                        if (phase === 'done') setPhase('idle')
+                      }}
                       placeholder="Random if blank…"
                       autoComplete="off"
                       spellCheck={false}
@@ -923,16 +953,17 @@ function Dashboard() {
                   <div className="slug-input">
                     <input
                       name="deployment-channel"
-                      disabled={phase !== 'idle'}
+                      disabled={busy}
                       value={channel}
-                      onChange={(event) =>
+                      onChange={(event) => {
                         setChannel(
                           event.target.value
                             .toLowerCase()
                             .replace(/[^a-z0-9-]/g, '')
                             .slice(0, 32),
                         )
-                      }
+                        if (phase === 'done') setPhase('idle')
+                      }}
                       placeholder="production"
                       autoComplete="off"
                       spellCheck={false}
@@ -947,10 +978,13 @@ function Dashboard() {
                 <label className="routing-toggle">
                   <input
                     name="spa-fallback"
-                    disabled={phase !== 'idle'}
+                    disabled={busy}
                     type="checkbox"
                     checked={spaFallback}
-                    onChange={(event) => setSpaFallback(event.target.checked)}
+                    onChange={(event) => {
+                      setSpaFallback(event.target.checked)
+                      if (phase === 'done') setPhase('idle')
+                    }}
                   />
                   <span>
                     <b>SPA routing</b>
@@ -960,12 +994,13 @@ function Dashboard() {
                 <label className="routing-toggle">
                   <input
                     name="private-deploy"
-                    disabled={phase !== 'idle'}
+                    disabled={busy}
                     type="checkbox"
                     checked={privateDeploy}
                     onChange={(event) => {
                       setPrivateDeploy(event.target.checked)
                       if (!event.target.checked) setDeployPassword('')
+                      if (phase === 'done') setPhase('idle')
                     }}
                   />
                   <span>
@@ -1067,23 +1102,11 @@ function Dashboard() {
                     shell. Your browser password is never copied.
                   </p>
                 ) : null}
-                <pre className="console-code">
-                  {deployCommand(data.platform.controlPlaneUrl, {
-                    slug,
-                    channel,
-                    spaFallback,
-                    privateDeploy,
-                  })}
-                </pre>
+                <pre className="console-code">{cliCommand}</pre>
                 <CopyButton
                   className="button button-paper"
                   label="Copy CLI preview command"
-                  value={deployCommand(data.platform.controlPlaneUrl, {
-                    slug,
-                    channel,
-                    spaFallback,
-                    privateDeploy,
-                  })}
+                  value={cliCommand}
                 />
               </details>
               {folderChoices.length ? (
@@ -1134,7 +1157,8 @@ function Dashboard() {
                 <DeploymentPreflight
                   files={files}
                   spa={spaFallback}
-                  disabled={phase !== 'idle' && phase !== 'done'}
+                  report={preflight}
+                  disabled={busy}
                   onExclude={(paths) => {
                     const excluded = new Set(paths)
                     setFiles(files.filter((item) => !excluded.has(item.path)))
@@ -1179,6 +1203,7 @@ function Dashboard() {
                   : `Uploaded ${uploaded} / ${uploadTotal} missing files · ${reused} already stored`}
               </p>
               <button
+                type="button"
                 className="button button-paper"
                 onClick={() => uploadController.current?.abort()}
               >
@@ -1187,12 +1212,15 @@ function Dashboard() {
             </div>
           ) : null}
           {phase === 'uploading' || phase === 'finalizing' ? (
-            <div className="upload-progress">
-              <span
-                style={{
-                  width: `${phase === 'finalizing' ? 100 : (uploaded / (uploadTotal || files.length)) * 100}%`,
-                }}
-              />
+            <div
+              className="upload-progress"
+              role="progressbar"
+              aria-label="Deployment upload progress"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={progressPercent}
+            >
+              <span style={{ width: `${progressPercent}%` }} />
             </div>
           ) : null}
           {error ? (
@@ -1366,7 +1394,10 @@ function Dashboard() {
                       </small>
                     </span>
                     <span className="site-time">
-                      <i /> {timeAgo(site.updatedAt)}
+                      <i />{' '}
+                      <time dateTime={site.updatedAt}>
+                        {formatRelativeTime(site.updatedAt)}
+                      </time>
                     </span>
                     <span className="site-row-actions">
                       <Link
@@ -1543,7 +1574,9 @@ function Dashboard() {
                     {deployment.fileCount} files ·{' '}
                     {formatBytes(deployment.totalBytes)}
                   </span>
-                  <time>{timeAgo(deployment.createdAt)}</time>
+                  <time dateTime={deployment.createdAt}>
+                    {formatRelativeTime(deployment.createdAt)}
+                  </time>
                 </div>
               ))}
             </div>

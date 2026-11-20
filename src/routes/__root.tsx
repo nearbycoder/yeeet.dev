@@ -51,7 +51,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <HeadContent />
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var stored=localStorage.getItem('yeeet-theme');var theme=stored==='light'||stored==='dark'?stored:matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';document.documentElement.dataset.theme=theme;document.documentElement.style.colorScheme=theme;var meta=document.querySelector('meta[name="theme-color"]');if(meta)meta.content=theme==='dark'?'#181b17':'#f7f7f4'}catch(_){}})()`,
+            __html: `(function(){try{var stored=localStorage.getItem('yeeet-theme');var theme=stored==='light'||stored==='dark'?stored:matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';document.documentElement.dataset.theme=theme;document.documentElement.style.colorScheme=theme;var meta=document.querySelector('meta[name="theme-color"]');if(meta)meta.content=theme==='dark'?'#181b17':'#f7f7f4';var prefs=JSON.parse(localStorage.getItem('yeeet:reading-preferences:v1')||'null');if(prefs&&typeof prefs==='object'){if(typeof prefs.largeText==='boolean')document.documentElement.dataset.largeText=String(prefs.largeText);if(typeof prefs.reduceMotion==='boolean')document.documentElement.dataset.reduceMotion=String(prefs.reduceMotion)}}catch(_){}})()`,
           }}
         />
       </head>

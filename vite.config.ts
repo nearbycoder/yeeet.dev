@@ -1,5 +1,4 @@
 import { defineConfig } from 'vite'
-import { devtools } from '@tanstack/devtools-vite'
 
 import { tanstackStart } from '@tanstack/react-start/plugin/vite'
 
@@ -11,9 +10,8 @@ const config = defineConfig({
   // Native image rendering runs on the server and cannot be prebundled as JS.
   optimizeDeps: { exclude: ['@resvg/resvg-js'] },
   plugins: [
-    devtools(),
     nitro({
-      rollupConfig: { external: [/^@sentry\//, /^@resvg\/resvg-js/] },
+      rollupConfig: { external: [/^@resvg\/resvg-js/] },
     }),
 
     tanstackStart(),

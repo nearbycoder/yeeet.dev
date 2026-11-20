@@ -5,6 +5,28 @@ import { sitePreferences, sites } from '#/db/schema'
 import { organizationSchema } from '#/lib/site-organization'
 import { HttpError } from './http'
 
+export function parseSiteTags(value: string | null | undefined): Array<string> {
+  if (!value) return []
+  try {
+    const parsed = JSON.parse(value) as unknown
+    return Array.isArray(parsed)
+      ? parsed.filter((item): item is string => typeof item === 'string')
+      : []
+  } catch {
+    return []
+  }
+}
+
+export async function getSitePreference(userId: string, siteId: string) {
+  const row = await db.query.sitePreferences.findFirst({
+    where: and(
+      eq(sitePreferences.userId, userId),
+      eq(sitePreferences.siteId, siteId),
+    ),
+  })
+  return row ? { ...row, tags: parseSiteTags(row.tags) } : null
+}
+
 export async function listSitePreferences(userId: string) {
   const rows = await db
     .select()
@@ -12,13 +34,16 @@ export async function listSitePreferences(userId: string) {
     .where(eq(sitePreferences.userId, userId))
   return rows.map((row) => ({
     ...row,
-    tags: JSON.parse(row.tags) as Array<string>,
+    tags: parseSiteTags(row.tags),
   }))
 }
 export async function saveSiteOrganization(userId: string, input: unknown) {
   const data = organizationSchema.parse(input)
   const site = await db.query.sites.findFirst({
-    where: and(eq(sites.slug, data.slug), eq(sites.userId, userId)),
+    where: and(
+      eq(sites.slug, data.slug.trim().toLowerCase()),
+      eq(sites.userId, userId),
+    ),
   })
   if (!site) throw new HttpError(404, 'Site not found.', 'not_found')
   const values = {

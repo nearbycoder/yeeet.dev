@@ -2,6 +2,7 @@ import { LaunchChecklist } from '#/components/launch-checklist'
 import { getLaunchChecklist } from '#/server/functions'
 import { SiteNotes } from '#/components/site-notes'
 import { SiteOrganization } from '#/components/site-organization'
+import { formatBytes, formatShortDate } from '#/lib/format'
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { Route as SiteRoute } from './route'
 
@@ -9,24 +10,6 @@ export const Route = createFileRoute('/dashboard_/sites/$slug/')({
   loader: ({ params }) => getLaunchChecklist({ data: { slug: params.slug } }),
   component: SiteOverview,
 })
-
-function formatBytes(value: number | null) {
-  if (!value) return '0 B'
-  const units = ['B', 'KB', 'MB', 'GB']
-  const rank = Math.min(
-    Math.floor(Math.log(value) / Math.log(1024)),
-    units.length - 1,
-  )
-  return `${(value / 1024 ** rank).toFixed(rank ? 1 : 0)} ${units[rank]}`
-}
-
-function formatDate(value: string) {
-  return new Intl.DateTimeFormat(undefined, {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  }).format(new Date(value))
-}
 
 function SiteOverview() {
   const { site, latestVersions } = SiteRoute.useLoaderData()
@@ -100,7 +83,7 @@ function SiteOverview() {
                   <div>
                     <b>{version.releaseLabel || version.id.slice(0, 12)}</b>
                     <small>
-                      {version.source} · {formatDate(version.createdAt)}
+                      {version.source} · {formatShortDate(version.createdAt)}
                     </small>
                   </div>
                   <span
@@ -152,7 +135,7 @@ function SiteOverview() {
           >
             Connect a domain
           </Link>
-          <p>Last updated {formatDate(site.updatedAt)}.</p>
+          <p>Last updated {formatShortDate(site.updatedAt)}.</p>
         </aside>
       </div>
       <LaunchChecklist slug={site.slug} data={checklist} />

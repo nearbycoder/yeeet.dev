@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import type { UploadFile } from '#/lib/browser-upload'
 import { matchingUploadPaths } from '#/lib/upload-rules'
 import { formatBytes } from '#/lib/asset-review'
+import { formatNumber } from '#/lib/format'
 
 export function UploadSelection({
   original,
@@ -72,6 +73,7 @@ export function UploadSelection({
     page * 100,
     Math.max(0, Math.ceil(matching.length / 100) - 1) * 100,
   )
+  const currentPage = Math.floor(start / 100)
   function toggle(path: string, include: boolean) {
     if (disabled) return
     const paths = new Set(selected)
@@ -102,6 +104,7 @@ export function UploadSelection({
       </label>
       <div className="console-actions">
         <button
+          type="button"
           className="button button-paper"
           disabled={disabled || !history.undo.length}
           onClick={() => {
@@ -119,6 +122,7 @@ export function UploadSelection({
           Undo selection change
         </button>
         <button
+          type="button"
           className="button button-paper"
           disabled={disabled || !history.redo.length}
           onClick={() => {
@@ -136,6 +140,7 @@ export function UploadSelection({
           Redo selection change
         </button>
         <button
+          type="button"
           className="button button-paper"
           disabled={disabled || files.length === original.length}
           onClick={() => change([...original])}
@@ -143,6 +148,7 @@ export function UploadSelection({
           Restore all files
         </button>
         <button
+          type="button"
           className="button button-paper"
           disabled={disabled || !matching.length}
           onClick={() => {
@@ -200,6 +206,7 @@ export function UploadSelection({
           </>
         )}
         <button
+          type="button"
           className="button button-paper"
           disabled={
             disabled || !rulePreview.paths.size || Boolean(rulePreview.error)
@@ -213,7 +220,7 @@ export function UploadSelection({
       </details>
       <p role="status">
         {files.length} included · {original.length - files.length} excluded ·{' '}
-        {files.reduce((sum, item) => sum + item.file.size, 0).toLocaleString()}{' '}
+        {formatNumber(files.reduce((sum, item) => sum + item.file.size, 0))}{' '}
         bytes to review
       </p>
       <ul className="file-paths">
@@ -226,7 +233,7 @@ export function UploadSelection({
                 checked={selected.has(item.path)}
                 onChange={(event) => toggle(item.path, event.target.checked)}
               />{' '}
-              {item.path} · {item.file.size.toLocaleString()} B
+              {item.path} · {formatNumber(item.file.size)} B
             </label>
           </li>
         ))}
@@ -236,16 +243,18 @@ export function UploadSelection({
       ) : null}
       <nav className="console-actions" aria-label="Upload file pages">
         <button
+          type="button"
           className="button button-paper"
           disabled={start === 0}
-          onClick={() => setPage(Math.max(0, page - 1))}
+          onClick={() => setPage(Math.max(0, currentPage - 1))}
         >
           Previous selection page
         </button>
         <button
+          type="button"
           className="button button-paper"
           disabled={start + 100 >= matching.length}
-          onClick={() => setPage(page + 1)}
+          onClick={() => setPage(currentPage + 1)}
         >
           Next selection page
         </button>

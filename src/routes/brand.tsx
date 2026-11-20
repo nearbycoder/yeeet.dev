@@ -31,9 +31,16 @@ function BrandCard() {
   const { asset } = Route.useSearch()
 
   useEffect(() => {
+    const previousTheme = document.documentElement.dataset.theme
     document.documentElement.dataset.theme = 'light'
     document.documentElement.classList.add('promo-capture')
     document.body.classList.add('promo-capture')
+    return () => {
+      document.documentElement.classList.remove('promo-capture')
+      document.body.classList.remove('promo-capture')
+      if (previousTheme) document.documentElement.dataset.theme = previousTheme
+      else delete document.documentElement.dataset.theme
+    }
   }, [])
 
   if (asset === 'og-yeeetlings') {

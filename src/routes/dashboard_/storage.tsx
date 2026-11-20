@@ -1,18 +1,10 @@
 import { createFileRoute, Link, redirect } from '@tanstack/react-router'
 import { DashboardHeader } from '#/components/dashboard-header'
+import { DownloadButton } from '#/components/download-button'
+import { formatBytes, formatNumber } from '#/lib/format'
 import { storageSearchSchema } from '#/lib/storage-inventory'
-import { downloadText, toCsv } from '#/lib/download'
+import { toCsv } from '#/lib/download'
 import { getSession, getStorageInventory } from '#/server/functions'
-import { useState } from 'react'
-
-function formatStorageBytes(value: number) {
-  const units = ['B', 'KB', 'MB', 'GB', 'TB']
-  const rank = Math.min(
-    Math.floor(Math.log(Math.max(value, 1)) / Math.log(1024)),
-    units.length - 1,
-  )
-  return `${(value / 1024 ** rank).toFixed(rank ? 1 : 0)} ${units[rank]}`
-}
 
 export const Route = createFileRoute('/dashboard_/storage')({
   validateSearch: storageSearchSchema,
@@ -34,7 +26,6 @@ function StorageInventory() {
     search = Route.useSearch(),
     { user } = Route.useRouteContext(),
     navigate = Route.useNavigate()
-  const [error, setError] = useState('')
   return (
     <div className="dashboard-shell">
       <a className="skip-link" href="#main-content">
@@ -57,12 +48,12 @@ function StorageInventory() {
         <div className="site-metrics storage-metrics">
           <article>
             <span>Recorded bytes</span>
-            <strong>{formatStorageBytes(data.totalBytes)}</strong>
-            <small>{data.totalBytes.toLocaleString()} bytes</small>
+            <strong>{formatBytes(data.totalBytes)}</strong>
+            <small>{formatNumber(data.totalBytes)} bytes</small>
           </article>
           <article>
             <span>Versions</span>
-            <strong>{data.totalVersions.toLocaleString()}</strong>
+            <strong>{formatNumber(data.totalVersions)}</strong>
             <small>Across your account</small>
           </article>
         </div>
@@ -118,45 +109,27 @@ function StorageInventory() {
           Page {data.page + 1} · {data.rows.length} of {data.totalSites}{' '}
           matching sites
         </p>
-        <button
-          type="button"
-          className="button button-paper"
+        <DownloadButton
+          name="yeeet-storage-page.csv"
           disabled={!data.rows.length}
-          onClick={() => {
-            setError('')
-            try {
-              downloadText(
-                'yeeet-storage-page.csv',
-                toCsv([
-                  ['Site', 'Recorded bytes', 'Versions'],
-                  ...data.rows.map((row) => [
-                    row.slug,
-                    row.bytes,
-                    row.versions,
-                  ]),
-                ]),
-                'text/csv;charset=utf-8',
-              )
-            } catch {
-              setError('Could not create the download. Try again.')
-            }
-          }}
+          type="text/csv;charset=utf-8"
+          content={() =>
+            toCsv([
+              ['Site', 'Recorded bytes', 'Versions'],
+              ...data.rows.map((row) => [row.slug, row.bytes, row.versions]),
+            ])
+          }
         >
           Export this page as CSV
-        </button>
-        {error ? (
-          <p role="alert" className="form-error">
-            {error}
-          </p>
-        ) : null}
+        </DownloadButton>
         <div className="console-table-scroll">
           <table className="console-table">
             <thead>
               <tr>
-                <th>Site</th>
-                <th>Recorded bytes</th>
-                <th>Versions</th>
-                <th>Manage</th>
+                <th scope="col">Site</th>
+                <th scope="col">Recorded bytes</th>
+                <th scope="col">Versions</th>
+                <th scope="col">Manage</th>
               </tr>
             </thead>
             <tbody>
@@ -170,8 +143,8 @@ function StorageInventory() {
                       {row.slug}
                     </Link>
                   </td>
-                  <td>{row.bytes.toLocaleString()}</td>
-                  <td>{row.versions.toLocaleString()}</td>
+                  <td>{formatNumber(row.bytes)}</td>
+                  <td>{formatNumber(row.versions)}</td>
                   <td>
                     <Link
                       to="/dashboard/sites/$slug/cleanup"

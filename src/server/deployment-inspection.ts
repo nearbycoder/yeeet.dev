@@ -56,9 +56,12 @@ export async function compareDeployments(
   slug: string,
   target: string,
   base?: string,
+  preloadedTarget?: Awaited<ReturnType<typeof inspectDeployment>>,
 ) {
   const [next, previous] = await Promise.all([
-    inspectDeployment(userId, slug, target),
+    preloadedTarget
+      ? Promise.resolve(preloadedTarget)
+      : inspectDeployment(userId, slug, target),
     base ? inspectDeployment(userId, slug, base) : Promise.resolve(null),
   ])
   return {

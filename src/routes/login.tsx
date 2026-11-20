@@ -3,16 +3,21 @@ import { Link, createFileRoute, redirect } from '@tanstack/react-router'
 import { z } from 'zod'
 import { Brand, GitHubIcon } from '#/components/brand'
 import { authClient } from '#/lib/auth-client'
+import { safeRedirectPath } from '#/lib/format'
 import { ThemeToggle } from '#/components/theme-toggle'
 import { Yeeetling } from '#/components/yeeetling'
 import { getSession } from '#/server/functions'
 
-const searchSchema = z.object({ redirect: z.string().optional() })
+const searchSchema = z.object({
+  redirect: z.string().optional().catch(undefined),
+})
 
 export const Route = createFileRoute('/login')({
   validateSearch: searchSchema,
-  beforeLoad: async () => {
-    if (await getSession()) throw redirect({ to: '/dashboard' })
+  beforeLoad: async ({ search }) => {
+    if (await getSession()) {
+      throw redirect({ href: safeRedirectPath(search.redirect) })
+    }
   },
   component: Login,
 })
@@ -26,7 +31,7 @@ function Login() {
   const [invitationCode, setInvitationCode] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
-  const destination = redirectTo?.startsWith('/') ? redirectTo : '/dashboard'
+  const destination = safeRedirectPath(redirectTo)
   const githubEnabled = import.meta.env.VITE_GITHUB_AUTH_ENABLED === 'true'
 
   async function submit(event: React.FormEvent) {
@@ -45,7 +50,10 @@ function Login() {
               },
               body: JSON.stringify({ name, email, password }),
             }).then(async (response) => {
-              const data = await response.json()
+              const data = (await response.json().catch(() => ({}))) as {
+                message?: string
+                error?: { message?: string }
+              }
               return response.ok
                 ? { data, error: null }
                 : {
@@ -81,7 +89,9 @@ function Login() {
           body: JSON.stringify({ code: invitationCode }),
         })
         if (!response.ok) {
-          const body = await response.json()
+          const body = (await response.json().catch(() => ({}))) as {
+            error?: { message?: string }
+          }
           setError(body.error?.message || 'A valid invitation is required.')
           return
         }
@@ -104,136 +114,141 @@ function Login() {
   }
 
   return (
-    <main id="main-content" tabIndex={-1} className="auth-page">
-      <div className="auth-top">
-        <Brand />
-        <ThemeToggle inline />
-      </div>
-      <section className="auth-card">
-        <div className="auth-heading">
-          <div className="auth-mascot">
-            <Yeeetling
-              seed="launch-control"
-              phase={busy ? 'uploading' : error ? 'error' : 'ready'}
-            />
-          </div>
-          <div>
-            <div className="eyebrow">
-              <span className="status-dot" /> Launch control
-            </div>
-            <h1>{mode === 'login' ? 'Welcome back.' : 'Join the flight.'}</h1>
-            <p>
-              {mode === 'login'
-                ? 'Your sites have been holding orbit.'
-                : 'Your first deployment is less than a minute away.'}
-            </p>
-          </div>
+    <>
+      <a className="skip-link" href="#main-content">
+        Skip to content
+      </a>
+      <main id="main-content" tabIndex={-1} className="auth-page">
+        <div className="auth-top">
+          <Brand />
+          <ThemeToggle inline />
         </div>
-
-        {githubEnabled ? (
-          <>
-            <button
-              type="button"
-              className="button github-button"
-              onClick={github}
-              disabled={busy || (mode === 'signup' && !invitationCode)}
-            >
-              <GitHubIcon /> {busy ? 'Connecting…' : 'Continue with GitHub'}
-            </button>
-            <div className="auth-divider">
-              <span>or use email</span>
+        <section className="auth-card">
+          <div className="auth-heading">
+            <div className="auth-mascot">
+              <Yeeetling
+                seed="launch-control"
+                phase={busy ? 'uploading' : error ? 'error' : 'ready'}
+              />
             </div>
-          </>
-        ) : null}
+            <div>
+              <div className="eyebrow">
+                <span className="status-dot" /> Launch control
+              </div>
+              <h1>{mode === 'login' ? 'Welcome back.' : 'Join the flight.'}</h1>
+              <p>
+                {mode === 'login'
+                  ? 'Your sites have been holding orbit.'
+                  : 'Your first deployment is less than a minute away.'}
+              </p>
+            </div>
+          </div>
 
-        <form onSubmit={submit} className="auth-form" aria-busy={busy}>
-          {mode === 'signup' ? (
+          {githubEnabled ? (
             <>
-              <label>
-                <span>Invitation code</span>
-                <input
-                  name="invitation-code"
-                  value={invitationCode}
-                  onChange={(event) => setInvitationCode(event.target.value)}
-                  required
-                  autoComplete="off"
-                  spellCheck={false}
-                  placeholder="invite_…"
-                />
-              </label>
-              <label>
-                <span>Name</span>
-                <input
-                  name="name"
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
-                  required
-                  autoComplete="name"
-                  placeholder="e.g. Ada Lovelace…"
-                />
-              </label>
+              <button
+                type="button"
+                className="button github-button"
+                onClick={github}
+                disabled={busy || (mode === 'signup' && !invitationCode)}
+              >
+                <GitHubIcon /> {busy ? 'Connecting…' : 'Continue with GitHub'}
+              </button>
+              <div className="auth-divider">
+                <span>or use email</span>
+              </div>
             </>
           ) : null}
-          <label>
-            <span>Email</span>
-            <input
-              name="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              required
-              type="email"
-              autoComplete="email"
-              spellCheck={false}
-              placeholder="e.g. you@example.com…"
-            />
-          </label>
-          <label>
-            <span>Password</span>
-            <input
-              name="password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              required
-              minLength={8}
-              type="password"
-              autoComplete={
-                mode === 'login' ? 'current-password' : 'new-password'
-              }
-              placeholder="At least 8 characters…"
-            />
-          </label>
-          {error ? (
-            <p className="form-error" role="alert">
-              {error}
-            </p>
-          ) : null}
-          <button className="button button-coral auth-submit" disabled={busy}>
-            {busy
-              ? 'Checking trajectory…'
-              : mode === 'login'
-                ? 'Enter launchpad →'
-                : 'Create account →'}
-          </button>
-        </form>
-        <p className="auth-switch">
-          {mode === 'login'
-            ? 'New around here?'
-            : 'Already have a flight plan?'}{' '}
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => {
-              setMode(mode === 'login' ? 'signup' : 'login')
-              setError('')
-            }}
-          >
-            {mode === 'login' ? 'Create an account' : 'Sign in'}
-          </button>
-        </p>
-      </section>
-      <Link to="/" className="auth-back">
-        ← Back to earth
-      </Link>
-    </main>
+
+          <form onSubmit={submit} className="auth-form" aria-busy={busy}>
+            {mode === 'signup' ? (
+              <>
+                <label>
+                  <span>Invitation code</span>
+                  <input
+                    name="invitation-code"
+                    value={invitationCode}
+                    onChange={(event) => setInvitationCode(event.target.value)}
+                    required
+                    autoComplete="off"
+                    spellCheck={false}
+                    placeholder="invite_…"
+                  />
+                </label>
+                <label>
+                  <span>Name</span>
+                  <input
+                    name="name"
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
+                    required
+                    autoComplete="name"
+                    placeholder="e.g. Ada Lovelace…"
+                  />
+                </label>
+              </>
+            ) : null}
+            <label>
+              <span>Email</span>
+              <input
+                name="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                required
+                type="email"
+                autoComplete="email"
+                spellCheck={false}
+                placeholder="e.g. you@example.com…"
+              />
+            </label>
+            <label>
+              <span>Password</span>
+              <input
+                name="password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                required
+                minLength={8}
+                type="password"
+                autoComplete={
+                  mode === 'login' ? 'current-password' : 'new-password'
+                }
+                placeholder="At least 8 characters…"
+              />
+            </label>
+            {error ? (
+              <p className="form-error" role="alert">
+                {error}
+              </p>
+            ) : null}
+            <button className="button button-coral auth-submit" disabled={busy}>
+              {busy
+                ? 'Checking trajectory…'
+                : mode === 'login'
+                  ? 'Enter launchpad →'
+                  : 'Create account →'}
+            </button>
+          </form>
+          <p className="auth-switch">
+            {mode === 'login'
+              ? 'New around here?'
+              : 'Already have a flight plan?'}{' '}
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => {
+                setMode(mode === 'login' ? 'signup' : 'login')
+                setError('')
+              }}
+            >
+              {mode === 'login' ? 'Create an account' : 'Sign in'}
+            </button>
+          </p>
+        </section>
+        <Link to="/" className="auth-back">
+          ← Back to earth
+        </Link>
+      </main>
+    </>
   )
 }

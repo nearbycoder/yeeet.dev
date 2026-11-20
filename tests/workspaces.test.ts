@@ -84,10 +84,10 @@ test('delegated deployment access is scoped to the assigned site and revoked mem
     actingUserId: 'editor',
   })
   member = undefined
-  await assert.rejects(
-    actorForWorkspaceSite(actor, 'comet'),
-    /Workspace not found/,
-  )
+  await assert.rejects(actorForWorkspaceSite(actor, 'comet'), {
+    status: 409,
+    code: 'slug_taken',
+  })
 })
 
 test('shared workspaces cannot bypass an owner account suspension', async (t) => {

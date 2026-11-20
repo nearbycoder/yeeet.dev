@@ -1,5 +1,11 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
-import { existsSync, mkdtempSync, rmSync } from 'node:fs'
+import {
+  existsSync,
+  mkdtempSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
@@ -22,7 +28,7 @@ export default {
     if (url.pathname === '/api/todos') {
       return Response.json(db.query('SELECT id, title FROM todos ORDER BY id').all())
     }
-    if (url.pathname === '/api/site') return Response.json({ site, host: url.host, auth: request.headers.get('authorization'), internal: request.headers.get('x-yeeet-url') })
+    if (url.pathname === '/api/site') return Response.json({ site, host: url.host, hostHeader: request.headers.get('host'), auth: request.headers.get('authorization'), internal: request.headers.get('x-yeeet-url') })
     if (url.pathname === '/api/boom') throw new Error('kaboom')
     if (url.pathname === '/api/slow') { await Bun.sleep(2000); return new Response('late') }
     if (url.pathname === '/api/spin') { while (true) {} }
@@ -174,6 +180,7 @@ describe('requests', () => {
       })
     ).json()
     expect(body.host).toBe('todo.site.example.com')
+    expect(body.hostHeader).toBe('todo.site.example.com')
     expect(body.auth).toBe('Bearer user-token')
     expect(body.internal).toBeNull()
     expect(body.site).toEqual({
@@ -401,12 +408,62 @@ describe('operations', () => {
     expect(runtime.pool.workers.has(key)).toBe(true)
   })
 
-  test('purge removes a database or the whole site', async () => {
+  test('purge removes a database or the whole site without clearing sibling channel logs', async () => {
+    expect(await (await api(v1, '/api/log', {}, 'channel-a')).text()).toBe(
+      'logged',
+    )
+    expect(await (await api(v1, '/api/log', {}, 'channel-alpha')).text()).toBe(
+      'logged',
+    )
+    await Bun.sleep(50)
+    await (await call('purge', { siteId, database: 'channel-a' })).json()
+    const alphaLogs = await (
+      await call('logs', { siteId, database: 'channel-alpha' })
+    ).json()
+    expect(
+      alphaLogs.entries.some((entry) =>
+        entry.line.includes('hello from channel-alpha'),
+      ),
+    ).toBe(true)
+
     await (await call('purge', { siteId, database: 'channel-staging' })).json()
     const status = await (await call('status', { siteId })).json()
     expect(status.databases.map((db) => db.name)).not.toContain(
       'channel-staging',
     )
+
+    // Symlinks dropped in the db directory are ignored by status().
+    const sneakyLink = join(
+      dataDir,
+      'sites',
+      siteId,
+      'db',
+      'channel-evil.sqlite',
+    )
+    symlinkSync(join(dataDir, 'runtime.sqlite'), sneakyLink)
+    const afterLink = await (await call('status', { siteId })).json()
+    expect(afterLink.databases.map((db) => db.name)).not.toContain(
+      'channel-evil',
+    )
+    rmSync(sneakyLink, { force: true })
+
+    // Restore succeeds even if the live SQLite file on disk is corrupted.
+    const backup = runtime.pool.listBackups(siteId, 'live')[0]
+    await runtime.pool.stop(runtime.pool.workers.get(`${siteId}/live`))
+    writeFileSync(
+      join(dataDir, 'sites', siteId, 'db', 'live.sqlite'),
+      'not-a-valid-sqlite-database',
+    )
+    const recovered = await call('restore', {
+      siteId,
+      database: 'live',
+      backup: backup.name,
+    })
+    expect(recovered.status).toBe(200)
+    expect(await (await api(v1, '/api/todos')).json()).toEqual([
+      { id: 1, title: 'ship backends' },
+    ])
+
     await (await call('purge', { siteId })).json()
     expect(existsSync(join(dataDir, 'sites', siteId))).toBe(false)
   })

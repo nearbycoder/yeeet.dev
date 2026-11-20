@@ -22,17 +22,21 @@ const client = new S3Client({
   },
 })
 
+const defaultOrigins =
+  process.env.NODE_ENV === 'production'
+    ? process.env.BETTER_AUTH_URL || 'https://yeeet.dev'
+    : `${process.env.BETTER_AUTH_URL || 'https://yeeet.dev'},http://localhost:3000`
 const origins = [
   ...new Set(
-    (
-      process.env.S3_CORS_ORIGINS ||
-      `${process.env.BETTER_AUTH_URL || 'https://yeeet.dev'},http://localhost:3000`
-    )
+    (process.env.S3_CORS_ORIGINS || defaultOrigins)
       .split(',')
       .map((origin) => origin.trim().replace(/\/+$/, ''))
       .filter(Boolean),
   ),
 ]
+if (!origins.length) {
+  throw new Error('At least one CORS origin is required.')
+}
 
 await client.send(
   new PutBucketCorsCommand({

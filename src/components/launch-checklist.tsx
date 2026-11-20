@@ -1,4 +1,5 @@
 import { Link } from '@tanstack/react-router'
+import { formatDateTime } from '#/lib/format'
 import type { launchChecklist } from '#/server/launch-checklist'
 
 export function LaunchChecklist({
@@ -55,7 +56,7 @@ export function LaunchChecklist({
       detail: data.healthPassed
         ? 'The current build passed its configured origin check within 15 minutes.'
         : data.healthCheckedAt
-          ? `Last check: ${new Date(data.healthCheckedAt).toLocaleString()}. Run again for current evidence.`
+          ? `Last check: ${formatDateTime(data.healthCheckedAt)}. Run again for current evidence.`
           : 'No origin check recorded yet.',
       to: '/dashboard/sites/$slug/lifecycle' as const,
     },

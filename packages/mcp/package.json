@@ -24,7 +24,7 @@
     "README.md"
   ],
   "engines": {
-    "node": ">=20"
+    "node": "^20.19.0 || >=22.12.0"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "^2.3.1",

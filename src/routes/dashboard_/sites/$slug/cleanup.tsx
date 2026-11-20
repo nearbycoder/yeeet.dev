@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { ConfirmDialog } from '#/components/confirm-dialog'
 import { useConsoleMutation } from '#/lib/console-request'
+import { formatBytes, formatDateTime } from '#/lib/format'
 import {
   getRetentionConsole,
   getRetentionPreview,
@@ -19,11 +20,19 @@ function Cleanup() {
   const [keepCount, setKeepCount] = useState(policy?.keepCount ?? 10)
   const [minAgeDays, setMinAgeDays] = useState(policy?.minAgeDays ?? 30)
   const [enabled, setEnabled] = useState(policy?.enabled ?? false)
+  const [validationError, setValidationError] = useState('')
   const [preview, setPreview] = useState<Awaited<
     ReturnType<typeof getRetentionPreview>
   > | null>(null)
   const [confirm, setConfirm] = useState<'clean' | 'save' | null>(null)
   const mutation = useConsoleMutation()
+  const policyValid =
+    Number.isInteger(keepCount) &&
+    keepCount >= 1 &&
+    keepCount <= 1000 &&
+    Number.isInteger(minAgeDays) &&
+    minAgeDays >= 1 &&
+    minAgeDays <= 3650
   return (
     <div className="site-page-stack">
       <section className="panel site-page-panel">
@@ -34,9 +43,9 @@ function Cleanup() {
           with unresolved feedback or a retention pin are always protected.
           Deleting a version removes its links and feedback permanently.
         </p>
-        {mutation.error ? (
+        {mutation.error || validationError ? (
           <p className="form-error" role="alert">
-            {mutation.error}
+            {validationError || mutation.error}
           </p>
         ) : null}
         {mutation.notice ? (
@@ -48,6 +57,13 @@ function Cleanup() {
           className="console-form-grid"
           onSubmit={(event) => {
             event.preventDefault()
+            if (!policyValid) {
+              setValidationError(
+                'Use whole numbers: keep 1–1000 versions and at least 1–3650 days old.',
+              )
+              return
+            }
+            setValidationError('')
             void mutation.run(async () => {
               setPreview(
                 await getRetentionPreview({
@@ -68,6 +84,7 @@ function Cleanup() {
               onChange={(event) => {
                 setKeepCount(Number(event.target.value))
                 setPreview(null)
+                setValidationError('')
               }}
             />
           </label>
@@ -82,6 +99,7 @@ function Cleanup() {
               onChange={(event) => {
                 setMinAgeDays(Number(event.target.value))
                 setPreview(null)
+                setValidationError('')
               }}
             />
           </label>
@@ -94,7 +112,7 @@ function Cleanup() {
             <h3>
               {preview.candidates.length}{' '}
               {preview.candidates.length === 1 ? 'version' : 'versions'}{' '}
-              eligible · {(preview.totalBytes / 1024 / 1024).toFixed(2)} MB
+              eligible · {formatBytes(preview.totalBytes)}
             </h3>
             <p>
               Examined {preview.examined} recent versions;{' '}
@@ -104,14 +122,14 @@ function Cleanup() {
             </p>
             {preview.candidates.length ? (
               <>
-                <div className="console-table-wrap">
+                <div className="console-table-scroll">
                   <table className="console-table">
                     <thead>
                       <tr>
-                        <th>Version</th>
-                        <th>Created</th>
-                        <th>Status</th>
-                        <th>Size</th>
+                        <th scope="col">Version</th>
+                        <th scope="col">Created</th>
+                        <th scope="col">Status</th>
+                        <th scope="col">Size</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -120,17 +138,16 @@ function Cleanup() {
                           <td>
                             <code>{version.id.slice(0, 8)}</code>
                           </td>
-                          <td>
-                            {new Date(version.createdAt).toLocaleString()}
-                          </td>
+                          <td>{formatDateTime(version.createdAt)}</td>
                           <td>{version.status}</td>
-                          <td>{(version.totalBytes / 1024).toFixed(1)} KB</td>
+                          <td>{formatBytes(version.totalBytes)}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
                 <button
+                  type="button"
                   className="button danger-link"
                   disabled={mutation.busy}
                   onClick={() => setConfirm('clean')}
@@ -160,9 +177,19 @@ function Cleanup() {
           Enable daily cleanup
         </label>
         <button
+          type="button"
           className="button button-paper"
           disabled={mutation.busy}
-          onClick={() => setConfirm('save')}
+          onClick={() => {
+            if (!policyValid) {
+              setValidationError(
+                'Use whole numbers: keep 1–1000 versions and at least 1–3650 days old.',
+              )
+              return
+            }
+            setValidationError('')
+            setConfirm('save')
+          }}
         >
           Save retention policy
         </button>
@@ -174,17 +201,19 @@ function Cleanup() {
               {policy.minAgeDays} days old.
             </p>
             {policy.enabled ? (
-              <p>
-                Next run after {new Date(policy.nextRunAt).toLocaleString()}
-              </p>
+              <p>Next run after {formatDateTime(policy.nextRunAt)}</p>
             ) : null}
             {policy.lastRunAt ? (
               <p>
-                Last run: {new Date(policy.lastRunAt).toLocaleString()} ·{' '}
+                Last run: {formatDateTime(policy.lastRunAt)} ·{' '}
                 {policy.lastDeletedCount} versions removed
               </p>
             ) : null}
-            {policy.error ? <p className="form-error">{policy.error}</p> : null}
+            {policy.error ? (
+              <p className="form-error" role="alert">
+                {policy.error}
+              </p>
+            ) : null}
           </div>
         ) : null}
       </section>
@@ -202,7 +231,11 @@ function Cleanup() {
                 {job.attempts ? 'Retrying / processing' : 'Queued'}
               </b>
               <p>{job.attempts} attempts</p>
-              {job.error ? <p className="form-error">{job.error}</p> : null}
+              {job.error ? (
+                <p className="form-error" role="alert">
+                  {job.error}
+                </p>
+              ) : null}
             </article>
           ))
         ) : (
@@ -224,6 +257,8 @@ function Cleanup() {
         confirmLabel={
           confirm === 'clean' ? 'Delete listed versions' : 'Save policy'
         }
+        eyebrow={confirm === 'clean' ? 'DANGER ZONE' : 'CONFIRM CHANGE'}
+        tone={confirm === 'clean' ? 'danger' : 'neutral'}
         busyLabel="Saving…"
         cancelLabel="Cancel"
         busy={mutation.busy}

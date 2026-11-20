@@ -6,17 +6,30 @@ import {
   planDeployment,
 } from '#/server/deployments'
 import type { ManifestFile } from '#/server/deployments'
-import { errorResponse, HttpError, json } from '#/server/http'
+import { errorResponse, HttpError, json, readJsonBody } from '#/server/http'
 
-type CreateBody = {
-  slug?: string
-  files?: Array<ManifestFile>
-  source?: 'web' | 'cli' | 'api'
-  spaFallback?: boolean
-  password?: string
-  channel?: string
-  dryRun?: boolean
-  idempotencyKey?: string
+function optionalString(
+  value: unknown,
+  field: string,
+  code: string,
+): string | undefined {
+  if (value === undefined) return undefined
+  if (typeof value !== 'string') {
+    throw new HttpError(400, `${field} must be a string.`, code)
+  }
+  return value
+}
+
+function optionalBoolean(
+  value: unknown,
+  field: string,
+  code: string,
+): boolean | undefined {
+  if (value === undefined) return undefined
+  if (typeof value !== 'boolean') {
+    throw new HttpError(400, `${field} must be a boolean.`, code)
+  }
+  return value
 }
 
 export const Route = createFileRoute('/api/v1/deployments/')({
@@ -35,41 +48,67 @@ export const Route = createFileRoute('/api/v1/deployments/')({
       POST: async ({ request }) => {
         try {
           const actor = await requireActor(request)
-          const body = (await request.json()) as CreateBody
-          if (!body.files) {
+          const body = await readJsonBody(request)
+          if (!Array.isArray(body.files)) {
             throw new HttpError(
               400,
               'A file manifest is required.',
               'invalid_manifest',
             )
           }
-          const source = request.headers
-            .get('x-yeeet-client')
-            ?.startsWith('cli')
-            ? 'cli'
-            : body.source === 'api'
-              ? 'api'
-              : 'web'
-          if (body.dryRun) {
+          const slug = optionalString(body.slug, 'slug', 'invalid_slug')
+          const channel = optionalString(
+            body.channel,
+            'channel',
+            'invalid_channel',
+          )
+          const password = optionalString(
+            body.password,
+            'password',
+            'invalid_password',
+          )
+          const spaFallback = optionalBoolean(
+            body.spaFallback,
+            'spaFallback',
+            'invalid_request',
+          )
+          const dryRun = optionalBoolean(
+            body.dryRun,
+            'dryRun',
+            'invalid_request',
+          )
+          const bodyIdempotencyKey = optionalString(
+            body.idempotencyKey,
+            'idempotencyKey',
+            'invalid_idempotency_key',
+          )
+          const source =
+            request.headers.get('x-yeeet-client')?.startsWith('cli') ||
+            body.source === 'cli'
+              ? 'cli'
+              : body.source === 'api'
+                ? 'api'
+                : 'web'
+          if (dryRun) {
             return json(
               await planDeployment({
                 actor,
-                slug: body.slug,
-                files: body.files,
-                channel: body.channel,
+                slug,
+                files: body.files as Array<ManifestFile>,
+                channel,
               }),
             )
           }
           const result = await createDeployment({
             actor,
-            slug: body.slug,
-            files: body.files,
+            slug,
+            files: body.files as Array<ManifestFile>,
             source,
-            spaFallback: body.spaFallback,
-            password: body.password,
-            channel: body.channel,
+            spaFallback,
+            password,
+            channel,
             idempotencyKey:
-              request.headers.get('idempotency-key') ?? body.idempotencyKey,
+              request.headers.get('idempotency-key') ?? bodyIdempotencyKey,
           })
           return json(result, { status: 201 })
         } catch (error) {

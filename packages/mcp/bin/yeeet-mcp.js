@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { createHash, randomUUID } from 'node:crypto'
-import { createReadStream } from 'node:fs'
+import { createReadStream, realpathSync } from 'node:fs'
 import { readFile, stat } from 'node:fs/promises'
 import { basename, join, resolve } from 'node:path'
 import process from 'node:process'
@@ -31,7 +31,11 @@ async function apiRequest(path, options = {}) {
   headers.set('authorization', `Bearer ${token()}`)
   headers.set('user-agent', `yeeet-mcp/${VERSION}`)
   headers.set('x-yeeet-client', `mcp/${VERSION}`)
-  const response = await fetch(`${apiOrigin()}${path}`, { ...options, headers })
+  const response = await fetch(`${apiOrigin()}${path}`, {
+    ...options,
+    headers,
+    signal: options.signal ?? AbortSignal.timeout(60_000),
+  })
   const text = await response.text()
   let data
   try {
@@ -93,7 +97,7 @@ async function deploymentFiles(target) {
       '.git/**',
       'node_modules/**',
       '.yeeet/**',
-      '.DS_Store',
+      '**/.DS_Store',
       '.yeeetignore',
       ...ignoreFile
         .split(/\r?\n/)
@@ -133,14 +137,33 @@ export async function deployStaticPath(input) {
     dryRun: Boolean(input.dryRun),
   }
   const key = input.idempotencyKey || randomUUID()
-  const deployment = await apiRequest('/api/v1/deployments', {
+  const createRequest = {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
       ...(input.dryRun ? {} : { 'idempotency-key': key }),
     },
     body: JSON.stringify(createBody),
-  })
+  }
+  let deployment
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      deployment = await apiRequest('/api/v1/deployments', createRequest)
+      break
+    } catch (error) {
+      if (
+        !input.dryRun &&
+        (error.status == null || error.status >= 500) &&
+        attempt < 2
+      ) {
+        await new Promise((resolvePromise) =>
+          setTimeout(resolvePromise, 500 * (attempt + 1)),
+        )
+        continue
+      }
+      throw error
+    }
+  }
   if (input.dryRun) return deployment
 
   const localFiles = new Map(
@@ -150,13 +173,31 @@ export async function deployStaticPath(input) {
     const filePath = localFiles.get(upload.path)
     if (!filePath)
       throw new Error(`The API requested an unknown path: ${upload.path}`)
-    const response = await fetch(upload.url, {
-      method: upload.method,
-      headers: upload.headers,
-      body: await readFile(filePath),
-    })
-    if (!response.ok)
-      throw new Error(`Upload failed for ${upload.path} (${response.status}).`)
+    const body = await readFile(filePath)
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        const response = await fetch(upload.url, {
+          method: upload.method,
+          headers: upload.headers,
+          body,
+          signal: AbortSignal.timeout(120_000),
+        })
+        if (response.ok) break
+        const error = new Error(
+          `Upload failed for ${upload.path} (${response.status}).`,
+        )
+        error.status = response.status
+        throw error
+      } catch (error) {
+        if ((error.status == null || error.status >= 500) && attempt < 2) {
+          await new Promise((resolvePromise) =>
+            setTimeout(resolvePromise, 500 * (attempt + 1)),
+          )
+          continue
+        }
+        throw error
+      }
+    }
   })
 
   let completed
@@ -380,10 +421,28 @@ export function createYeeetMcpServer() {
       annotations: { readOnlyHint: true },
     },
     async ({ site, version }) => {
-      const history = await apiRequest(
-        `/api/v1/sites/${encodeURIComponent(site)}/versions`,
-      )
-      const selected = resolveVersion(history.versions, version)
+      const collected = []
+      let cursor = null
+      for (let page = 0; page < 20; page += 1) {
+        const params = new URLSearchParams()
+        if (version) params.set('q', version)
+        if (cursor) params.set('cursor', cursor)
+        const query = params.toString()
+        const history = await apiRequest(
+          `/api/v1/sites/${encodeURIComponent(site)}/versions${query ? `?${query}` : ''}`,
+        )
+        collected.push(...history.versions)
+        if (!version) {
+          if (
+            !history.site.activeDeploymentId ||
+            collected.some((entry) => entry.current)
+          )
+            break
+        }
+        if (!history.nextCursor) break
+        cursor = history.nextCursor
+      }
+      const selected = resolveVersion(collected, version)
       if (!selected) throw new Error('This site has no live version.')
       if (!selected.shareUrl)
         throw new Error('That version is public; protect it first.')
@@ -499,7 +558,9 @@ export function createYeeetMcpServer() {
         site: z.string().min(1),
         database: z
           .string()
-          .regex(/^(?:live|channel-[a-z0-9-]+|version-[0-9a-f-]{36})$/)
+          .regex(
+            /^(?:live|channel-[a-z0-9](?:[a-z0-9-]{0,30}[a-z0-9])?|version-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/,
+          )
           .optional(),
       }),
       annotations: { readOnlyHint: true },
@@ -549,9 +610,16 @@ export function createYeeetMcpServer() {
   return server
 }
 
-const invokedPath = process.argv[1]
-  ? fileURLToPath(import.meta.url) === resolve(process.argv[1])
-  : false
+let invokedPath = false
+if (process.argv[1]) {
+  try {
+    invokedPath =
+      realpathSync(fileURLToPath(import.meta.url)) ===
+      realpathSync(resolve(process.argv[1]))
+  } catch {
+    invokedPath = fileURLToPath(import.meta.url) === resolve(process.argv[1])
+  }
+}
 if (invokedPath) {
   void serveStdio(() => createYeeetMcpServer())
   console.error('Yeeet MCP server listening on stdio')

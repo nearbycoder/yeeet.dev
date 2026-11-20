@@ -1,4 +1,5 @@
 import { withSiteLock } from './site-lock'
+import type { SiteTransaction } from './site-lock'
 import { and, desc, eq, inArray, lte } from 'drizzle-orm'
 import { db } from '#/db'
 import {
@@ -20,9 +21,8 @@ import { HttpError } from './http'
 import { deleteStoredPrefix } from './storage'
 import { purgeBackendForPrefix } from './backend-runtime'
 
-type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0]
 async function plan(
-  tx: typeof db | Transaction,
+  tx: typeof db | SiteTransaction,
   siteId: string,
   policy: { keepCount: number; minAgeDays: number },
 ) {
@@ -220,8 +220,11 @@ export async function processStorageCleanup() {
       .returning({ id: storageCleanupJobs.id })
     if (!claimed.length) continue
     try {
-      await purgeBackendForPrefix(job.prefix)
+      const backendPurged = await purgeBackendForPrefix(job.prefix)
       await deleteStoredPrefix(job.prefix)
+      if (!backendPurged) {
+        throw new Error('Backend runtime cleanup failed.')
+      }
       await db
         .delete(storageCleanupJobs)
         .where(eq(storageCleanupJobs.id, job.id))

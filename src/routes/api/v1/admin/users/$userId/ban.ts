@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { banAccount } from '#/server/admin'
 import { requireAdmin } from '#/server/actor'
-import { errorResponse, json } from '#/server/http'
+import { errorResponse, HttpError, json, readJsonBody } from '#/server/http'
 
 export const Route = createFileRoute('/api/v1/admin/users/$userId/ban')({
   server: {
@@ -9,8 +9,13 @@ export const Route = createFileRoute('/api/v1/admin/users/$userId/ban')({
       POST: async ({ request, params }) => {
         try {
           const actor = await requireAdmin(request)
-          const body = (await request.json().catch(() => ({}))) as {
-            reason?: string
+          const body = await readJsonBody(request, { optional: true })
+          if (body.reason !== undefined && typeof body.reason !== 'string') {
+            throw new HttpError(
+              400,
+              'Ban reason must be a string.',
+              'invalid_reason',
+            )
           }
           return json(await banAccount(actor, params.userId, body.reason))
         } catch (error) {

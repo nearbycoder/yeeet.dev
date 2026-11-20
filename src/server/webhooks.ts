@@ -21,6 +21,7 @@ type WebhookEvent = (typeof WEBHOOK_EVENTS)[number]
 const EVENT_SET = new Set<string>(WEBHOOK_EVENTS)
 const MAX_ATTEMPTS = 6
 const DELIVERY_LEASE_MS = 30_000
+const WEBHOOK_TIMEOUT_MS = 10_000
 const RETRY_DELAYS_MS = [30_000, 5 * 60_000, 30 * 60_000, 2 * 60 * 60_000]
 
 function signingKey() {
@@ -97,7 +98,14 @@ function webhookHostname(url: URL) {
   return url.hostname.replace(/^\[|\]$/g, '')
 }
 
-export async function normalizeWebhookUrl(value: string) {
+function isLocalDevelopmentWebhook(url: URL) {
+  return (
+    process.env.NODE_ENV !== 'production' &&
+    (url.hostname === 'localhost' || url.hostname.endsWith('.localhost'))
+  )
+}
+
+function parseWebhookUrlSyntax(value: string) {
   let url: URL
   try {
     url = new URL(value.trim())
@@ -108,9 +116,7 @@ export async function normalizeWebhookUrl(value: string) {
       'invalid_webhook_url',
     )
   }
-  const localDevelopment =
-    process.env.NODE_ENV !== 'production' &&
-    (url.hostname === 'localhost' || url.hostname.endsWith('.localhost'))
+  const localDevelopment = isLocalDevelopmentWebhook(url)
   if (
     (url.protocol !== 'https:' &&
       !(localDevelopment && url.protocol === 'http:')) ||
@@ -124,14 +130,20 @@ export async function normalizeWebhookUrl(value: string) {
       'invalid_webhook_url',
     )
   }
+  if (!localDevelopment && isPrivateWebhookAddress(url.hostname)) {
+    throw new HttpError(
+      400,
+      'Webhook URLs cannot target private or loopback networks.',
+      'unsafe_webhook_url',
+    )
+  }
+  url.pathname ||= '/'
+  return { url, localDevelopment }
+}
+
+export async function normalizeWebhookUrl(value: string) {
+  const { url, localDevelopment } = parseWebhookUrlSyntax(value)
   if (!localDevelopment) {
-    if (isPrivateWebhookAddress(url.hostname)) {
-      throw new HttpError(
-        400,
-        'Webhook URLs cannot target private or loopback networks.',
-        'unsafe_webhook_url',
-      )
-    }
     let addresses: Array<{ address: string }>
     try {
       addresses = await lookup(webhookHostname(url), {
@@ -156,7 +168,6 @@ export async function normalizeWebhookUrl(value: string) {
       )
     }
   }
-  url.pathname ||= '/'
   return url.toString()
 }
 
@@ -253,11 +264,13 @@ export async function updateWebhookEndpoint(
   const [row] = await db
     .update(webhookEndpoints)
     .set({
-      ...(input.url ? { url: await normalizeWebhookUrl(input.url) } : {}),
+      ...(input.url !== undefined
+        ? { url: await normalizeWebhookUrl(input.url) }
+        : {}),
       ...(input.label !== undefined
         ? { label: (input.label.trim() || 'Webhook').slice(0, 100) }
         : {}),
-      ...(input.events
+      ...(input.events !== undefined
         ? { events: JSON.stringify(normalizeEvents(input.events)) }
         : {}),
       ...(input.active !== undefined ? { active: input.active } : {}),
@@ -286,10 +299,11 @@ export async function deleteWebhookEndpoint(userId: string, id: string) {
 }
 
 export async function listWebhookDeliveries(userId: string, limit = 50) {
+  const safeLimit = Math.min(Math.max(Math.floor(limit) || 50, 1), 100)
   const rows = await db.query.webhookDeliveries.findMany({
     where: eq(webhookDeliveries.userId, userId),
     orderBy: [desc(webhookDeliveries.createdAt)],
-    limit: Math.min(Math.max(limit, 1), 100),
+    limit: safeLimit,
   })
   return rows.map((row) => ({
     id: row.id,
@@ -344,15 +358,30 @@ export async function queueWebhookEvent(
   return { eventId, deliveries: selected.length }
 }
 
-async function postWebhook(
-  url: URL,
-  headers: Record<string, string>,
-  body: string,
-) {
-  const addresses = await lookup(webhookHostname(url), {
+async function resolveWebhookTarget(url: URL, localDevelopment: boolean) {
+  const lookupPromise = lookup(webhookHostname(url), {
     all: true,
     verbatim: true,
   })
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const addresses = await Promise.race([
+    lookupPromise,
+    new Promise<never>((_resolve, reject) => {
+      timer = setTimeout(
+        () => reject(new Error('Webhook DNS lookup timed out.')),
+        5_000,
+      )
+      timer.unref()
+    }),
+  ]).finally(() => {
+    if (timer) clearTimeout(timer)
+  })
+  if (localDevelopment) {
+    if (addresses.length === 0) {
+      throw new Error('The webhook hostname could not be resolved.')
+    }
+    return addresses[0]
+  }
   const address = addresses.find(
     (entry) => !isPrivateWebhookAddress(entry.address),
   )
@@ -364,8 +393,26 @@ async function postWebhook(
       'Webhook hostname resolved to a private or loopback network.',
     )
   }
+  return address
+}
+
+async function postWebhook(
+  url: URL,
+  localDevelopment: boolean,
+  headers: Record<string, string>,
+  body: string,
+) {
+  const address = await resolveWebhookTarget(url, localDevelopment)
   const request = url.protocol === 'http:' ? httpRequest : httpsRequest
   return new Promise<number>((resolvePromise, reject) => {
+    let settled = false
+    const finish = (error?: Error, status?: number) => {
+      if (settled) return
+      settled = true
+      clearTimeout(deadline)
+      if (error) reject(error)
+      else resolvePromise(status ?? 0)
+    }
     const outgoing = request(
       url,
       {
@@ -379,14 +426,23 @@ async function postWebhook(
           callback(null, address.address, address.family),
       },
       (response) => {
-        response.resume()
-        response.on('end', () => resolvePromise(response.statusCode ?? 0))
+        const status = response.statusCode ?? 0
+        // Discard any response body immediately so slow or huge responses
+        // cannot hold the worker past the delivery lease.
+        response.destroy()
+        finish(undefined, status)
       },
     )
-    outgoing.setTimeout(10_000, () =>
-      outgoing.destroy(new Error('Webhook request timed out.')),
-    )
-    outgoing.on('error', reject)
+    const deadline = setTimeout(() => {
+      const timeoutError = new Error('Webhook request timed out.')
+      outgoing.destroy(timeoutError)
+      finish(timeoutError)
+    }, WEBHOOK_TIMEOUT_MS)
+    deadline.unref()
+    outgoing.on('error', (error) => finish(error))
+    outgoing.on('close', () => {
+      if (!settled) finish(new Error('Webhook connection closed unexpectedly.'))
+    })
     outgoing.end(body)
   })
 }
@@ -397,10 +453,11 @@ async function deliverWebhook(
 ) {
   const attempts = delivery.attempts + 1
   try {
-    const url = await normalizeWebhookUrl(endpoint.url)
+    const { url, localDevelopment } = parseWebhookUrlSyntax(endpoint.url)
     const timestamp = Math.floor(Date.now() / 1000)
     const responseStatus = await postWebhook(
-      new URL(url),
+      url,
+      localDevelopment,
       {
         'content-type': 'application/json',
         'user-agent': `yeeet-webhooks/1.0 event/${delivery.event}`,
@@ -499,14 +556,18 @@ let workerStarted = false
 export function startWebhookWorker() {
   if (workerStarted || process.env.NODE_ENV === 'test') return
   workerStarted = true
-  void processDueWebhookDeliveries().catch((error) =>
-    console.error('Webhook delivery worker failed', error),
-  )
-  const timer = setInterval(() => {
-    void processDueWebhookDeliveries().catch((error) =>
-      console.error('Webhook delivery worker failed', error),
-    )
-  }, 15_000)
+  let running = false
+  const tick = () => {
+    if (running) return
+    running = true
+    void processDueWebhookDeliveries()
+      .catch((error) => console.error('Webhook delivery worker failed', error))
+      .finally(() => {
+        running = false
+      })
+  }
+  tick()
+  const timer = setInterval(tick, 15_000)
   timer.unref()
 }
 
@@ -555,5 +616,8 @@ export async function retryWebhookDelivery(userId: string, id: string) {
       'Only failed deliveries can be retried.',
       'delivery_not_failed',
     )
+  void processDueWebhookDeliveries().catch((error) =>
+    console.error('Webhook delivery worker failed', error),
+  )
   return { id, status: 'pending' }
 }

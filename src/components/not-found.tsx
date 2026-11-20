@@ -17,31 +17,36 @@ function LostPage({
   children?: React.ReactNode
 }) {
   return (
-    <main id="main-content" tabIndex={-1} className="auth-page lost-page">
-      <div className="auth-top">
-        <Brand />
-        <ThemeToggle inline />
-      </div>
-      <section className="lost-card">
-        <div className="lost-critter">
-          <Yeeetling seed={seed} phase="error" />
-          <span className="lost-question" aria-hidden="true">
-            ?
-          </span>
+    <>
+      <a className="skip-link" href="#main-content">
+        Skip to content
+      </a>
+      <main id="main-content" tabIndex={-1} className="auth-page lost-page">
+        <div className="auth-top">
+          <Brand />
+          <ThemeToggle inline />
         </div>
-        <div className="eyebrow">
-          <span className="status-dot" /> {code}
-        </div>
-        <h1>{title}</h1>
-        <p>{detail}</p>
-        <div className="lost-actions">
-          {children}
-          <Link to="/" className="button button-paper">
-            Back to earth
-          </Link>
-        </div>
-      </section>
-    </main>
+        <section className="lost-card">
+          <div className="lost-critter">
+            <Yeeetling seed={seed} phase="error" />
+            <span className="lost-question" aria-hidden="true">
+              ?
+            </span>
+          </div>
+          <div className="eyebrow">
+            <span className="status-dot" /> {code}
+          </div>
+          <h1>{title}</h1>
+          <p>{detail}</p>
+          <div className="lost-actions">
+            {children}
+            <Link to="/" className="button button-paper">
+              Back to earth
+            </Link>
+          </div>
+        </section>
+      </main>
+    </>
   )
 }
 

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { requestJson, useConsoleMutation } from '#/lib/console-request'
+import { formatDateTime } from '#/lib/format'
 import { CopyButton } from './copy-button'
 import { ConfirmDialog } from './confirm-dialog'
 import type {
@@ -220,11 +221,11 @@ export function WebhookManager({
         <table className="console-table">
           <thead>
             <tr>
-              <th>Endpoint / event</th>
-              <th>Status</th>
-              <th>Attempts / response</th>
-              <th>Detail</th>
-              <th>Action</th>
+              <th scope="col">Endpoint / event</th>
+              <th scope="col">Status</th>
+              <th scope="col">Attempts / response</th>
+              <th scope="col">Detail</th>
+              <th scope="col">Action</th>
             </tr>
           </thead>
           <tbody>
@@ -236,7 +237,7 @@ export function WebhookManager({
                   <br />
                   {delivery.event}
                   <br />
-                  <small>{new Date(delivery.createdAt).toLocaleString()}</small>
+                  <small>{formatDateTime(delivery.createdAt)}</small>
                 </td>
                 <td>{delivery.status}</td>
                 <td>
@@ -246,8 +247,8 @@ export function WebhookManager({
                 <td>
                   {delivery.error ??
                     (delivery.deliveredAt
-                      ? `Delivered ${new Date(delivery.deliveredAt).toLocaleString()}`
-                      : `Next attempt ${new Date(delivery.nextAttemptAt).toLocaleString()}`)}
+                      ? `Delivered ${formatDateTime(delivery.deliveredAt)}`
+                      : `Next attempt ${formatDateTime(delivery.nextAttemptAt)}`)}
                 </td>
                 <td>
                   {delivery.status === 'failed' ? (
@@ -318,6 +319,7 @@ export function WebhookManager({
               confirm.kind === 'rotate' ? { rotateSecret: true } : undefined,
             )
             setSecret(result.secret ?? '')
+            if (confirm.kind === 'delete' && editing === confirm.id) reset()
             setConfirm(null)
           })
         }

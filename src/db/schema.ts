@@ -81,6 +81,7 @@ export const deployments = pgTable(
       table.id,
     ),
     index('deployments_user_id_idx').on(table.userId),
+    index('deployments_user_created_at_idx').on(table.userId, table.createdAt),
     index('deployments_created_at_idx').on(table.createdAt),
     uniqueIndex('deployments_user_idempotency_idx').on(
       table.userId,
@@ -191,7 +192,12 @@ export const webhookDeliveries = pgTable(
       table.endpointId,
     ),
     index('webhook_deliveries_due_idx').on(table.status, table.nextAttemptAt),
+    index('webhook_deliveries_endpoint_id_idx').on(table.endpointId),
     index('webhook_deliveries_user_id_idx').on(table.userId),
+    index('webhook_deliveries_user_created_at_idx').on(
+      table.userId,
+      table.createdAt,
+    ),
     index('webhook_deliveries_created_at_idx').on(table.createdAt),
   ],
 )
@@ -401,6 +407,7 @@ export const sitePreferences = pgTable(
       table.userId,
       table.siteId,
     ),
+    index('site_preferences_site_id_idx').on(table.siteId),
   ],
 )
 
@@ -482,6 +489,7 @@ export const deploymentFeedback = pgTable(
       table.workspaceId,
       table.deploymentId,
     ),
+    index('deployment_feedback_deployment_id_idx').on(table.deploymentId),
   ],
 )
 

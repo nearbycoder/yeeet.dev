@@ -41,7 +41,7 @@ async function main() {
   }
   const context = Object.freeze({ db, site })
 
-  Bun.serve({
+  const server = Bun.serve({
     unix: process.env.YEEET_SOCKET,
     maxRequestBodySize: 10 * 1024 * 1024,
     idleTimeout: 0,
@@ -91,6 +91,24 @@ async function main() {
       }
     },
   })
+  let shuttingDown = false
+  const shutdown = () => {
+    if (shuttingDown) return
+    shuttingDown = true
+    try {
+      server.stop()
+    } catch {
+      // Ignore stop errors during exit.
+    }
+    try {
+      db.close()
+    } catch {
+      // Ignore already-closed database.
+    }
+    process.exit(0)
+  }
+  process.on('SIGTERM', shutdown)
+  process.on('SIGINT', shutdown)
   report({ type: 'ready' })
 }
 

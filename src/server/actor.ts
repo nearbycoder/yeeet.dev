@@ -9,7 +9,28 @@ export type Actor = {
   userId: string
   email?: string
   name?: string
+  role?: string
+  banned?: boolean
   authType: 'session' | 'api-key'
+}
+
+export function isAccountBanned(account: {
+  banned: boolean
+  banExpires: Date | null
+}) {
+  return (
+    account.banned &&
+    (!account.banExpires || account.banExpires.getTime() > Date.now())
+  )
+}
+
+export function hasAdminRole(role?: string | null) {
+  return (
+    role
+      ?.split(',')
+      .map((entry) => entry.trim())
+      .includes('admin') ?? false
+  )
 }
 
 function bearerToken(request: Request) {
@@ -42,7 +63,17 @@ export async function getActor(request: Request): Promise<Actor | null> {
     if (result.valid && result.key?.referenceId) {
       return { userId: result.key.referenceId, authType: 'api-key' }
     }
-  } catch {
+    const errorCode = result.error?.code
+    if (errorCode === 'RATE_LIMITED' || errorCode === 'USAGE_EXCEEDED') {
+      throw new HttpError(
+        429,
+        result.error?.message ||
+          'API key rate limit exceeded. Wait a moment and try again.',
+        'rate_limited',
+      )
+    }
+  } catch (error) {
+    if (error instanceof HttpError) throw error
     return null
   }
 
@@ -64,7 +95,7 @@ export async function requireActor(request: Request) {
   if (!account) {
     throw new HttpError(401, 'This account no longer exists.', 'unauthorized')
   }
-  if (account.banned) {
+  if (isAccountBanned(account)) {
     throw new HttpError(
       403,
       account.banReason
@@ -73,16 +104,18 @@ export async function requireActor(request: Request) {
       'account_suspended',
     )
   }
-  return actor
+  return {
+    ...actor,
+    email: account.email,
+    name: account.name,
+    role: account.role,
+    banned: false,
+  }
 }
 
 export async function requireAdmin(request: Request) {
   const actor = await requireActor(request)
-  const account = await db.query.user.findFirst({
-    where: eq(user.id, actor.userId),
-  })
-  const roles = account?.role.split(',').map((role) => role.trim()) ?? []
-  if (!roles.includes('admin')) {
+  if (!hasAdminRole(actor.role)) {
     throw new HttpError(403, 'Administrator access required.', 'forbidden')
   }
   return { ...actor, role: 'admin' as const }

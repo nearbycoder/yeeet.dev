@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { formatDateTime } from '#/lib/format'
 import { getBrowserSessions, endBrowserSession } from '#/server/functions'
 import { ConfirmDialog } from './confirm-dialog'
 
@@ -102,9 +103,8 @@ export function SessionManager() {
                 <h3>{row.current ? 'This browser' : 'Other session'}</h3>
                 <p style={{ overflowWrap: 'anywhere' }}>{row.userAgent}</p>
                 <p>
-                  IP: {row.ipAddress} · Started{' '}
-                  {new Date(row.createdAt).toLocaleString()} · Expires{' '}
-                  {new Date(row.expiresAt).toLocaleString()}
+                  IP: {row.ipAddress} · Started {formatDateTime(row.createdAt)}{' '}
+                  · Expires {formatDateTime(row.expiresAt)}
                 </p>
                 {!row.current ? (
                   <button

@@ -656,7 +656,7 @@ function Yeeet({ t }: { t: number }) {
                 key={pin.code}
                 style={{ left: x, top: y, opacity: p }}
               >
-                {t > 18650 ? (
+                {t > 18650 + index * 120 ? (
                   <i
                     style={{
                       transform: `translate(-50%, -50%) scale(${1 + ripple * 3})`,

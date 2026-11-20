@@ -26,6 +26,11 @@ test('the CLI ships byte-identical copies of the shared runtime modules', () => 
       `packages/cli/runtime/${file} drifted from packages/runtime/src/${file}`,
     )
   }
+  assert.equal(
+    readFileSync('packages/cli/bin/deployment-files.js', 'utf8'),
+    readFileSync('packages/mcp/bin/deployment-files.js', 'utf8'),
+    'packages/cli/bin/deployment-files.js drifted from packages/mcp/bin/deployment-files.js',
+  )
 })
 
 test('static deployments have no backend', () => {
@@ -195,7 +200,12 @@ test('the gateway signs, filters, and applies response policy to backend request
         body,
       }
       response.setHeader('content-type', 'application/json')
-      response.setHeader('set-cookie', ['a=1; Path=/', 'b=2; Path=/'])
+      response.setHeader('set-cookie', [
+        'a=1; Domain=.yeeet.dev; Path=/; HttpOnly',
+        'b=2; Path=/',
+        'yeeet_share_deadbeef=spoof; Path=/',
+        'yeeet_invitation=spoof; Path=/',
+      ])
       response.end('{"ok":true}')
     })
   })
@@ -210,7 +220,7 @@ test('the gateway signs, filters, and applies response policy to backend request
         method: 'POST',
         headers: {
           'content-type': 'application/json',
-          cookie: `session=abc; yeeet_share_${deploymentId.replaceAll('-', '')}=secret`,
+          cookie: `session=abc; yeeet_share_${deploymentId.replaceAll('-', '')}=secret; yeeet_share_other=secret2; yeeet_invitation=inv`,
           'x-yeeet-runtime-context': 'forged',
         },
         body: '{"title":"hi"}',
@@ -232,7 +242,7 @@ test('the gateway signs, filters, and applies response policy to backend request
     assert.equal(response.headers.get('x-yeeet-deployment'), deploymentId)
     assert.match(response.headers.get('x-robots-tag') ?? '', /noindex/)
     assert.deepEqual(response.headers.getSetCookie(), [
-      'a=1; Path=/',
+      'a=1; Path=/; HttpOnly',
       'b=2; Path=/',
     ])
 

@@ -12,10 +12,11 @@ import {
   chmodSync,
   chownSync,
   existsSync,
+  lchownSync,
+  lstatSync,
   mkdirSync,
   readdirSync,
   rmSync,
-  statSync,
 } from 'node:fs'
 import { join } from 'node:path'
 
@@ -46,8 +47,33 @@ export function assertDatabaseName(value) {
   return value
 }
 
+export function assertNotSymlink(path) {
+  let info
+  try {
+    info = lstatSync(path)
+  } catch {
+    return
+  }
+  if (info.isSymbolicLink()) {
+    throw new RuntimeError(
+      400,
+      'invalid_path',
+      'Symbolic links are not allowed in site data.',
+    )
+  }
+}
+
 function ensureDirectory(path, mode, owner) {
+  assertNotSymlink(path)
   mkdirSync(path, { recursive: true, mode })
+  const info = lstatSync(path)
+  if (info.isSymbolicLink() || !info.isDirectory()) {
+    throw new RuntimeError(
+      500,
+      'invalid_directory',
+      `Expected directory at ${path}.`,
+    )
+  }
   chmodSync(path, mode)
   if (owner) chownSync(path, owner.uid, owner.gid)
 }
@@ -60,9 +86,10 @@ export class SiteStore {
     ensureDirectory(join(dataDir, 'sites'), 0o711)
     ensureDirectory(join(dataDir, 'backups'), 0o700)
     ensureDirectory(join(dataDir, 'bundles'), 0o711)
-    this.state = new Database(join(dataDir, 'runtime.sqlite'), { create: true })
-    chmodSync(join(dataDir, 'runtime.sqlite'), 0o600)
-    this.state.run('PRAGMA journal_mode = WAL')
+    const statePath = join(dataDir, 'runtime.sqlite')
+    this.state = new Database(statePath, { create: true })
+    this.state.run('PRAGMA journal_mode = DELETE')
+    chmodSync(statePath, 0o600)
     this.state.run(
       'CREATE TABLE IF NOT EXISTS site_users (uid INTEGER PRIMARY KEY AUTOINCREMENT, site_id TEXT NOT NULL UNIQUE)',
     )
@@ -129,9 +156,16 @@ export class SiteStore {
   /** Give files created by root (migrations, restores) back to the site's user. */
   restoreOwnership(siteId, path = this.siteDir(siteId)) {
     const owner = this.user(siteId)
-    if (!owner || !existsSync(path)) return
-    chownSync(path, owner.uid, owner.gid)
-    if (!statSync(path).isDirectory()) return
+    if (!owner) return
+    let info
+    try {
+      info = lstatSync(path)
+    } catch {
+      return
+    }
+    if (info.isSymbolicLink()) return
+    lchownSync(path, owner.uid, owner.gid)
+    if (!info.isDirectory()) return
     for (const entry of readdirSync(path)) {
       this.restoreOwnership(siteId, join(path, entry))
     }
@@ -141,7 +175,14 @@ export class SiteStore {
     const dir = this.databaseDir(siteId)
     if (!existsSync(dir)) return []
     return readdirSync(dir)
-      .filter((name) => name.endsWith('.sqlite'))
+      .filter((name) => {
+        if (!name.endsWith('.sqlite')) return false
+        try {
+          return lstatSync(join(dir, name)).isFile()
+        } catch {
+          return false
+        }
+      })
       .map((name) => name.slice(0, -'.sqlite'.length))
       .filter((name) => DATABASE_NAME.test(name))
       .sort()

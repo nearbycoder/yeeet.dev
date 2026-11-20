@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import type { FileGrowthReport } from '#/lib/file-growth'
+import { formatNumber } from '#/lib/format'
 
 function deltaLabel(value: number) {
-  return `${value > 0 ? '+' : ''}${value.toLocaleString()} B`
+  return `${value > 0 ? '+' : ''}${formatNumber(value)} B`
 }
 export function FileGrowth({ report }: { report: FileGrowthReport }) {
   const [growthOnly, setGrowthOnly] = useState(true)
@@ -14,9 +15,9 @@ export function FileGrowth({ report }: { report: FileGrowthReport }) {
     <details className="console-item" aria-label="File size changes">
       <summary>File size changes ({deltaLabel(report.delta)} net)</summary>
       <p>
-        Uncompressed bytes: {report.beforeBytes.toLocaleString()} before →{' '}
-        {report.afterBytes.toLocaleString()} after. Largest absolute changes
-        first; same-size content changes are omitted.
+        Uncompressed bytes: {formatNumber(report.beforeBytes)} before →{' '}
+        {formatNumber(report.afterBytes)} after. Largest absolute changes first;
+        same-size content changes are omitted.
       </p>
       <label>
         <input
@@ -45,8 +46,8 @@ export function FileGrowth({ report }: { report: FileGrowthReport }) {
                 <td>
                   <code>{file.path}</code> · {file.kind}
                 </td>
-                <td>{file.before.toLocaleString()} B</td>
-                <td>{file.after.toLocaleString()} B</td>
+                <td>{formatNumber(file.before)} B</td>
+                <td>{formatNumber(file.after)} B</td>
                 <td>{deltaLabel(file.delta)}</td>
               </tr>
             ))}
@@ -65,6 +66,7 @@ export function FileGrowth({ report }: { report: FileGrowthReport }) {
       )}
       {limit < matching.length ? (
         <button
+          type="button"
           className="button button-paper"
           onClick={() => setLimit(limit + 20)}
         >

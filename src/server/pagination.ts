@@ -23,6 +23,24 @@ export function encodeCursor(
     JSON.stringify({ t: row.cursorTime, id: row.id, scope: scopeHash(scope) }),
   ).toString('base64url')
 }
+function isValidCalendarTimestamp(value: string) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})\.\d{6}$/.exec(
+    value,
+  )
+  if (!match) return false
+  const [, year, month, day, hour, minute, second] = match.map(Number)
+  const date = new Date(Date.UTC(year, month - 1, day, hour, minute, second))
+  return (
+    Number.isFinite(date.getTime()) &&
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day &&
+    date.getUTCHours() === hour &&
+    date.getUTCMinutes() === minute &&
+    date.getUTCSeconds() === second
+  )
+}
+
 export function decodeCursor(value: string | undefined, scope: unknown) {
   if (!value) return null
   try {
@@ -32,7 +50,7 @@ export function decodeCursor(value: string | undefined, scope: unknown) {
     )
     if (
       parsed.scope !== scopeHash(scope) ||
-      !Number.isFinite(Date.parse(parsed.t))
+      !isValidCalendarTimestamp(parsed.t)
     )
       throw new Error()
     return parsed

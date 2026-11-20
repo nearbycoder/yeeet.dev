@@ -4,7 +4,6 @@ import { db } from '#/db'
 import { deploymentFiles, deployments, sites } from '#/db/schema'
 import { BackendLayoutError, describeBackend } from '#/lib/backend-layout'
 import { signContext, verifyContext } from '../../packages/runtime/src/auth.js'
-import { deploymentShareCookieName } from './deployment-access'
 import { HttpError, json } from './http'
 import { getStoredObject } from './storage'
 
@@ -212,12 +211,12 @@ export async function prepareDeploymentBackend(
   })
 }
 
-/** Delete runtime data that belongs to a removed storage prefix. Never throws. */
-export async function purgeBackendForPrefix(prefix: string) {
-  if (!backendRuntimeEnabled()) return
+/** Delete runtime data that belongs to a removed storage prefix. Returns true when purged or not applicable. */
+export async function purgeBackendForPrefix(prefix: string): Promise<boolean> {
+  if (!backendRuntimeEnabled()) return true
   const match =
     /^sites\/([0-9a-f-]{36})\/(?:deployments\/([0-9a-f-]{36})\/)?$/.exec(prefix)
-  if (!match) return
+  if (!match) return true
   try {
     const response = await callRuntime(
       {
@@ -228,14 +227,58 @@ export async function purgeBackendForPrefix(prefix: string) {
       {},
       15_000,
     )
-    if (!response.ok)
+    if (!response.ok) {
       console.warn('Backend runtime purge failed', {
         prefix,
         status: response.status,
       })
+      return false
+    }
+    return true
   } catch (error) {
     console.warn('Backend runtime purge skipped', { prefix, error })
+    return false
   }
+}
+
+/** Delete a single backend database (e.g. a removed channel). Never throws. */
+export async function purgeBackendDatabase(siteId: string, database: string) {
+  if (!backendRuntimeEnabled()) return
+  try {
+    const response = await callRuntime(
+      { op: 'purge', siteId, database },
+      {},
+      15_000,
+    )
+    if (!response.ok) {
+      console.warn('Backend database purge failed', {
+        siteId,
+        database,
+        status: response.status,
+      })
+    }
+  } catch (error) {
+    console.warn('Backend database purge skipped', { siteId, database, error })
+  }
+}
+
+function sanitizeBackendSetCookie(raw: string): string | null {
+  const parts = raw
+    .split(';')
+    .map((part) => part.trim())
+    .filter(Boolean)
+  if (!parts.length) return null
+  const [nameValue, ...attributes] = parts
+  const eqIndex = nameValue.indexOf('=')
+  if (eqIndex <= 0) return null
+  const name = nameValue.slice(0, eqIndex).trim().toLowerCase()
+  if (name.startsWith('yeeet_share_') || name === 'yeeet_invitation') {
+    return null
+  }
+  // Force host-only cookies so tenant sites cannot toss cookies across
+  // *.site.yeeet.dev or onto the parent control-plane domain.
+  const safeAttributes = attributes.filter((attr) => !/^domain\s*=/i.test(attr))
+  return [nameValue, ...safeAttributes].join('; ')
 }
 
 export async function backendRuntimeOperation<T>(
@@ -282,11 +325,14 @@ export async function proxyBackendRequest(input: {
   }
   const cookies = request.headers.get('cookie')
   if (cookies) {
-    const shareCookie = deploymentShareCookieName(input.deploymentId)
     const kept = cookies
       .split(';')
       .map((part) => part.trim())
-      .filter((part) => part && !part.startsWith(`${shareCookie}=`))
+      .filter((part) => {
+        if (!part) return false
+        const name = part.split('=', 1)[0].trim().toLowerCase()
+        return !name.startsWith('yeeet_share_') && name !== 'yeeet_invitation'
+      })
     if (kept.length) headers.set('cookie', kept.join('; '))
     else headers.delete('cookie')
   }
@@ -340,6 +386,14 @@ export async function proxyBackendRequest(input: {
 
   const responseHeaders = new Headers(upstream.headers)
   for (const name of HOP_BY_HOP) responseHeaders.delete(name)
+  const upstreamCookies = upstream.headers.getSetCookie()
+  if (upstreamCookies.length) {
+    responseHeaders.delete('set-cookie')
+    for (const cookie of upstreamCookies) {
+      const sanitized = sanitizeBackendSetCookie(cookie)
+      if (sanitized) responseHeaders.append('set-cookie', sanitized)
+    }
+  }
   // fetch already decoded any compressed body.
   if (responseHeaders.has('content-encoding')) {
     responseHeaders.delete('content-encoding')
@@ -357,6 +411,7 @@ export async function proxyBackendRequest(input: {
       'noindex, nofollow, noarchive, nosnippet, noimageindex',
     )
   if (input.protectedDeployment) responseHeaders.append('vary', 'cookie')
+  if (request.method === 'HEAD') void upstream.body?.cancel()
   return new Response(request.method === 'HEAD' ? null : upstream.body, {
     status: upstream.status,
     statusText: upstream.statusText,

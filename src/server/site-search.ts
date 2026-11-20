@@ -14,6 +14,7 @@ import { db } from '#/db'
 import { customDomains, deployments, sitePreferences, sites } from '#/db/schema'
 import { siteSearchSchema } from '#/lib/pagination'
 import { emptyOrganization } from '#/lib/site-organization'
+import { parseSiteTags } from './site-organization'
 import {
   afterCursor,
   cursorTime,
@@ -146,7 +147,7 @@ export async function searchSites(userId: string, input: unknown = {}) {
           ...emptyOrganization,
           favorite: favorite ?? false,
           project: project ?? '',
-          tags: tags ? (JSON.parse(tags) as Array<string>) : [],
+          tags: parseSiteTags(tags),
         },
         customDomains: bySite.get(site.id) ?? [],
       }),

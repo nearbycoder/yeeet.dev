@@ -34,6 +34,7 @@ export function runtimeConfig() {
     secret,
     controlPlaneUrl: controlPlaneUrl.replace(/\/+$/, ''),
     dataDir: resolve(process.env.DATA_DIR || '/data'),
+    isolationSetting,
     isolation: isolationSetting !== 'off' && isRoot,
     idleTimeoutMs: integer('RUNTIME_IDLE_TIMEOUT_MS', 5 * 60_000),
     maxWorkers: integer('RUNTIME_MAX_WORKERS', 32),

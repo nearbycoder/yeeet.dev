@@ -10,7 +10,7 @@ export const Route = createFileRoute('/dashboard_/sites/$slug/domains')({
 })
 
 function SiteDomains() {
-  const { site } = SiteRoute.useLoaderData()
+  const { platform, site } = SiteRoute.useLoaderData()
   const data = Route.useLoaderData()
   const router = useRouter()
   const [hostname, setHostname] = useState('')
@@ -181,8 +181,11 @@ function SiteDomains() {
           <span>◎</span>
           <h2>No custom domains yet</h2>
           <p>
-            The built-in <code>{site.slug}.site.yeeet.dev</code> address stays
-            active either way.
+            The built-in{' '}
+            <code>
+              {site.slug}.{platform.siteDomain}
+            </code>{' '}
+            address stays active either way.
           </p>
         </section>
       )}

@@ -7,9 +7,12 @@ import { purgeBackendForPrefix } from './backend-runtime'
 // Metadata deletion enqueues this job in the same transaction. A storage
 // outage must never resurrect a version or discard the remaining cleanup work.
 export async function attemptStorageCleanup(id: string, prefix: string) {
-  await purgeBackendForPrefix(prefix)
+  const backendPurged = await purgeBackendForPrefix(prefix)
   try {
     const deletedObjects = await deleteStoredPrefix(prefix)
+    if (!backendPurged) {
+      return { deletedObjects, cleanupPending: true }
+    }
     await db.delete(storageCleanupJobs).where(eq(storageCleanupJobs.id, id))
     return { deletedObjects, cleanupPending: false }
   } catch {

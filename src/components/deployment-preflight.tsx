@@ -7,20 +7,25 @@ export function DeploymentPreflight({
   spa,
   disabled,
   onExclude,
+  report: providedReport,
 }: {
   files: Array<UploadFile>
   spa: boolean
   disabled: boolean
   onExclude: (paths: Array<string>) => void
+  report?: ReturnType<typeof deploymentPreflight>
 }) {
-  const report = useMemo(
+  const computedReport = useMemo(
     () =>
-      deploymentPreflight(
-        files.map((item) => ({ path: item.path, size: item.file.size })),
-        spa,
-      ),
-    [files, spa],
+      providedReport
+        ? null
+        : deploymentPreflight(
+            files.map((item) => ({ path: item.path, size: item.file.size })),
+            spa,
+          ),
+    [files, spa, providedReport],
   )
+  const report = providedReport ?? computedReport!
   const groups = [
     ['Likely private files', report.privatePaths],
     ['Source maps may expose source code', report.sourceMaps],
@@ -74,6 +79,7 @@ export function DeploymentPreflight({
         ))}
       {report.privatePaths.length ? (
         <button
+          type="button"
           className="button button-paper"
           disabled={disabled}
           onClick={() => onExclude(report.privatePaths)}

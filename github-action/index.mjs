@@ -1,5 +1,8 @@
 import { spawn } from 'node:child_process'
+import { randomBytes } from 'node:crypto'
+import { existsSync, realpathSync } from 'node:fs'
 import { appendFile, readFile } from 'node:fs/promises'
+import { dirname, join, resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 
@@ -41,7 +44,9 @@ function eventRepository(payload) {
 function pullRequestNumber(payload) {
   const explicit = input('pr-number')
   const value =
-    explicit || payload.pull_request?.number || payload.issue?.number
+    explicit ||
+    payload.pull_request?.number ||
+    (payload.issue?.pull_request ? payload.issue.number : null)
   if (value == null || !/^\d+$/.test(String(value))) return null
   return String(value)
 }
@@ -56,13 +61,24 @@ async function eventPayload() {
 }
 
 function commandError(message) {
-  process.stderr.write(`::error::${String(message).replace(/[\r\n]+/g, ' ')}\n`)
+  process.stdout.write(`::error::${String(message).replace(/[\r\n]+/g, ' ')}\n`)
   process.exitCode = 1
 }
 
-async function setOutput(name, value) {
-  if (!process.env.GITHUB_OUTPUT || value == null) return
-  await appendFile(process.env.GITHUB_OUTPUT, `${name}=${String(value)}\n`)
+function formatOutput(name, value) {
+  const stringValue = String(value)
+  if (!/[\r\n]/.test(stringValue)) return `${name}=${stringValue}\n`
+  const delimiter = `yeeet_eof_${randomBytes(8).toString('hex')}`
+  return `${name}<<${delimiter}\n${stringValue}\n${delimiter}\n`
+}
+
+async function writeOutputs(entries) {
+  if (!process.env.GITHUB_OUTPUT) return
+  const lines = entries
+    .filter(([, value]) => value != null)
+    .map(([name, value]) => formatOutput(name, value))
+    .join('')
+  if (lines) await appendFile(process.env.GITHUB_OUTPUT, lines)
 }
 
 async function addSummary(markdown) {
@@ -70,10 +86,27 @@ async function addSummary(markdown) {
   await appendFile(process.env.GITHUB_STEP_SUMMARY, `${markdown}\n`)
 }
 
+function resolveNpxCommand(argumentsList) {
+  if (process.platform !== 'win32') {
+    return { command: 'npx', args: argumentsList }
+  }
+  const candidates = [
+    process.env.npm_execpath
+      ? join(dirname(process.env.npm_execpath), 'npx-cli.js')
+      : null,
+    join(dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npx-cli.js'),
+  ].filter(Boolean)
+  const npxCli = candidates.find((candidate) => existsSync(candidate))
+  if (npxCli) {
+    return { command: process.execPath, args: [npxCli, ...argumentsList] }
+  }
+  return { command: 'npx.cmd', args: argumentsList }
+}
+
 function runCli(argumentsList, environment) {
-  const executable = process.platform === 'win32' ? 'npx.cmd' : 'npx'
+  const { command, args } = resolveNpxCommand(argumentsList)
   return new Promise((resolvePromise, reject) => {
-    const child = spawn(executable, argumentsList, {
+    const child = spawn(command, args, {
       env: environment,
       stdio: ['ignore', 'pipe', 'pipe'],
       windowsHide: true,
@@ -122,6 +155,7 @@ async function upsertPullRequestComment({ body, payload, pullRequest, token }) {
   const commentsUrl = `${api}/repos/${repository}/issues/${pullRequest}/comments`
   const commentsResponse = await fetch(`${commentsUrl}?per_page=100`, {
     headers,
+    signal: AbortSignal.timeout(15_000),
   })
   if (!commentsResponse.ok) {
     throw new Error(
@@ -141,6 +175,7 @@ async function upsertPullRequestComment({ body, payload, pullRequest, token }) {
       method: existing ? 'PATCH' : 'POST',
       headers,
       body: JSON.stringify({ body }),
+      signal: AbortSignal.timeout(15_000),
     },
   )
   if (!response.ok) {
@@ -152,6 +187,8 @@ export async function run() {
   const token = input('token')
   if (!token) throw new Error('The token input is required.')
   process.stdout.write(`::add-mask::${token}\n`)
+  const password = input('password')
+  if (password) process.stdout.write(`::add-mask::${password}\n`)
 
   const mode = input('mode') || 'deploy'
   if (!['deploy', 'cleanup'].includes(mode)) {
@@ -168,7 +205,7 @@ export async function run() {
   const configuredSite = input('site') || repositoryName
   const site = pullRequest
     ? previewSiteName(configuredSite, pullRequest)
-    : safeSitePart(configuredSite)
+    : safeSitePart(configuredSite).slice(0, 63).replace(/-+$/g, '')
   if (mode === 'cleanup' && !pullRequest) {
     throw new Error('cleanup mode requires a pull request number.')
   }
@@ -183,7 +220,7 @@ export async function run() {
   const environment = {
     ...process.env,
     YEEET_TOKEN: token,
-    ...(input('password') ? { YEEET_DEPLOY_PASSWORD: input('password') } : {}),
+    ...(password ? { YEEET_DEPLOY_PASSWORD: password } : {}),
   }
 
   let result
@@ -208,11 +245,11 @@ export async function run() {
     result = parseCliJson(await runCli(deployArguments, environment))
   }
 
-  await Promise.all([
-    setOutput('site', result.site || site),
-    setOutput('url', result.url),
-    setOutput('version-url', result.versionUrl),
-    setOutput('deployment', result.deployment),
+  await writeOutputs([
+    ['site', result.site || site],
+    ['url', result.url],
+    ['version-url', result.versionUrl],
+    ['deployment', result.deployment],
   ])
 
   const comment = previewComment({
@@ -237,7 +274,14 @@ export async function run() {
   )
 }
 
-const invokedPath = process.argv[1]
-  ? fileURLToPath(import.meta.url) === process.argv[1]
-  : false
+let invokedPath = false
+if (process.argv[1]) {
+  try {
+    invokedPath =
+      realpathSync(fileURLToPath(import.meta.url)) ===
+      realpathSync(resolve(process.argv[1]))
+  } catch {
+    invokedPath = fileURLToPath(import.meta.url) === resolve(process.argv[1])
+  }
+}
 if (invokedPath) run().catch((error) => commandError(error.message))

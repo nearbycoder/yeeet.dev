@@ -43,10 +43,14 @@ import {
 } from '../src/server/webhooks'
 import {
   applySiteHeaders,
+  isPrivateSiteRulePath,
   matchingRedirect,
   parseHeaderRules,
   parseRedirectRules,
 } from '../src/server/site-rules'
+import { candidatePaths } from '../src/lib/route-resolution'
+import { safeRedirectPath } from '../src/lib/format'
+import { decodeCursor, encodeCursor } from '../src/server/pagination'
 
 async function withEnvironment<T>(
   values: Record<string, string | undefined>,
@@ -576,4 +580,102 @@ test('docs host handles HEAD, unsupported methods, and unknown paths', async () 
 
     assert.equal(maybeServeDocs(new Request('https://yeeet.dev/')), null)
   })
+})
+
+test('blocks encoded or normalized paths targeting private rule or backend files', () => {
+  for (const [path, expected] of [
+    ['/%5fheaders', '_headers'],
+    ['//_headers', '_headers'],
+    ['/./_redirects', '_redirects'],
+  ] as const) {
+    const resolved = candidatePaths(path)
+    assert.ok(resolved.includes(expected), path)
+    const filtered = resolved.filter(
+      (candidate) => !isPrivateSiteRulePath(candidate),
+    )
+    assert.equal(filtered.includes(expected), false, path)
+  }
+  assert.deepEqual(candidatePaths('/../secret'), [])
+  assert.deepEqual(candidatePaths('/foo%00bar'), [])
+})
+
+test('hardens _headers and _redirects against control chars, reserved headers, and protocol-relative splats', () => {
+  assert.throws(
+    () => parseHeaderRules('/\n  X-Yeeet-Request-Id: forged'),
+    /controlled by Yeeet/,
+  )
+  assert.throws(
+    () => parseHeaderRules('/\n  X-Test: hello\u2603'),
+    /needs a safe value/,
+  )
+  const rules = parseRedirectRules('/go/* /:splat 302')
+  assert.deepEqual(matchingRedirect(rules, '/go//evil.com'), {
+    from: '/go/*',
+    to: '/evil.com',
+    status: 302,
+  })
+  assert.deepEqual(matchingRedirect(rules, '/go/docs'), {
+    from: '/go/*',
+    to: '/docs',
+    status: 302,
+  })
+})
+
+test('injectSiteSocialMetadata preserves replacement tokens like $& and $$ literally', () => {
+  const html =
+    '<!doctype html><html><head><title>Price $&amp; $$100</title></head><body>Hi</body></html>'
+  const out = injectSiteSocialMetadata(html, {
+    hostname: 'demo.site.yeeet.dev',
+    imageUrl: 'https://demo.site.yeeet.dev/_yeeet/og.png',
+    pageUrl: 'https://demo.site.yeeet.dev/$&/$$',
+    siteName: 'Demo $& $$',
+  })
+  assert.equal(out.match(/<\/head>/g)?.length, 1)
+  assert.match(out, /content="https:\/\/demo\.site\.yeeet\.dev\/\$&amp;\/\$\$"/)
+})
+
+test('rejects impossible calendar timestamps in pagination cursors', () => {
+  const valid = encodeCursor(
+    { cursorTime: '2026-02-28T12:34:56.000000', id: 'row-1' },
+    { kind: 'test' },
+  )
+  assert.equal(decodeCursor(valid, { kind: 'test' })?.id, 'row-1')
+  const impossible = encodeCursor(
+    { cursorTime: '2026-02-31T00:00:00.000000', id: 'row-1' },
+    { kind: 'test' },
+  )
+  assert.throws(() => decodeCursor(impossible, { kind: 'test' }), {
+    code: 'invalid_cursor',
+  })
+})
+
+test('safeRedirectPath allows only same-origin relative paths', () => {
+  assert.equal(
+    safeRedirectPath('/dashboard?site=comet#top'),
+    '/dashboard?site=comet#top',
+  )
+  for (const bad of [
+    '//evil.com/phish',
+    '/\\evil.com',
+    'https://evil.com',
+    'javascript:alert(1)',
+    '/ok\nInjected: 1',
+  ]) {
+    assert.equal(safeRedirectPath(bad), '/dashboard', bad)
+  }
+})
+
+test('normalizeCustomDomain rejects docs host and control-plane subdomains', async () => {
+  await withEnvironment(
+    {
+      BETTER_AUTH_URL: 'https://yeeet.dev',
+      DOCS_HOST: 'docs.yeeet.dev',
+      SITE_DOMAIN: 'site.yeeet.dev',
+    },
+    () => {
+      assert.throws(() => normalizeCustomDomain('docs.yeeet.dev'))
+      assert.throws(() => normalizeCustomDomain('api.yeeet.dev'))
+      assert.throws(() => normalizeCustomDomain('sub.docs.yeeet.dev'))
+    },
+  )
 })

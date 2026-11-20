@@ -10,9 +10,21 @@ import {
   filterFileRange,
   formatBytes,
 } from '#/lib/asset-review'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { exploreFiles, fileFamily } from '#/lib/file-explorer'
 import type { ManifestFile } from '#/lib/file-explorer'
+import { formatNumber } from '#/lib/format'
+
+function isPrivateDeploymentPath(path: string) {
+  return (
+    path === '_headers' ||
+    path === '_redirects' ||
+    path === '_server.ts' ||
+    path === '_server.js' ||
+    path.startsWith('_server/') ||
+    path.startsWith('_migrations/')
+  )
+}
 
 export function FileExplorer({
   files,
@@ -40,6 +52,21 @@ export function FileExplorer({
   const [minimum, setMinimum] = useState(filters.fileMin?.toString() ?? '')
   const [maximum, setMaximum] = useState(filters.fileMax?.toString() ?? '')
   const [selected, setSelected] = useState<Set<string>>(() => new Set())
+  useEffect(() => {
+    setQuery(filters.fileQuery ?? '')
+    setFamily(filters.fileType ?? '')
+    setOrder(filters.fileOrder ?? 'path')
+    setDirectory(filters.fileDirectory ?? '')
+    setMinimum(filters.fileMin?.toString() ?? '')
+    setMaximum(filters.fileMax?.toString() ?? '')
+  }, [
+    filters.fileQuery,
+    filters.fileType,
+    filters.fileOrder,
+    filters.fileDirectory,
+    filters.fileMin,
+    filters.fileMax,
+  ])
   const directories = useMemo(() => fileDirectories(files), [files])
   const matching = useMemo(
     () =>
@@ -73,6 +100,7 @@ export function FileExplorer({
     page * pageSize,
     Math.max(0, Math.ceil(matching.length / pageSize) - 1) * pageSize,
   )
+  const currentPage = Math.floor(start / pageSize)
   return (
     <section className="file-explorer" aria-label="File explorer">
       <h3>Files</h3>
@@ -177,6 +205,7 @@ export function FileExplorer({
       ) : null}
       <div className="console-actions">
         <button
+          type="button"
           className="button button-paper"
           onClick={() =>
             onBookmark({
@@ -202,6 +231,7 @@ export function FileExplorer({
           {formatBytes(selectedFiles.reduce((sum, file) => sum + file.size, 0))}
         </span>
         <button
+          type="button"
           className="button button-paper"
           disabled={!matching.length}
           onClick={() =>
@@ -214,6 +244,7 @@ export function FileExplorer({
           Select all matches
         </button>
         <button
+          type="button"
           className="button button-paper"
           disabled={!selected.size}
           onClick={() => setSelected(new Set())}
@@ -261,8 +292,7 @@ export function FileExplorer({
           ? `${start + 1}–${Math.min(start + pageSize, matching.length)}`
           : '0'}{' '}
         of {matching.length} matching files ·{' '}
-        {matching.reduce((sum, file) => sum + file.size, 0).toLocaleString()}{' '}
-        bytes
+        {formatNumber(matching.reduce((sum, file) => sum + file.size, 0))} bytes
       </p>
       <div className="console-table-scroll">
         <table className="console-table">
@@ -294,7 +324,7 @@ export function FileExplorer({
                 <td>
                   <code>{file.path}</code>
                 </td>
-                <td>{file.size.toLocaleString()} B</td>
+                <td>{formatNumber(file.size)} B</td>
                 <td>{file.contentType}</td>
                 <td>
                   <code
@@ -313,6 +343,7 @@ export function FileExplorer({
                     </summary>
                     {canPreviewText(file.contentType) ? (
                       <button
+                        type="button"
                         className="button button-paper"
                         onClick={() => setPreview(file.path)}
                         aria-label={`Preview ${file.path}`}
@@ -328,8 +359,7 @@ export function FileExplorer({
                     >
                       Download original
                     </a>
-                    {previewUrl &&
-                    !['_headers', '_redirects'].includes(file.path) ? (
+                    {previewUrl && !isPrivateDeploymentPath(file.path) ? (
                       <a
                         className="button button-paper"
                         aria-label={`Open version file ${file.path}`}
@@ -354,8 +384,7 @@ export function FileExplorer({
                         ariaLabel={`Copy checksum: ${file.path}`}
                       />
                     ) : null}
-                    {previewUrl &&
-                    !['_headers', '_redirects'].includes(file.path) ? (
+                    {previewUrl && !isPrivateDeploymentPath(file.path) ? (
                       <CopyButton
                         className="button button-paper"
                         value={fileVersionUrl(previewUrl, file.path)}
@@ -383,6 +412,7 @@ export function FileExplorer({
         <p>
           No files match.{' '}
           <button
+            type="button"
             className="button button-paper"
             onClick={() => {
               setQuery('')
@@ -399,16 +429,18 @@ export function FileExplorer({
       ) : null}
       <nav className="console-actions" aria-label="File pages">
         <button
+          type="button"
           className="button button-paper"
           disabled={start === 0}
-          onClick={() => setPage(Math.max(0, page - 1))}
+          onClick={() => setPage(Math.max(0, currentPage - 1))}
         >
           Previous files
         </button>
         <button
+          type="button"
           className="button button-paper"
           disabled={start + pageSize >= matching.length}
-          onClick={() => setPage(page + 1)}
+          onClick={() => setPage(currentPage + 1)}
         >
           Next files
         </button>

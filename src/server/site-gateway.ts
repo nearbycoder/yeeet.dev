@@ -23,11 +23,11 @@ import {
   injectSiteSocialMetadata,
 } from './site-social-metadata'
 import {
-  HEADERS_FILE,
-  REDIRECTS_FILE,
   applySiteHeaders,
   deserializeSiteRules,
+  isPrivateSiteRulePath,
   matchingRedirect,
+  safeRewritePath,
 } from './site-rules'
 import type { SiteHeaderRule, SiteRedirectRule } from './site-rules'
 import { getStoredObject } from './storage'
@@ -53,22 +53,26 @@ function uuidFromVersionLabel(label: string) {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`
 }
 
+const MAX_SOCIAL_INJECTION_BYTES = 2 * 1024 * 1024
+
 function siteTarget(request: Request): SiteTarget | null {
   const url = new URL(request.url)
   if (process.env.NODE_ENV !== 'production') {
-    const override = request.headers.get('x-yeeet-site')
+    const override = request.headers.get('x-yeeet-site')?.trim()
     if (override) {
       const label = override.toLowerCase()
       const deploymentId = uuidFromVersionLabel(label)
-      return deploymentId
-        ? { kind: 'version', deploymentId, label }
-        : label.includes('--')
-          ? { kind: 'channel', hostnameLabel: label, label }
-          : {
-              kind: 'live',
-              slug: label,
-              label: new URL(siteUrl(label)).hostname,
-            }
+      if (deploymentId) return { kind: 'version', deploymentId, label }
+      if (label.includes('--'))
+        return { kind: 'channel', hostnameLabel: label, label }
+      if (/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(label)) {
+        return {
+          kind: 'live',
+          slug: label,
+          label: new URL(siteUrl(label)).hostname,
+        }
+      }
+      return null
     }
   }
 
@@ -99,7 +103,7 @@ function siteTarget(request: Request): SiteTarget | null {
 }
 
 export function siteResponsePolicy(
-  contentType: string,
+  _contentType: string,
   immutableVersion: boolean,
   protectedDeployment: boolean,
   noCrawl = immutableVersion,
@@ -110,9 +114,7 @@ export function siteResponsePolicy(
       ? 'private, no-store, max-age=0'
       : immutableVersion
         ? 'public, max-age=31536000, immutable'
-        : contentType.includes('text/html')
-          ? 'public, max-age=0, s-maxage=10, stale-while-revalidate=30'
-          : 'public, max-age=0, s-maxage=10, stale-while-revalidate=30'
+        : 'public, max-age=0, s-maxage=10, stale-while-revalidate=30'
   const blockCrawlers = noCrawl || protectedDeployment
   return {
     cacheControl,
@@ -241,7 +243,7 @@ function notFound(hostname: string, noCrawl = false) {
     headers.expires = '0'
   }
   return new Response(
-    `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Not found</title><style>body{margin:0;background:#f4f0e8;color:#171714;font:16px ui-monospace,monospace;display:grid;min-height:100vh;place-items:center}main{max-width:36rem;padding:2rem}.mark{font-size:3rem;font-weight:900;letter-spacing:-.1em}a{color:#f04d2f}</style><main><div class="mark">Y!</div><h1>Nothing landed here.</h1><p>${hostname} exists, but this path doesn't.</p><a href="/">Back to the site →</a></main>`,
+    `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Not found</title><style>body{margin:0;background:#f4f0e8;color:#171714;font:16px ui-monospace,monospace;display:grid;min-height:100vh;place-items:center}main{max-width:36rem;padding:2rem}.mark{font-size:3rem;font-weight:900;letter-spacing:-.1em}a{color:#f04d2f}</style><main><div class="mark">Y!</div><h1>Nothing landed here.</h1><p>${escapeHtml(hostname)} exists, but this path doesn't.</p><a href="/">Back to the site →</a></main>`,
     {
       status: 404,
       headers,
@@ -359,7 +361,16 @@ export async function maybeServeSite(
     }
 
     if (isUnlock) {
-      const form = await request.formData()
+      let form: FormData
+      try {
+        form = await request.formData()
+      } catch {
+        return unlockPage(
+          request,
+          target.label,
+          'Enter the deployment password.',
+        )
+      }
       const password = form.get('password')
       if (
         typeof password === 'string' &&
@@ -384,6 +395,9 @@ export async function maybeServeSite(
 
   const protectedDeployment = Boolean(deployment.passwordHash)
   if (requestUrl.pathname === GENERATED_SOCIAL_IMAGE_PATH) {
+    if (!readOnlyMethod) {
+      return new Response('Method not allowed', { status: 405 })
+    }
     const responsePolicy = siteResponsePolicy(
       'image/png',
       target.kind === 'version',
@@ -443,6 +457,9 @@ export async function maybeServeSite(
   )
   const redirect = matchingRedirect(redirectRules, requestUrl.pathname)
   if (redirect && redirect.status !== 200) {
+    if (!readOnlyMethod) {
+      return new Response('Method not allowed', { status: 405 })
+    }
     const responsePolicy = siteResponsePolicy(
       'text/plain',
       target.kind === 'version',
@@ -469,7 +486,7 @@ export async function maybeServeSite(
 
   const effectivePath =
     redirect?.status === 200
-      ? new URL(redirect.to, 'https://rewrite.yeeet.invalid').pathname
+      ? safeRewritePath(redirect.to)
       : requestUrl.pathname
   const backend = parseBackend(deployment.backend)
   if (backend && isBackendRoute(effectivePath)) {
@@ -499,22 +516,16 @@ export async function maybeServeSite(
   if (!readOnlyMethod) {
     return new Response('Method not allowed', { status: 405 })
   }
-  if (
-    effectivePath === `/${HEADERS_FILE}` ||
-    effectivePath === `/${REDIRECTS_FILE}`
-  ) {
+  if (isPrivateSiteRulePath(effectivePath)) {
     return notFound(target.label, noCrawlTarget || protectedDeployment)
   }
 
-  // Backend source and migrations are private even if a path names them.
+  // Rule files, backend source, and migrations are private even via encoded paths.
   const candidates = candidatePaths(effectivePath).filter(
-    (path) => !isPrivateBackendPath(path),
+    (path) => !isPrivateBackendPath(path) && !isPrivateSiteRulePath(path),
   )
   if (!candidates.length)
-    return notFound(
-      target.label,
-      noCrawlTarget || Boolean(deployment.passwordHash),
-    )
+    return notFound(target.label, noCrawlTarget || protectedDeployment)
 
   const rows = await db
     .select()
@@ -532,21 +543,22 @@ export async function maybeServeSite(
   const files = new Map(rows.map((row) => [row.path, row]))
   let file = candidates.map((path) => files.get(path)).find(Boolean)
   let status = 200
-  if (!file && shouldUseSpaFallback(request, deployment.spaFallback)) {
+  if (
+    !file &&
+    shouldUseSpaFallback(request, deployment.spaFallback, effectivePath)
+  ) {
     file = files.get('index.html')
   }
   if (!file && files.has('404.html')) {
     file = files.get('404.html')
     status = 404
   }
-  if (!file)
-    return notFound(
-      target.label,
-      noCrawlTarget || Boolean(deployment.passwordHash),
-    )
+  if (!file) return notFound(target.label, noCrawlTarget || protectedDeployment)
 
   const injectSocialImage =
-    status === 200 && file.contentType.includes('text/html')
+    status === 200 &&
+    file.contentType.includes('text/html') &&
+    file.size <= MAX_SOCIAL_INJECTION_BYTES
   const responsePolicy = siteResponsePolicy(
     file.contentType,
     target.kind === 'version',
@@ -624,6 +636,25 @@ export async function maybeServeSite(
       headers,
     })
   } catch (error) {
+    const s3Status =
+      typeof error === 'object' &&
+      error !== null &&
+      '$metadata' in error &&
+      typeof (error as { $metadata?: { httpStatusCode?: unknown } }).$metadata
+        ?.httpStatusCode === 'number'
+        ? (error as { $metadata: { httpStatusCode: number } }).$metadata
+            .httpStatusCode
+        : undefined
+    const s3Name =
+      typeof error === 'object' && error !== null && 'name' in error
+        ? String((error as { name?: unknown }).name)
+        : ''
+    if (s3Status === 416 || s3Name === 'InvalidRange') {
+      return new Response('Range not satisfiable', {
+        status: 416,
+        headers: { 'content-range': `bytes */${file.size}` },
+      })
+    }
     console.error('Failed to read site object', {
       site: target.label,
       path: file.path,

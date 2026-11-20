@@ -7,6 +7,7 @@ import { CopyButton } from '#/components/copy-button'
 import { Fragment, useState } from 'react'
 import { Link, createFileRoute, useRouter } from '@tanstack/react-router'
 import { ConfirmDialog } from '#/components/confirm-dialog'
+import { formatBytes, formatDateTime } from '#/lib/format'
 import {
   getDeploymentInspection,
   updateRetentionPin,
@@ -28,23 +29,6 @@ type VersionAction = {
   description: string
   diff?: ManifestDiffData
   confirmLabel: string
-}
-
-function formatBytes(value: number | null) {
-  if (!value) return '0 B'
-  const units = ['B', 'KB', 'MB', 'GB']
-  const rank = Math.min(
-    Math.floor(Math.log(value) / Math.log(1024)),
-    units.length - 1,
-  )
-  return `${(value / 1024 ** rank).toFixed(rank ? 1 : 0)} ${units[rank]}`
-}
-
-function formatDate(value: string) {
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(new Date(value))
 }
 
 function SiteVersions() {
@@ -301,6 +285,7 @@ function SiteVersions() {
           {compareIds.length === 2 ? (
             <>
               <button
+                type="button"
                 className="button button-paper"
                 onClick={() =>
                   setSelection({
@@ -322,6 +307,7 @@ function SiteVersions() {
             </>
           ) : null}
           <button
+            type="button"
             className="button button-paper"
             disabled={!compareIds.length}
             onClick={() => setSelection({ slug: data.site.slug, ids: [] })}
@@ -338,7 +324,10 @@ function SiteVersions() {
                 className={`site-version-card ${version.current ? 'is-current' : ''}`}
               >
                 <div className="site-version-index">
-                  <i className={`activity-status ${version.status}`}>
+                  <i
+                    className={`activity-status ${version.status}`}
+                    aria-hidden="true"
+                  >
                     {version.status === 'ready'
                       ? '✓'
                       : version.status === 'failed'
@@ -357,7 +346,7 @@ function SiteVersions() {
                   </div>
                   <p>
                     {version.releaseLabel ? `${version.id.slice(0, 8)} · ` : ''}
-                    {version.source} · {formatDate(version.createdAt)}
+                    {version.source} · {formatDateTime(version.createdAt)}
                     {version.channel ? ` · ${version.channel} channel` : ''}
                   </p>
                   {version.releaseNotes ? (
@@ -388,6 +377,7 @@ function SiteVersions() {
                     <span className="sr-only"> {version.id.slice(0, 8)}</span>
                   </label>
                   <button
+                    type="button"
                     className="button button-paper"
                     disabled={Boolean(busy)}
                     onClick={() =>
@@ -486,10 +476,12 @@ function SiteVersions() {
                   onSubmit={(event) => {
                     event.preventDefault()
                     if (password.length < 8) return
-                    void updateAccess(version.id, { password }).then(() => {
-                      setPassword('')
-                      setAccessVersion('')
-                    })
+                    void updateAccess(version.id, { password })
+                      .then(() => {
+                        setPassword('')
+                        setAccessVersion('')
+                      })
+                      .catch(() => undefined)
                   }}
                 >
                   <div>

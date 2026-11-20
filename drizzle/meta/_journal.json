@@ -141,6 +141,13 @@
       "when": 1793106002813,
       "tag": "0019_deployment_backend",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1795202419513,
+      "tag": "0020_query_and_fk_indexes",
+      "breakpoints": true
     }
   ]
 }

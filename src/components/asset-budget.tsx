@@ -6,6 +6,7 @@ import {
 import { useEffect, useMemo, useState } from 'react'
 import { assetBudget } from '#/lib/asset-budget'
 import type { ManifestFile } from '#/lib/file-explorer'
+import { formatNumber } from '#/lib/format'
 
 export function AssetBudget({
   files,
@@ -16,8 +17,8 @@ export function AssetBudget({
   userId: string
   slug: string
 }) {
-  const [fileKiB, setFileKiB] = useState(512)
-  const [totalMiB, setTotalMiB] = useState(10)
+  const [fileKiBInput, setFileKiBInput] = useState('512')
+  const [totalMiBInput, setTotalMiBInput] = useState('10')
   const [notice, setNotice] = useState('')
   const storageKey = budgetStorageKey(userId, slug)
   useEffect(() => {
@@ -28,17 +29,25 @@ export function AssetBudget({
             JSON.stringify(defaultBudgetPreferences),
         ),
       )
-      setFileKiB(saved.fileKiB)
-      setTotalMiB(saved.totalMiB)
+      setFileKiBInput(String(saved.fileKiB))
+      setTotalMiBInput(String(saved.totalMiB))
     } catch {
-      setFileKiB(512)
-      setTotalMiB(10)
+      setFileKiBInput('512')
+      setTotalMiBInput('10')
       setNotice('Saved budgets could not be loaded. Defaults are shown.')
     }
   }, [storageKey])
+  const parsedFileKiB = Math.max(
+    1,
+    Math.min(1048576, Math.round(Number(fileKiBInput)) || 512),
+  )
+  const parsedTotalMiB = Math.max(
+    1,
+    Math.min(1048576, Math.round(Number(totalMiBInput)) || 10),
+  )
   const report = useMemo(
-    () => assetBudget(files, fileKiB, totalMiB),
-    [files, fileKiB, totalMiB],
+    () => assetBudget(files, parsedFileKiB, parsedTotalMiB),
+    [files, parsedFileKiB, parsedTotalMiB],
   )
   return (
     <details className="console-item">
@@ -55,12 +64,8 @@ export function AssetBudget({
             type="number"
             min={1}
             max={1048576}
-            value={fileKiB}
-            onChange={(event) =>
-              setFileKiB(
-                Math.max(1, Math.min(1048576, Number(event.target.value))),
-              )
-            }
+            value={fileKiBInput}
+            onChange={(event) => setFileKiBInput(event.target.value)}
           />
         </label>
         <label>
@@ -70,23 +75,22 @@ export function AssetBudget({
             type="number"
             min={1}
             max={1048576}
-            value={totalMiB}
-            onChange={(event) =>
-              setTotalMiB(
-                Math.max(1, Math.min(1048576, Number(event.target.value))),
-              )
-            }
+            value={totalMiBInput}
+            onChange={(event) => setTotalMiBInput(event.target.value)}
           />
         </label>
         <button
+          type="button"
           className="button button-paper"
           onClick={() => {
             try {
               const preferences = budgetPreferencesSchema.parse({
-                fileKiB,
-                totalMiB,
+                fileKiB: Number(fileKiBInput),
+                totalMiB: Number(totalMiBInput),
               })
               localStorage.setItem(storageKey, JSON.stringify(preferences))
+              setFileKiBInput(String(preferences.fileKiB))
+              setTotalMiBInput(String(preferences.totalMiB))
               setNotice('Budgets saved for this site.')
             } catch {
               setNotice(
@@ -98,12 +102,13 @@ export function AssetBudget({
           Save site budgets
         </button>
         <button
+          type="button"
           className="button button-paper"
           onClick={() => {
             try {
               localStorage.removeItem(storageKey)
-              setFileKiB(512)
-              setTotalMiB(10)
+              setFileKiBInput('512')
+              setTotalMiBInput('10')
               setNotice('Saved budgets cleared. Defaults restored.')
             } catch {
               setNotice(
@@ -119,13 +124,13 @@ export function AssetBudget({
       <p role="status">
         {report.overFiles.length} files exceed the file budget.{' '}
         {report.overTotal
-          ? `${report.overTotal.toLocaleString()} bytes over the total budget.`
+          ? `${formatNumber(report.overTotal)} bytes over the total budget.`
           : 'Within the total budget.'}
       </p>
       <ul>
         {report.byType.map(([kind, bytes]) => (
           <li key={kind}>
-            {kind}: {bytes.toLocaleString()} bytes (
+            {kind}: {formatNumber(bytes)} bytes (
             {report.total ? Math.round((bytes / report.total) * 100) : 0}%)
           </li>
         ))}
@@ -135,7 +140,7 @@ export function AssetBudget({
         <ol>
           {report.largest.map((file) => (
             <li key={file.path}>
-              <code>{file.path}</code> · {file.size.toLocaleString()} bytes
+              <code>{file.path}</code> · {formatNumber(file.size)} bytes
               {file.size > report.fileLimit ? ' · Over budget' : ''}
             </li>
           ))}

@@ -29,7 +29,7 @@ export async function ownedDeploymentFile(
     .where(
       and(
         eq(sites.userId, userId),
-        eq(sites.slug, clean.slug),
+        eq(sites.slug, clean.slug.trim().toLowerCase()),
         eq(deployments.id, clean.version),
         eq(deployments.status, 'ready'),
         eq(deploymentFiles.path, clean.path),

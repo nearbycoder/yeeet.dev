@@ -3,10 +3,10 @@ import { candidatePaths, shouldUseSpaFallback } from '#/lib/route-resolution'
 import { inspectDeployment } from './deployment-inspection'
 import {
   deserializeSiteRules,
-  matchingRedirect,
+  isPrivateSiteRulePath,
   matchingHeaders,
-  HEADERS_FILE,
-  REDIRECTS_FILE,
+  matchingRedirect,
+  safeRewritePath,
 } from './site-rules'
 import type { SiteHeaderRule, SiteRedirectRule } from './site-rules'
 import { GENERATED_SOCIAL_IMAGE_PATH } from './site-social-metadata'
@@ -69,19 +69,14 @@ export function simulateRoute(version: RoutingVersion, path: string) {
       redirect: { to: redirect.to, status: redirect.status },
     }
   const effectivePath =
-    redirect?.status === 200
-      ? new URL(redirect.to, 'https://rewrite.yeeet.invalid').pathname
-      : pathname
+    redirect?.status === 200 ? safeRewritePath(redirect.to) : pathname
   result.effectivePath = effectivePath
   if (version.backend && isBackendRoute(effectivePath))
     return { ...result, status: 200, backend: true }
-  if (
-    effectivePath === `/${HEADERS_FILE}` ||
-    effectivePath === `/${REDIRECTS_FILE}`
-  )
-    return result
+  if (isPrivateSiteRulePath(effectivePath)) return result
   const candidates = candidatePaths(effectivePath).filter(
-    (candidate) => !isPrivateBackendPath(candidate),
+    (candidate) =>
+      !isPrivateBackendPath(candidate) && !isPrivateSiteRulePath(candidate),
   )
   if (!candidates.length) return result
   const files = new Set(version.files.map((file) => file.path))
@@ -89,7 +84,7 @@ export function simulateRoute(version: RoutingVersion, path: string) {
   let status = 200
   if (
     !file &&
-    shouldUseSpaFallback(request, version.spaFallback) &&
+    shouldUseSpaFallback(request, version.spaFallback, effectivePath) &&
     files.has('index.html')
   ) {
     file = 'index.html'

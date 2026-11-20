@@ -6,7 +6,7 @@ import {
 import { z } from 'zod'
 import { searchSites } from './site-search'
 import { organizationSchema, emptyOrganization } from '#/lib/site-organization'
-import { listSitePreferences, saveSiteOrganization } from './site-organization'
+import { getSitePreference, saveSiteOrganization } from './site-organization'
 import { createServerFn } from '@tanstack/react-start'
 import { getRequest, getRequestHeaders } from '@tanstack/react-start/server'
 import { auth } from '#/lib/auth'
@@ -17,10 +17,14 @@ import { listCustomDomains } from './custom-domains'
 import {
   findSiteVersion,
   listRecentDeployments,
+  listSiteChannels,
   listSites,
   listSiteVersions,
 } from './deployments'
+import { HttpError } from './http'
 import { publicPlatformConfig } from './platform-config'
+
+const slugInputSchema = z.object({ slug: z.string().min(1).max(63) })
 
 export const getSession = createServerFn({ method: 'GET' }).handler(
   async () => {
@@ -37,7 +41,9 @@ export const getDashboardData = createServerFn({ method: 'GET' })
     const [page, recent, destination] = await Promise.all([
       searchSites(actor.userId, data),
       listRecentDeployments(actor.userId),
-      data.site ? listSites(actor.userId, data.site) : Promise.resolve([]),
+      data.site
+        ? listSites(actor.userId, data.site).catch(() => [])
+        : Promise.resolve([]),
     ])
     return {
       ...page,
@@ -54,24 +60,22 @@ export const getSiteSearchPage = createServerFn({ method: 'GET' })
   })
 
 export const getSiteWorkspaceData = createServerFn({ method: 'GET' })
-  .validator((data: { slug: string }) => data)
+  .validator((data: { slug: string }) => slugInputSchema.parse(data))
   .handler(async ({ data }) => {
     const actor = await requireActor(getRequest())
-    const [siteRows, domains, history, preferences] = await Promise.all([
+    const [siteRows, domains, history] = await Promise.all([
       listSites(actor.userId, data.slug),
       listCustomDomains(actor.userId, data.slug),
       listSiteVersions(actor.userId, data.slug, 3),
-      listSitePreferences(actor.userId),
     ])
     const site = siteRows.find((row) => row.slug === history.site.slug)
-    if (!site) throw new Error('Site not found.')
+    if (!site) throw new HttpError(404, 'Site not found.', 'not_found')
+    const preference = await getSitePreference(actor.userId, site.id)
     return {
       platform: publicPlatformConfig(),
       site: {
         ...site,
-        organization:
-          preferences.find((pref) => pref.siteId === site.id) ??
-          emptyOrganization,
+        organization: preference ?? emptyOrganization,
         customDomains: domains,
       },
       latestVersions: history.versions,
@@ -81,7 +85,10 @@ export const getSiteWorkspaceData = createServerFn({ method: 'GET' })
 export const getSiteVersionsData = createServerFn({ method: 'GET' })
   .validator((data: unknown) =>
     versionSearchSchema
-      .extend({ slug: z.string(), version: z.string().optional() })
+      .extend({
+        slug: z.string().min(1).max(63),
+        version: z.string().optional(),
+      })
       .parse(data),
   )
   .handler(async ({ data }) => {
@@ -98,7 +105,7 @@ export const getSiteVersionsData = createServerFn({ method: 'GET' })
   })
 
 export const getSiteDomainsData = createServerFn({ method: 'GET' })
-  .validator((data: { slug: string }) => data)
+  .validator((data: { slug: string }) => slugInputSchema.parse(data))
   .handler(async ({ data }) => {
     const actor = await requireActor(getRequest())
     return {
@@ -107,7 +114,14 @@ export const getSiteDomainsData = createServerFn({ method: 'GET' })
   })
 
 export const getSiteAnalyticsData = createServerFn({ method: 'GET' })
-  .validator((data: { slug: string; days?: number }) => data)
+  .validator((data: { slug: string; days?: number }) =>
+    z
+      .object({
+        slug: z.string().min(1).max(63),
+        days: z.number().int().min(1).max(90).optional(),
+      })
+      .parse(data),
+  )
   .handler(async ({ data }) => {
     const actor = await requireActor(getRequest())
     return getSiteAnalytics(actor.userId, data.slug, data.days)
@@ -125,29 +139,42 @@ export const getAdminData = createServerFn({ method: 'GET' }).handler(
 )
 
 export const getDeploymentInspection = createServerFn({ method: 'GET' })
-  .validator((data: { slug: string; version: string; base?: string }) => data)
+  .validator((data: { slug: string; version: string; base?: string }) =>
+    z
+      .object({
+        slug: z.string().min(1).max(63),
+        version: z.string().min(1).max(64),
+        base: z.string().min(1).max(64).optional(),
+      })
+      .parse(data),
+  )
   .handler(async ({ data }) => {
     const actor = await requireActor(getRequest())
     const { inspectDeployment, compareDeployments } =
       await import('./deployment-inspection')
+    const version = await inspectDeployment(
+      actor.userId,
+      data.slug,
+      data.version,
+    )
     return {
-      version: await inspectDeployment(actor.userId, data.slug, data.version),
+      version,
       comparison: data.base
         ? await compareDeployments(
             actor.userId,
             data.slug,
             data.version,
             data.base,
+            version,
           )
         : null,
     }
   })
 
 export const getSiteChannelsData = createServerFn({ method: 'GET' })
-  .validator((data: { slug: string }) => data)
+  .validator((data: { slug: string }) => slugInputSchema.parse(data))
   .handler(async ({ data }) => {
     const actor = await requireActor(getRequest())
-    const { listSiteChannels } = await import('./deployments')
     const [history, result] = await Promise.all([
       listSiteVersions(actor.userId, data.slug),
       listSiteChannels(actor.userId, data.slug),
@@ -203,7 +230,7 @@ export const updateWorkspace = createServerFn({ method: 'POST' })
   })
 
 export const getLifecycleConsole = createServerFn({ method: 'GET' })
-  .validator((data: { slug: string }) => data)
+  .validator((data: { slug: string }) => slugInputSchema.parse(data))
   .handler(async ({ data }) => {
     const actor = await requireActor(getRequest())
     const { lifecycleConsole } = await import('./lifecycle')
@@ -224,7 +251,7 @@ export const updateHealthCheck = createServerFn({ method: 'POST' })
     return saveHealthCheck(actor.userId, data)
   })
 export const checkSiteHealth = createServerFn({ method: 'POST' })
-  .validator((data: { slug: string }) => data)
+  .validator((data: { slug: string }) => slugInputSchema.parse(data))
   .handler(async ({ data }) => {
     const actor = await requireActor(getRequest())
     const { runHealthCheck } = await import('./lifecycle')
@@ -232,7 +259,7 @@ export const checkSiteHealth = createServerFn({ method: 'POST' })
   })
 
 export const getRetentionConsole = createServerFn({ method: 'GET' })
-  .validator((data: { slug: string }) => data)
+  .validator((data: { slug: string }) => slugInputSchema.parse(data))
   .handler(async ({ data }) => {
     const actor = await requireActor(getRequest())
     const { retentionConsole } = await import('./retention')

@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto'
-import { and, asc, eq, gte, lte, sql } from 'drizzle-orm'
+import { and, asc, eq, gte, inArray, lte, sql } from 'drizzle-orm'
 import { analyticsPeriod } from '#/lib/analytics-report'
 import { db } from '#/db'
 import { deployments, siteAnalyticsDaily, sites } from '#/db/schema'
-import { HttpError } from './http'
+import { HttpError, pgErrorInfo } from './http'
 import { siteUrl } from './platform-config'
 
 type AnalyticsBucket = {
@@ -15,13 +15,14 @@ type AnalyticsBucket = {
   views: number
 }
 
+const MAX_BUFFER_ENTRIES = 10_000
 const buffer = new Map<string, AnalyticsBucket>()
 const deploymentOwners = new Map<
   string,
   Promise<{ siteId: string; userId: string } | null>
 >()
 const observedPaths = new Map<string, Set<string>>()
-let flushing = false
+let inFlightFlush: Promise<void> | null = null
 let workerStarted = false
 
 function utcDate(value = new Date()) {
@@ -80,7 +81,7 @@ function addBucket(bucket: AnalyticsBucket) {
   )
   const current = buffer.get(key)
   if (current) current.views += bucket.views
-  else buffer.set(key, bucket)
+  else if (buffer.size < MAX_BUFFER_ENTRIES) buffer.set(key, bucket)
   if (buffer.size >= 500) {
     void flushAnalytics().catch((error) =>
       console.error('Analytics flush failed', error),
@@ -126,43 +127,77 @@ export function recordSiteResponse(request: Request, response: Response) {
     .catch((error) => console.error('Analytics record failed', error))
 }
 
+function requeueEntries(entries: Array<[string, AnalyticsBucket]>) {
+  for (const [key, bucket] of entries) {
+    const current = buffer.get(key)
+    if (current) current.views += bucket.views
+    else if (buffer.size < MAX_BUFFER_ENTRIES) buffer.set(key, bucket)
+  }
+}
+
+async function insertAnalyticsBatch(entries: Array<[string, AnalyticsBucket]>) {
+  const siteIds = [...new Set(entries.map(([, bucket]) => bucket.siteId))]
+  const existing = await db
+    .select({ id: sites.id })
+    .from(sites)
+    .where(inArray(sites.id, siteIds))
+  const liveSiteIds = new Set(existing.map((row) => row.id))
+  const batch = entries
+    .filter(([, bucket]) => liveSiteIds.has(bucket.siteId))
+    .map(([, bucket]) => ({ id: randomUUID(), ...bucket }))
+  if (liveSiteIds.size < siteIds.length) {
+    // Drop cached owners for deleted sites so future requests do not re-buffer them.
+    deploymentOwners.clear()
+  }
+  if (!batch.length) return
+  await db
+    .insert(siteAnalyticsDaily)
+    .values(batch)
+    .onConflictDoUpdate({
+      target: [
+        siteAnalyticsDaily.siteId,
+        siteAnalyticsDaily.date,
+        siteAnalyticsDaily.path,
+        siteAnalyticsDaily.status,
+      ],
+      set: {
+        views: sql`${siteAnalyticsDaily.views} + excluded.views`,
+        updatedAt: new Date(),
+      },
+    })
+}
+
 export async function flushAnalytics() {
-  if (flushing || !buffer.size) return
-  flushing = true
+  if (inFlightFlush) return inFlightFlush
+  if (!buffer.size) return
   const entries = [...buffer.entries()]
   buffer.clear()
-  try {
-    for (let index = 0; index < entries.length; index += 500) {
-      const batch = entries.slice(index, index + 500).map(([, bucket]) => ({
-        id: randomUUID(),
-        ...bucket,
-      }))
-      await db
-        .insert(siteAnalyticsDaily)
-        .values(batch)
-        .onConflictDoUpdate({
-          target: [
-            siteAnalyticsDaily.siteId,
-            siteAnalyticsDaily.date,
-            siteAnalyticsDaily.path,
-            siteAnalyticsDaily.status,
-          ],
-          set: {
-            views: sql`${siteAnalyticsDaily.views} + excluded.views`,
-            updatedAt: new Date(),
-          },
-        })
+  let index = 0
+  const run = (async () => {
+    try {
+      for (; index < entries.length; index += 500) {
+        const slice = entries.slice(index, index + 500)
+        try {
+          await insertAnalyticsBatch(slice)
+        } catch (error) {
+          // A site can be deleted between the existence check and insert;
+          // retry once so deleted rows are filtered out instead of poisoning the buffer.
+          if (pgErrorInfo(error).code === '23503') {
+            await insertAnalyticsBatch(slice)
+          } else {
+            throw error
+          }
+        }
+      }
+    } catch (error) {
+      requeueEntries(entries.slice(index))
+      throw error
+    } finally {
+      inFlightFlush = null
     }
-  } catch (error) {
-    for (const [key, bucket] of entries) {
-      const current = buffer.get(key)
-      if (current) current.views += bucket.views
-      else buffer.set(key, bucket)
-    }
-    throw error
-  } finally {
-    flushing = false
-  }
+  })()
+  inFlightFlush = run
+  return run
 }
 
 export function startAnalyticsWorker() {
@@ -181,10 +216,13 @@ export async function getSiteAnalytics(
   value: string,
   requestedDays = 30,
 ) {
-  await flushAnalytics()
+  await flushAnalytics().catch((error) =>
+    console.error('Analytics flush failed before report', error),
+  )
+  const slug = value.trim().toLowerCase()
   const days = Math.min(Math.max(Math.floor(requestedDays) || 30, 1), 90)
   const site = await db.query.sites.findFirst({
-    where: and(eq(sites.slug, value), eq(sites.userId, userId)),
+    where: and(eq(sites.slug, slug), eq(sites.userId, userId)),
   })
   if (!site) throw new HttpError(404, 'Site not found.', 'not_found')
   const now = new Date()

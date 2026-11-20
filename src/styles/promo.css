@@ -1009,16 +1009,8 @@
 .promo-chapters button:hover,
 .promo-chapters button[aria-current='true'] {
   border-color: var(--ink);
-  color: var(--ink);
-}
-.promo-chapters button[aria-current='true'] {
   background: var(--lime);
   color: var(--night);
-}
-.promo-capture {
-  margin: 0;
-  overflow: hidden;
-  background: #f7f7f4;
 }
 @media (max-width: 650px) {
   .promo-controls {
@@ -1058,6 +1050,7 @@
 }
 html.promo-capture,
 body.promo-capture {
+  margin: 0;
   overflow: hidden;
   background: #f7f7f4;
 }

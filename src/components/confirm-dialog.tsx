@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import type { KeyboardEvent, ReactNode } from 'react'
+import type { ReactNode } from 'react'
 
 type ConfirmDialogProps = {
   open: boolean
@@ -42,6 +42,10 @@ export function ConfirmDialog({
   const descriptionId = useId()
   const dialogRef = useRef<HTMLElement>(null)
   const cancelButtonRef = useRef<HTMLButtonElement>(null)
+  const busyRef = useRef(busy)
+  const cancelRef = useRef(onCancel)
+  busyRef.current = busy
+  cancelRef.current = onCancel
 
   useEffect(() => {
     if (!open) return
@@ -51,7 +55,43 @@ export function ConfirmDialog({
     document.body.style.overflow = 'hidden'
     cancelButtonRef.current?.focus()
 
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        event.stopPropagation()
+        if (!busyRef.current) cancelRef.current()
+        return
+      }
+      if (event.key !== 'Tab') return
+
+      const dialog = dialogRef.current
+      if (!dialog) return
+      const focusable = Array.from(
+        dialog.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR),
+      ).filter((element) => element.getAttribute('aria-hidden') !== 'true')
+      if (!focusable.length) {
+        event.preventDefault()
+        dialog.focus()
+        return
+      }
+
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      if (!dialog.contains(document.activeElement)) {
+        event.preventDefault()
+        ;(event.shiftKey ? last : first).focus()
+      } else if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first.focus()
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
     return () => {
+      document.removeEventListener('keydown', handleKeyDown)
       document.body.style.overflow = previousOverflow
       if (previousFocus instanceof HTMLElement && previousFocus.isConnected) {
         previousFocus.focus()
@@ -60,36 +100,6 @@ export function ConfirmDialog({
   }, [open])
 
   if (!open || typeof document === 'undefined') return null
-
-  function handleKeyDown(event: KeyboardEvent<HTMLElement>) {
-    if (event.key === 'Escape' && !busy) {
-      event.preventDefault()
-      event.stopPropagation()
-      onCancel()
-      return
-    }
-    if (event.key !== 'Tab') return
-
-    const dialog = dialogRef.current
-    if (!dialog) return
-    const focusable = Array.from(
-      dialog.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR),
-    ).filter((element) => element.getAttribute('aria-hidden') !== 'true')
-    if (!focusable.length) {
-      event.preventDefault()
-      return
-    }
-
-    const first = focusable[0]
-    const last = focusable[focusable.length - 1]
-    if (event.shiftKey && document.activeElement === first) {
-      event.preventDefault()
-      last.focus()
-    } else if (!event.shiftKey && document.activeElement === last) {
-      event.preventDefault()
-      first.focus()
-    }
-  }
 
   return createPortal(
     <div
@@ -100,13 +110,13 @@ export function ConfirmDialog({
     >
       <section
         ref={dialogRef}
+        tabIndex={-1}
         className="confirm-dialog"
         role="alertdialog"
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={descriptionId}
         aria-busy={busy}
-        onKeyDown={handleKeyDown}
       >
         <div
           className={`confirm-dialog-mark ${tone === 'neutral' ? 'is-neutral' : ''}`}

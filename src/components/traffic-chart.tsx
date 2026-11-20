@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react'
+import { formatNumber, formatUtcMonthDay } from '#/lib/format'
 
 type TrafficPoint = { date: string; views: number }
 
@@ -10,10 +11,7 @@ function niceCeiling(value: number) {
 }
 
 function label(date: string, interval: 'day' | 'week') {
-  const formatted = new Date(`${date}T00:00:00Z`).toLocaleDateString(
-    undefined,
-    { month: 'short', day: 'numeric', timeZone: 'UTC' },
-  )
+  const formatted = formatUtcMonthDay(date)
   return interval === 'week' ? `Week of ${formatted}` : formatted
 }
 
@@ -38,7 +36,7 @@ export function TrafficChart({
         <div className="traffic-grid">
           {ticks.map((tick) => (
             <span key={tick}>
-              <b>{tick.toLocaleString()}</b>
+              <b>{formatNumber(tick)}</b>
             </span>
           ))}
         </div>
@@ -61,11 +59,11 @@ export function TrafficChart({
                   style={{ bottom: `${(point.views / ceiling) * 100}%` }}
                   className="traffic-peak"
                 >
-                  {point.views.toLocaleString()}
+                  {formatNumber(point.views)}
                 </em>
               ) : null}
               <span className="traffic-tip">
-                <b>{point.views.toLocaleString()} views</b>
+                <b>{formatNumber(point.views)} views</b>
                 {label(point.date, interval)}
               </span>
             </div>
@@ -102,7 +100,7 @@ export function TrafficChart({
                     {label(point.date, interval)}
                   </time>
                 </td>
-                <td>{point.views.toLocaleString()}</td>
+                <td>{formatNumber(point.views)}</td>
               </tr>
             ))}
           </tbody>

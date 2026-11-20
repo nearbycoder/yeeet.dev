@@ -1,5 +1,5 @@
 // Shared backend layout rules. This file is copied byte-for-byte into
-// packages/cli/runtime; tests/backend-layout.test.ts keeps the copies identical.
+// packages/cli/runtime; tests/backend.test.ts keeps the copies identical.
 
 export const BACKEND_ENTRIES = ['_server.ts', '_server.js']
 export const BACKEND_DIRECTORY = '_server/'

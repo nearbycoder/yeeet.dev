@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { duplicateAssets } from '#/lib/duplicate-assets'
 import type { ManifestFile } from '#/lib/file-explorer'
+import { formatNumber } from '#/lib/format'
 
 export function DuplicateAssets({ files }: { files: Array<ManifestFile> }) {
   const groups = useMemo(() => duplicateAssets(files), [files])
@@ -11,9 +12,9 @@ export function DuplicateAssets({ files }: { files: Array<ManifestFile> }) {
       <p>
         Files with the same recorded SHA-256 and byte size. Repeated content
         totals{' '}
-        {groups
-          .reduce((sum, group) => sum + group.redundantBytes, 0)
-          .toLocaleString()}{' '}
+        {formatNumber(
+          groups.reduce((sum, group) => sum + group.redundantBytes, 0),
+        )}{' '}
         bytes across extra paths. This is a build-size opportunity, not a
         storage billing estimate. Check references before removing files in your
         source build.
@@ -24,9 +25,8 @@ export function DuplicateAssets({ files }: { files: Array<ManifestFile> }) {
       {groups.slice(0, limit).map((group) => (
         <details key={group.key}>
           <summary>
-            {group.files.length} copies ·{' '}
-            {group.redundantBytes.toLocaleString()} repeated bytes ·{' '}
-            {group.files[0].path}
+            {group.files.length} copies · {formatNumber(group.redundantBytes)}{' '}
+            repeated bytes · {group.files[0].path}
           </summary>
           <ul className="file-paths">
             {group.files.slice(0, 100).map((file) => (
@@ -45,6 +45,7 @@ export function DuplicateAssets({ files }: { files: Array<ManifestFile> }) {
       ))}
       {limit < groups.length ? (
         <button
+          type="button"
           className="button button-paper"
           onClick={() => setLimit(limit + 10)}
         >

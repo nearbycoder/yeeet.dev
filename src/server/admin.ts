@@ -7,8 +7,10 @@ import {
   deployments,
   session,
   sites,
+  storageCleanupJobs,
   user,
 } from '#/db/schema'
+import { hasAdminRole } from './actor'
 import type { Actor } from './actor'
 import { HttpError } from './http'
 import { siteUrl } from './platform-config'
@@ -18,8 +20,30 @@ import {
   listInvitations,
   revokeInvitation,
 } from './invitations'
-import { deleteStoredPrefix } from './storage'
-import { purgeBackendForPrefix } from './backend-runtime'
+import { withSiteLock } from './site-lock'
+import { attemptStorageCleanup } from './storage-cleanup'
+
+type AuditDetailValue =
+  | string
+  | number
+  | boolean
+  | null
+  | Array<AuditDetailValue>
+  | { [key: string]: AuditDetailValue }
+
+function parseAuditDetails(
+  value: string | null,
+): Record<string, AuditDetailValue> | null {
+  if (!value) return null
+  try {
+    const parsed: unknown = JSON.parse(value)
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed))
+      return null
+    return parsed as Record<string, AuditDetailValue>
+  } catch {
+    return null
+  }
+}
 
 async function audit(input: {
   actorId: string
@@ -111,7 +135,7 @@ export async function adminOverview() {
     invitations: invitationRows,
     events: eventRows.map((event) => ({
       ...event,
-      details: event.details ? JSON.parse(event.details) : null,
+      details: parseAuditDetails(event.details),
       createdAt: event.createdAt.toISOString(),
     })),
   }
@@ -132,7 +156,7 @@ export async function banAccount(
     throw new HttpError(400, 'You cannot suspend yourself.', 'invalid_target')
   }
   const account = await targetAccount(userId)
-  if (account.role.split(',').includes('admin')) {
+  if (hasAdminRole(account.role)) {
     throw new HttpError(
       409,
       'Demote an administrator before suspending them.',
@@ -198,11 +222,26 @@ export async function deleteSite(actor: Actor, siteId: string) {
     where: eq(customDomains.siteId, site.id),
   })
   await Promise.all(
-    domains.map((domain) => removeRailwayCustomDomain(domain.railwayDomainId)),
+    domains.map((domain) =>
+      removeRailwayCustomDomain(domain.railwayDomainId, {
+        ignoreNotFound: true,
+      }),
+    ),
   )
-  const deletedObjects = await deleteStoredPrefix(`sites/${site.id}/`)
-  await purgeBackendForPrefix(`sites/${site.id}/`)
-  await db.delete(sites).where(eq(sites.id, site.id))
+  const prefix = `sites/${site.id}/`
+  await withSiteLock(site.id, site.userId, async (tx) => {
+    await tx
+      .insert(storageCleanupJobs)
+      .values({
+        id: site.id,
+        userId: site.userId,
+        siteId: site.id,
+        prefix,
+      })
+      .onConflictDoNothing()
+    await tx.delete(sites).where(eq(sites.id, site.id))
+  })
+  const { deletedObjects } = await attemptStorageCleanup(site.id, prefix)
   await audit({
     actorId: actor.userId,
     targetUserId: site.userId,

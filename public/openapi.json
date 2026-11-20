@@ -73,6 +73,37 @@
     }
   ],
   "paths": {
+    "/api/v1/invitations/authorize": {
+      "post": {
+        "operationId": "authorizeInvitation",
+        "security": [],
+        "description": "Validate a beta invitation code and set an HTTP-only grant cookie for registration.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["code"],
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Invitation code accepted and grant cookie issued"
+          },
+          "400": {
+            "description": "Missing or invalid invitation code"
+          }
+        }
+      }
+    },
     "/api/v1/me": {
       "get": {
         "operationId": "getCurrentUser",
@@ -132,6 +163,29 @@
             "required": true,
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Optional search prefix for version ID, channel, release label, or notes."
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Opaque pagination cursor returned by a previous page."
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "enum": ["all", "ready", "uploading", "failed"]
             }
           }
         ],
@@ -212,8 +266,52 @@
       }
     },
     "/api/v1/sites/{slug}/versions/{deploymentId}": {
+      "parameters": [
+        {
+          "name": "slug",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "deploymentId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "minLength": 8
+          }
+        }
+      ],
+      "get": {
+        "operationId": "getSiteVersion",
+        "responses": {
+          "200": {
+            "description": "Version metadata, preview URL, and privacy state"
+          },
+          "404": {
+            "description": "Version not found"
+          }
+        }
+      },
       "delete": {
         "operationId": "deleteSiteVersion",
+        "responses": {
+          "200": {
+            "description": "Version and stored objects deleted; replacement live version returned"
+          },
+          "404": {
+            "description": "Version not found"
+          }
+        }
+      }
+    },
+    "/api/v1/sites/{slug}/versions/{deploymentId}/file": {
+      "get": {
+        "operationId": "getSiteVersionFile",
+        "description": "Preview a text file or download any stored file from a ready version.",
         "parameters": [
           {
             "name": "slug",
@@ -229,16 +327,36 @@
             "required": true,
             "schema": {
               "type": "string",
-              "minLength": 8
+              "format": "uuid"
             }
+          },
+          {
+            "name": "path",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Normalized path inside the deployment manifest."
+          },
+          {
+            "name": "download",
+            "in": "query",
+            "schema": {
+              "enum": ["1"]
+            },
+            "description": "Set to 1 to download raw bytes as an attachment instead of JSON text preview."
           }
         ],
         "responses": {
           "200": {
-            "description": "Version and stored objects deleted; replacement live version returned"
+            "description": "Text preview JSON or attachment download stream"
           },
           "404": {
-            "description": "Version not found"
+            "description": "File not found in this ready version"
+          },
+          "415": {
+            "description": "Binary or non-text file cannot be previewed"
           }
         }
       }
@@ -305,6 +423,16 @@
       }
     },
     "/api/v1/sites/{slug}/domains": {
+      "parameters": [
+        {
+          "name": "slug",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
       "get": {
         "operationId": "listCustomDomains",
         "responses": {
@@ -346,6 +474,25 @@
       }
     },
     "/api/v1/sites/{slug}/domains/{domainId}/refresh": {
+      "parameters": [
+        {
+          "name": "slug",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "domainId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
       "post": {
         "operationId": "refreshCustomDomain",
         "responses": {
@@ -356,6 +503,25 @@
       }
     },
     "/api/v1/sites/{slug}/domains/{domainId}": {
+      "parameters": [
+        {
+          "name": "slug",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "domainId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
       "delete": {
         "operationId": "deleteCustomDomain",
         "responses": {
@@ -435,6 +601,46 @@
       ],
       "patch": {
         "operationId": "updateWebhookEndpoint",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "label": {
+                    "type": "string",
+                    "maxLength": 100
+                  },
+                  "events": {
+                    "type": "array",
+                    "items": {
+                      "enum": [
+                        "*",
+                        "deployment.ready",
+                        "deployment.activated",
+                        "deployment.deleted",
+                        "site.deleted",
+                        "channel.updated",
+                        "channel.deleted"
+                      ]
+                    }
+                  },
+                  "active": {
+                    "type": "boolean"
+                  },
+                  "rotateSecret": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Webhook updated; a rotated secret is shown once"
@@ -453,6 +659,18 @@
     "/api/v1/webhooks/deliveries": {
       "get": {
         "operationId": "listWebhookDeliveries",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Recent durable webhook delivery attempts"
@@ -603,26 +821,26 @@
       }
     },
     "/api/v1/sites/{slug}/channels/{channel}": {
+      "parameters": [
+        {
+          "name": "slug",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "channel",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
       "put": {
         "operationId": "setSiteChannel",
-        "parameters": [
-          {
-            "name": "slug",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "channel",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -695,6 +913,22 @@
     "/api/v1/admin/invitations": {
       "post": {
         "operationId": "createInvitation",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string",
+                    "maxLength": 100
+                  }
+                }
+              }
+            }
+          }
+        },
         "responses": {
           "201": {
             "description": "Invitation created; plaintext code is returned once"
@@ -703,6 +937,16 @@
       }
     },
     "/api/v1/admin/invitations/{invitationId}/revoke": {
+      "parameters": [
+        {
+          "name": "invitationId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
       "post": {
         "operationId": "revokeInvitation",
         "responses": {
@@ -713,8 +957,34 @@
       }
     },
     "/api/v1/admin/users/{userId}/ban": {
+      "parameters": [
+        {
+          "name": "userId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
       "post": {
         "operationId": "suspendUser",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "maxLength": 500
+                  }
+                }
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "User suspended and active sessions revoked"
@@ -723,6 +993,16 @@
       }
     },
     "/api/v1/admin/users/{userId}/unban": {
+      "parameters": [
+        {
+          "name": "userId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
       "post": {
         "operationId": "reinstateUser",
         "responses": {
@@ -733,8 +1013,34 @@
       }
     },
     "/api/v1/admin/users/{userId}/role": {
+      "parameters": [
+        {
+          "name": "userId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
       "post": {
         "operationId": "setUserRole",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["role"],
+                "properties": {
+                  "role": {
+                    "enum": ["admin", "user"]
+                  }
+                }
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "User role changed"
@@ -743,6 +1049,16 @@
       }
     },
     "/api/v1/admin/sites/{siteId}": {
+      "parameters": [
+        {
+          "name": "siteId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
       "delete": {
         "operationId": "deleteSite",
         "responses": {

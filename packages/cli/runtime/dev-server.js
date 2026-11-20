@@ -10,16 +10,18 @@ import { Database } from 'bun:sqlite'
 import {
   copyFileSync,
   existsSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
   readdirSync,
+  realpathSync,
   rmSync,
   statSync,
   watch,
 } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { dirname, join, resolve } from 'node:path'
+import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
   BACKEND_DIRECTORY,
@@ -51,12 +53,18 @@ function parseArgs(argv) {
   return options
 }
 
-function walk(root, relative = '') {
-  const absolute = join(root, relative)
+const IGNORED_DIRS = new Set(['.git', 'node_modules', '.yeeet'])
+
+function walk(root, relativePath = '') {
+  const absolute = join(root, relativePath)
   if (!existsSync(absolute)) return []
   return readdirSync(absolute, { withFileTypes: true }).flatMap((entry) => {
-    const path = relative ? `${relative}/${entry.name}` : entry.name
-    if (entry.isDirectory()) return walk(root, path)
+    if (entry.isSymbolicLink()) return []
+    const path = relativePath ? `${relativePath}/${entry.name}` : entry.name
+    if (entry.isDirectory()) {
+      if (IGNORED_DIRS.has(entry.name)) return []
+      return walk(root, path)
+    }
     return entry.isFile()
       ? [{ path, size: statSync(join(root, path)).size }]
       : []
@@ -66,9 +74,14 @@ function walk(root, relative = '') {
 /** Read the backend in a site folder, or null for a static site. */
 export function loadBackend(dir) {
   const files = [
-    ...BACKEND_ENTRIES.filter((entry) => existsSync(join(dir, entry))).map(
-      (path) => ({ path, size: statSync(join(dir, path)).size }),
-    ),
+    ...BACKEND_ENTRIES.filter((entry) => {
+      const full = join(dir, entry)
+      try {
+        return lstatSync(full).isFile()
+      } catch {
+        return false
+      }
+    }).map((path) => ({ path, size: statSync(join(dir, path)).size })),
     ...walk(dir, BACKEND_DIRECTORY.slice(0, -1)),
     ...walk(dir, MIGRATIONS_DIRECTORY.slice(0, -1)),
   ]
@@ -94,7 +107,7 @@ function stageBundle(dir, backend, stateDir) {
   return target
 }
 
-async function startWorker({ bundleDir, backend, dbPath, site, logs }) {
+async function startWorker({ bundleDir, backend, dbPath, site, logs, onExit }) {
   const socket = join(
     tmpdir(),
     `yeeet-dev-${process.pid}-${Date.now().toString(36)}.sock`,
@@ -125,14 +138,23 @@ async function startWorker({ bundleDir, backend, dbPath, site, logs }) {
     },
   })
   const output = []
-  if (logs === 'pipe')
-    for (const stream of [proc.stdout, proc.stderr])
-      new Response(stream).text().then((text) => output.push(text))
-  proc.exited.then((code) =>
+  const pipePromises =
+    logs === 'pipe'
+      ? [proc.stdout, proc.stderr].map((stream) =>
+          new Response(stream)
+            .text()
+            .then((text) => output.push(text))
+            .catch(() => undefined),
+        )
+      : []
+  let stopping = false
+  proc.exited.then((code) => {
     settle.reject(
       new Error(`The backend exited during startup (code ${code}).`),
-    ),
-  )
+    )
+    rmSync(socket, { force: true })
+    if (!stopping) onExit?.(code)
+  })
   const timeout = setTimeout(
     () =>
       settle.reject(new Error('The backend did not start within 10 seconds.')),
@@ -141,9 +163,13 @@ async function startWorker({ bundleDir, backend, dbPath, site, logs }) {
   try {
     await ready
   } catch (error) {
+    stopping = true
     proc.kill('SIGKILL')
     rmSync(socket, { force: true })
-    await Promise.race([proc.exited, Bun.sleep(200)])
+    await Promise.race([
+      Promise.allSettled([proc.exited, ...pipePromises]),
+      Bun.sleep(300),
+    ])
     error.logs = output.join('').trim().split('\n').filter(Boolean).slice(-20)
     throw error
   } finally {
@@ -153,6 +179,7 @@ async function startWorker({ bundleDir, backend, dbPath, site, logs }) {
     proc,
     socket,
     async stop() {
+      stopping = true
       proc.kill('SIGTERM')
       await Promise.race([proc.exited, Bun.sleep(2000)])
       proc.kill('SIGKILL')
@@ -229,15 +256,24 @@ function candidatePaths(pathname) {
   } catch {
     decoded = pathname
   }
-  const clean = decoded.replace(/^\/+/, '').replaceAll('\\', '/')
-  if (clean.split('/').includes('..')) return []
-  if (!clean || clean.endsWith('/')) return [`${clean}index.html`]
-  if (!clean.split('/').at(-1)?.includes('.'))
+  if (decoded.includes('\0')) return []
+  const normalized = decoded.replaceAll('\\', '/')
+  const rawParts = normalized.split('/')
+  const parts = []
+  for (const part of rawParts) {
+    if (part === '..') return []
+    if (!part || part === '.') continue
+    parts.push(part)
+  }
+  const clean = parts.join('/')
+  if (!clean) return ['index.html']
+  if (normalized.endsWith('/')) return [`${clean}/index.html`]
+  if (!parts.at(-1)?.includes('.'))
     return [clean, `${clean}.html`, `${clean}/index.html`]
   return [clean]
 }
 
-function servable(dir, path) {
+function servable(dir, path, rootReal = realpathSync(dir)) {
   if (
     isPrivateBackendPath(path) ||
     path === '_headers' ||
@@ -246,14 +282,35 @@ function servable(dir, path) {
   )
     return null
   const absolute = join(dir, path)
-  return existsSync(absolute) && statSync(absolute).isFile() ? absolute : null
+  try {
+    const info = lstatSync(absolute)
+    if (info.isSymbolicLink() || !info.isFile()) return null
+    const fileReal = realpathSync(absolute)
+    const rel = relative(rootReal, fileReal)
+    if (!rel || rel.startsWith('..') || isAbsolute(rel)) return null
+    return fileReal
+  } catch {
+    return null
+  }
 }
 
 async function serve(options) {
   const dir = options.dir
-  const projectConfig = existsSync(join(dir, '.yeeet.json'))
-    ? JSON.parse(readFileSync(join(dir, '.yeeet.json'), 'utf8'))
-    : {}
+  const rootReal = realpathSync(dir)
+  const port = options.port ?? 8787
+  if (!Number.isInteger(port) || port < 1 || port > 65535)
+    throw new Error('--port must be an integer between 1 and 65535.')
+  let projectConfig = {}
+  const configFile = join(dir, '.yeeet.json')
+  if (existsSync(configFile)) {
+    try {
+      const parsed = JSON.parse(readFileSync(configFile, 'utf8'))
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed))
+        projectConfig = parsed
+    } catch {
+      throw new Error('.yeeet.json contains invalid JSON.')
+    }
+  }
   const spaFallback = options.static
     ? false
     : (projectConfig.spaFallback ?? true)
@@ -314,7 +371,7 @@ async function serve(options) {
       db.close()
     }
     try {
-      worker = await startWorker({
+      const startedWorker = await startWorker({
         bundleDir: stageBundle(dir, backend, stateDir),
         backend,
         dbPath,
@@ -324,7 +381,16 @@ async function serve(options) {
           database,
         },
         logs: 'inherit',
+        onExit(code) {
+          if (worker === startedWorker) {
+            worker = null
+            console.error(
+              `  ! backend worker exited unexpectedly (code ${code}); restarting on next request`,
+            )
+          }
+        },
       })
+      worker = startedWorker
     } catch (error) {
       backendError = { code: 'backend_start_failed', message: error.message }
       console.error(`  ✗ ${error.message}`)
@@ -334,26 +400,36 @@ async function serve(options) {
   }
 
   function restart() {
-    restarting = restarting.then(async () => {
-      if (worker) await worker.stop()
-      worker = null
-      if ((await start()).started) console.log('  ↻ backend reloaded')
-    })
+    restarting = restarting
+      .catch(() => undefined)
+      .then(async () => {
+        if (worker) await worker.stop().catch(() => undefined)
+        worker = null
+        if ((await start()).started) console.log('  ↻ backend reloaded')
+      })
+      .catch((error) => {
+        backendError = {
+          code: 'backend_reload_failed',
+          message: error instanceof Error ? error.message : String(error),
+        }
+        console.error(`  ✗ ${backendError.message}`)
+      })
     return restarting
   }
 
   const { backend: initialBackend } = await start()
 
   let debounce = null
-  watch(dir, { recursive: true }, (_event, name) => {
+  const watcher = watch(dir, { recursive: true }, (_event, name) => {
     const path = String(name ?? '').replaceAll('\\', '/')
+    if (/(^|\/)(\.git|\.yeeet|node_modules)(\/|$)/.test(path)) return
     if (!isPrivateBackendPath(path)) return
     clearTimeout(debounce)
     debounce = setTimeout(restart, 120)
   })
 
   const server = Bun.serve({
-    port: options.port ?? 8787,
+    port,
     hostname: options.host ?? '127.0.0.1',
     maxRequestBodySize: 10 * 1024 * 1024,
     idleTimeout: 60,
@@ -361,7 +437,9 @@ async function serve(options) {
       const url = new URL(request.url)
       if (isBackendRoute(url.pathname) && (backend || backendError)) {
         await restarting
-        if (!worker)
+        if (!worker && backend && !backendError) await restart()
+        const activeWorker = worker
+        if (!activeWorker)
           return Response.json(
             {
               error: backendError ?? {
@@ -374,12 +452,13 @@ async function serve(options) {
         const headers = new Headers(request.headers)
         for (const name of [...headers.keys()])
           if (name.startsWith('x-yeeet-')) headers.delete(name)
+        headers.set('host', url.host)
         headers.set('x-yeeet-url', url.href)
         try {
           const response = await fetch(
             `http://localhost${url.pathname}${url.search}`,
             {
-              unix: worker.socket,
+              unix: activeWorker.socket,
               method: request.method,
               headers,
               body:
@@ -400,6 +479,10 @@ async function serve(options) {
           })
         } catch (error) {
           const timedOut = error?.name === 'TimeoutError'
+          if (timedOut && worker === activeWorker) {
+            worker = null
+            void activeWorker.stop().catch(() => undefined)
+          }
           return Response.json(
             {
               error: {
@@ -416,7 +499,9 @@ async function serve(options) {
       if (request.method !== 'GET' && request.method !== 'HEAD')
         return new Response('Method not allowed', { status: 405 })
       const candidates = candidatePaths(url.pathname)
-      let file = candidates.map((path) => servable(dir, path)).find(Boolean)
+      let file = candidates
+        .map((path) => servable(dir, path, rootReal))
+        .find(Boolean)
       let status = 200
       const segment = url.pathname.split('/').at(-1) ?? ''
       const accept = request.headers.get('accept')
@@ -426,9 +511,9 @@ async function serve(options) {
         !segment.includes('.') &&
         (!accept || accept.includes('text/html'))
       )
-        file = servable(dir, 'index.html')
-      if (!file && servable(dir, '404.html')) {
-        file = servable(dir, '404.html')
+        file = servable(dir, 'index.html', rootReal)
+      if (!file && servable(dir, '404.html', rootReal)) {
+        file = servable(dir, '404.html', rootReal)
         status = 404
       }
       if (!file) return new Response('Not found', { status: 404 })
@@ -451,9 +536,14 @@ async function serve(options) {
     )
   console.log('')
 
+  let shuttingDown = false
   const shutdown = async () => {
+    if (shuttingDown) return
+    shuttingDown = true
+    clearTimeout(debounce)
+    watcher.close()
     server.stop(true)
-    if (worker) await worker.stop()
+    if (worker) await worker.stop().catch(() => undefined)
     process.exit(0)
   }
   process.on('SIGINT', shutdown)

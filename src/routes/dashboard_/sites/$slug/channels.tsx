@@ -25,6 +25,9 @@ function Channels() {
   } | null>(null)
   const mutation = useConsoleMutation()
   const ready = history.versions.filter((entry) => entry.status === 'ready')
+  const selectedVersion = ready.some((entry) => entry.id === version)
+    ? version
+    : (ready.at(0)?.id ?? '')
   const base = `/api/v1/sites/${encodeURIComponent(history.site.slug)}`
   return (
     <section className="panel site-page-panel">
@@ -52,7 +55,7 @@ function Channels() {
             await requestJson(
               `${base}/channels/${encodeURIComponent(name)}`,
               'PUT',
-              { version: version || ready.at(0)?.id },
+              { version: selectedVersion },
             )
             setName('')
           }, 'Channel saved. Production was not changed.')
@@ -73,7 +76,7 @@ function Channels() {
           Ready version
           <select
             required
-            value={version || ready.at(0)?.id || ''}
+            value={selectedVersion}
             onChange={(event) => setVersion(event.target.value)}
           >
             {ready.map((entry) => (

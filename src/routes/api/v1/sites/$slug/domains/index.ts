@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { requireActor } from '#/server/actor'
 import { createCustomDomain, listCustomDomains } from '#/server/custom-domains'
-import { errorResponse, HttpError, json } from '#/server/http'
+import { errorResponse, HttpError, json, readJsonBody } from '#/server/http'
 
 export const Route = createFileRoute('/api/v1/sites/$slug/domains/')({
   server: {
@@ -19,10 +19,8 @@ export const Route = createFileRoute('/api/v1/sites/$slug/domains/')({
       POST: async ({ request, params }) => {
         try {
           const actor = await requireActor(request)
-          const body = (await request.json().catch(() => ({}))) as {
-            domain?: string
-          }
-          if (!body.domain) {
+          const body = await readJsonBody(request)
+          if (typeof body.domain !== 'string' || !body.domain.trim()) {
             throw new HttpError(400, 'A domain is required.', 'invalid_domain')
           }
           return json(

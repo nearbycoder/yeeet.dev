@@ -132,7 +132,7 @@ function SiteLayout() {
             Cleanup
           </Link>
         </nav>
-        <Outlet />
+        <Outlet key={site.slug} />
       </main>
     </div>
   )

@@ -60,7 +60,7 @@ function documentTitle(html: string, fallback: string) {
 
 function insertIntoHead(html: string, metadata: string) {
   if (/<\/head\s*>/i.test(html)) {
-    return html.replace(/<\/head\s*>/i, `${metadata}</head>`)
+    return html.replace(/<\/head\s*>/i, () => `${metadata}</head>`)
   }
   const head = /<head\b[^>]*>/i.exec(html)
   if (head?.index != null) {

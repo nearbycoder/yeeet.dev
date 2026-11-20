@@ -59,6 +59,7 @@
             box.onchange = async () => {
               await fetch(`/api/todos/${todo.id}`, {
                 method: 'PATCH',
+                headers: { 'content-type': 'application/json' },
                 body: JSON.stringify({ done: box.checked }),
               })
               load()
@@ -84,6 +85,7 @@
         const form = event.target
         await fetch('/api/todos', {
           method: 'POST',
+          headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ title: form.title.value }),
         })
         form.reset()

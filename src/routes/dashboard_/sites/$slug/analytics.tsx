@@ -8,6 +8,7 @@ import {
   analyticsCsv,
   periodChange,
 } from '#/lib/analytics-report'
+import { formatNumber } from '#/lib/format'
 import { getSiteAnalyticsData } from '#/server/functions'
 
 export const Route = createFileRoute('/dashboard_/sites/$slug/analytics')({
@@ -40,6 +41,7 @@ function SiteAnalytics() {
         >
           {([7, 30, 90] as const).map((days) => (
             <button
+              type="button"
               key={days}
               aria-pressed={data.period.days === days}
               onClick={() =>
@@ -74,7 +76,7 @@ function SiteAnalytics() {
       <section className="site-analytics-summary" aria-label="Traffic summary">
         <article>
           <span>Page views</span>
-          <strong>{data.totalViews.toLocaleString()}</strong>
+          <strong>{formatNumber(data.totalViews)}</strong>
           <small>Last {data.period.days} days</small>
           <small>
             {periodChange(data.totalViews, data.comparison.totalViews)} from
@@ -83,17 +85,17 @@ function SiteAnalytics() {
         </article>
         <article>
           <span>Successful</span>
-          <strong>{data.statuses.successful.toLocaleString()}</strong>
+          <strong>{formatNumber(data.statuses.successful)}</strong>
           <small>2xx responses</small>
         </article>
         <article>
           <span>Redirects</span>
-          <strong>{data.statuses.redirects.toLocaleString()}</strong>
+          <strong>{formatNumber(data.statuses.redirects)}</strong>
           <small>3xx responses</small>
         </article>
         <article>
           <span>Errors</span>
-          <strong>{data.statuses.errors.toLocaleString()}</strong>
+          <strong>{formatNumber(data.statuses.errors)}</strong>
           <small>4xx and 5xx responses</small>
         </article>
       </section>
@@ -109,7 +111,7 @@ function SiteAnalytics() {
           </span>
         </div>
         <div>
-          <b>{data.comparison.totalViews.toLocaleString()}</b>
+          <b>{formatNumber(data.comparison.totalViews)}</b>
           <span>page views</span>
         </div>
         <div>
@@ -154,12 +156,14 @@ function SiteAnalytics() {
             aria-label="Traffic aggregation"
           >
             <button
+              type="button"
               aria-pressed={interval === 'day'}
               onClick={() => setInterval('day')}
             >
               Daily
             </button>
             <button
+              type="button"
               aria-pressed={interval === 'week'}
               onClick={() => setInterval('week')}
             >
@@ -191,7 +195,7 @@ function SiteAnalytics() {
                 <div key={item.path}>
                   <span>{String(index + 1).padStart(2, '0')}</span>
                   <code>{item.path}</code>
-                  <b>{item.views.toLocaleString()}</b>
+                  <b>{formatNumber(item.views)}</b>
                 </div>
               ))}
             </div>

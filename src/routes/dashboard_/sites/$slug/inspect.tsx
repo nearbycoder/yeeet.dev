@@ -11,16 +11,25 @@ import { ManifestExport } from '#/components/manifest-export'
 import { FileExplorer } from '#/components/file-explorer'
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
+import { formatDateTime } from '#/lib/format'
 import {
   getDeploymentInspection,
   getSiteVersionsData,
 } from '#/server/functions'
 import { ManifestDiff } from '#/components/manifest-diff'
 
+function formatJsonRules(raw: string) {
+  try {
+    return JSON.stringify(JSON.parse(raw), null, 2)
+  } catch {
+    return raw
+  }
+}
+
 export const Route = createFileRoute('/dashboard_/sites/$slug/inspect')({
   validateSearch: fileFilterSearchSchema.extend({
-    version: z.string().optional(),
-    base: z.string().optional(),
+    version: z.string().optional().catch(undefined),
+    base: z.string().optional().catch(undefined),
   }),
   loaderDeps: ({ search }) => ({ version: search.version, base: search.base }),
   loader: async ({ params, deps }) => {
@@ -110,9 +119,9 @@ function Inspector() {
             </p>
           ) : null}
           <p>
-            Started {new Date(version.createdAt).toLocaleString()}
+            Started {formatDateTime(version.createdAt)}
             {version.completedAt
-              ? ` · Completed ${new Date(version.completedAt).toLocaleString()}`
+              ? ` · Completed ${formatDateTime(version.completedAt)}`
               : ''}
           </p>
           {detail.comparison ? (
@@ -147,11 +156,11 @@ function Inspector() {
             </p>
             <h4>Headers</h4>
             <pre className="console-code">
-              {JSON.stringify(JSON.parse(version.headerRules), null, 2)}
+              {formatJsonRules(version.headerRules)}
             </pre>
             <h4>Redirects</h4>
             <pre className="console-code">
-              {JSON.stringify(JSON.parse(version.redirectRules), null, 2)}
+              {formatJsonRules(version.redirectRules)}
             </pre>
           </details>
           <RouteSimulator
@@ -182,15 +191,7 @@ function Inspector() {
           />
           <ManifestExport slug={history.site.slug} version={version} />
           <FileExplorer
-            key={JSON.stringify([
-              version.id,
-              search.fileQuery,
-              search.fileType,
-              search.fileOrder,
-              search.fileDirectory,
-              search.fileMin,
-              search.fileMax,
-            ])}
+            key={version.id}
             filters={search}
             onBookmark={(filters) =>
               void navigate({

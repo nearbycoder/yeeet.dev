@@ -63,10 +63,17 @@ export function FilePreview({
           `/api/v1/sites/${encodeURIComponent(slug)}/versions/${encodeURIComponent(version)}/file?${new URLSearchParams({ path })}`,
           { signal: controller.signal },
         )
-        const data = await response.json()
+        const data = (await response.json().catch(() => ({}))) as {
+          text?: string
+          truncated?: boolean
+          error?: { message?: string }
+        }
         if (!response.ok)
           throw new Error(data.error?.message || 'Could not load the file.')
-        setResult(data)
+        setResult({
+          text: data.text ?? '',
+          truncated: Boolean(data.truncated),
+        })
       } catch (cause) {
         if (!controller.signal.aborted)
           setError(
@@ -79,13 +86,14 @@ export function FilePreview({
   return (
     <section className="console-item" aria-label={`Text preview: ${path}`}>
       <h3>Text preview: {path}</h3>
-      <button className="button button-paper" onClick={onClose}>
+      <button type="button" className="button button-paper" onClick={onClose}>
         Close preview
       </button>
       {error ? (
         <p role="alert" className="form-error">
           {error}{' '}
           <button
+            type="button"
             className="button button-paper"
             onClick={() => setRetry((value) => value + 1)}
           >
@@ -115,6 +123,7 @@ export function FilePreview({
             </label>
             <div className="console-actions">
               <button
+                type="button"
                 className="button button-paper"
                 disabled={!matches.length}
                 onClick={() =>
@@ -124,6 +133,7 @@ export function FilePreview({
                 Previous match
               </button>
               <button
+                type="button"
                 className="button button-paper"
                 disabled={!matches.length}
                 onClick={() => setPosition((current + 1) % matches.length)}
@@ -157,6 +167,7 @@ export function FilePreview({
                 Line numbers
               </label>
               <button
+                type="button"
                 className="button button-paper"
                 disabled={result.truncated}
                 onClick={() => {

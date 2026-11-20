@@ -24,18 +24,25 @@ try {
   let invitationSeeded = false
   if (invitationCode) {
     const codeHash = createHash('sha256').update(invitationCode).digest('hex')
+    const codeHint =
+      invitationCode.length > 6 ? `…${invitationCode.slice(-6)}` : '…'
     const result = await pool.query(
       `insert into invitations
         (id, code_hash, code_hint, label, active, use_count, created_at)
        values ($1, $2, $3, 'Bootstrap access', true, 0, now())
        on conflict (code_hash) do nothing`,
-      [randomUUID(), codeHash, `…${invitationCode.slice(-6)}`],
+      [randomUUID(), codeHash, codeHint],
     )
     invitationSeeded = (result.rowCount ?? 0) > 0
   }
 
+  const invitationState = !invitationCode
+    ? 'skipped'
+    : invitationSeeded
+      ? 'seeded'
+      : 'current'
   console.log(
-    `Admin bootstrap complete (${promoted} promoted, invitation ${invitationSeeded ? 'seeded' : 'current'}).`,
+    `Admin bootstrap complete (${promoted} promoted, invitation ${invitationState}).`,
   )
 } finally {
   await pool.end()

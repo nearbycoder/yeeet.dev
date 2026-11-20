@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { setAccountRole } from '#/server/admin'
 import { requireAdmin } from '#/server/actor'
-import { HttpError, errorResponse, json } from '#/server/http'
+import { HttpError, errorResponse, json, readJsonBody } from '#/server/http'
 
 export const Route = createFileRoute('/api/v1/admin/users/$userId/role')({
   server: {
@@ -9,7 +9,7 @@ export const Route = createFileRoute('/api/v1/admin/users/$userId/role')({
       POST: async ({ request, params }) => {
         try {
           const actor = await requireAdmin(request)
-          const body = (await request.json()) as { role?: string }
+          const body = await readJsonBody(request)
           if (body.role !== 'admin' && body.role !== 'user') {
             throw new HttpError(400, 'Invalid role.', 'invalid_role')
           }

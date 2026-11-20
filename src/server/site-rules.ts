@@ -2,11 +2,15 @@ import { HttpError } from './http'
 
 export const HEADERS_FILE = '_headers'
 export const REDIRECTS_FILE = '_redirects'
-export const SITE_RULE_FILES = [HEADERS_FILE, REDIRECTS_FILE] as const
+export const SITE_RULE_FILES: ReadonlySet<string> = new Set([
+  HEADERS_FILE,
+  REDIRECTS_FILE,
+])
+export const MAX_RULE_FILE_BYTES = 64 * 1024
 
-const MAX_RULE_FILE_BYTES = 64 * 1024
 const MAX_RULES = 100
 const HEADER_NAME = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/
+const SAFE_HEADER_VALUE = /^[\t\x20-\x7e\x80-\xff]+$/
 const BLOCKED_HEADERS = new Set([
   'accept-ranges',
   'connection',
@@ -26,6 +30,7 @@ const BLOCKED_HEADERS = new Set([
   'upgrade',
   'x-content-type-options',
   'x-yeeet-deployment',
+  'x-yeeet-request-id',
 ])
 const REDIRECT_STATUSES = new Set([200, 301, 302, 303, 307, 308])
 
@@ -121,7 +126,7 @@ export function parseHeaderRules(value: string): Array<SiteHeaderRule> {
     if (BLOCKED_HEADERS.has(lowerName)) {
       throw ruleError(HEADERS_FILE, line, `${name} is controlled by Yeeet`)
     }
-    if (!headerValue || /[\r\n]/.test(headerValue)) {
+    if (!headerValue || !SAFE_HEADER_VALUE.test(headerValue)) {
       throw ruleError(HEADERS_FILE, line, `${name} needs a safe value`)
     }
     current.headers.push({ name: lowerName, value: headerValue.slice(0, 4096) })
@@ -142,6 +147,13 @@ export function parseRedirectRules(value: string): Array<SiteRedirectRule> {
     }
     const from = validatePathPattern(parts[0], REDIRECTS_FILE, line)
     const to = parts[1]
+    if (!SAFE_HEADER_VALUE.test(to)) {
+      throw ruleError(
+        REDIRECTS_FILE,
+        line,
+        'destination contains unsafe characters',
+      )
+    }
     const status = Number(parts[2] ?? 301)
     if (!REDIRECT_STATUSES.has(status)) {
       throw ruleError(
@@ -201,11 +213,22 @@ function matchPattern(pattern: string, pathname: string) {
 }
 
 function substitute(value: string, params: Record<string, string>) {
-  let result = value
-  for (const [name, replacement] of Object.entries(params)) {
-    result = result.replaceAll(`:${name}`, replacement)
+  return value.replace(/:([A-Za-z0-9_]+)/g, (match, name: string) =>
+    Object.hasOwn(params, name) ? params[name] : match,
+  )
+}
+
+export function isPrivateSiteRulePath(path: string) {
+  return SITE_RULE_FILES.has(path.replace(/^\/+/, ''))
+}
+
+export function safeRewritePath(destination: string) {
+  const normalized = `/${destination.replace(/^\/+/, '')}`
+  try {
+    return new URL(normalized, 'https://rewrite.yeeet.invalid').pathname
+  } catch {
+    return normalized.split(/[?#]/, 1)[0] || '/'
   }
-  return result
 }
 
 export function matchingHeaders(
@@ -223,6 +246,7 @@ export function applySiteHeaders(
   pathname: string,
 ) {
   for (const header of matchingHeaders(rules, pathname)) {
+    if (!SAFE_HEADER_VALUE.test(header.value)) continue
     headers.set(header.name, header.value)
   }
 }
@@ -233,7 +257,19 @@ export function matchingRedirect(
 ) {
   for (const rule of rules) {
     const params = matchPattern(rule.from, pathname)
-    if (params) return { ...rule, to: substitute(rule.to, params) }
+    if (params) {
+      let to = substitute(rule.to, params)
+      // Prevent splat substitution from turning a relative path into a
+      // protocol-relative redirect (e.g. /old/* -> /:splat with /old//evil.com).
+      if (
+        rule.to.startsWith('/') &&
+        !rule.to.startsWith('//') &&
+        to.startsWith('//')
+      ) {
+        to = `/${to.replace(/^\/+/, '')}`
+      }
+      return { ...rule, to }
+    }
   }
   return null
 }

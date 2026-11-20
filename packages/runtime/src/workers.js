@@ -5,6 +5,7 @@ import { Database } from 'bun:sqlite'
 import {
   copyFileSync,
   existsSync,
+  lstatSync,
   mkdirSync,
   readdirSync,
   readFileSync,
@@ -19,8 +20,14 @@ import {
   applyMigrations,
   appliedMigrations,
   MigrationError,
+  planMigrations,
 } from './migrations.js'
-import { RuntimeError, assertDatabaseName, assertSiteId } from './site-store.js'
+import {
+  RuntimeError,
+  assertDatabaseName,
+  assertNotSymlink,
+  assertSiteId,
+} from './site-store.js'
 
 const HARNESS_PATH = fileURLToPath(new URL('./harness.js', import.meta.url))
 const HOP_BY_HOP = [
@@ -65,6 +72,7 @@ export class WorkerPool {
     this.workers = new Map()
     this.locks = new Map()
     this.logs = new Map()
+    this.preparing = new Set()
     this.socketCounter = 0
     this.timers = []
   }
@@ -73,14 +81,19 @@ export class WorkerPool {
     this.timers.push(
       setInterval(() => this.reapIdle(), 15_000),
       setInterval(() => this.enforceMemory(), 5_000),
-      setInterval(
-        () =>
+      setInterval(() => {
+        try {
           this.bundles.collectGarbage(
             7 * 24 * 60 * 60_000,
-            new Set([...this.workers.values()].map((w) => w.deploymentId)),
-          ),
-        60 * 60_000,
-      ),
+            new Set([
+              ...[...this.workers.values()].map((w) => w.deploymentId),
+              ...this.preparing,
+            ]),
+          )
+        } catch (error) {
+          console.error('[runtime] bundle garbage collection failed', error)
+        }
+      }, 60 * 60_000),
     )
     for (const timer of this.timers) timer.unref?.()
   }
@@ -126,17 +139,22 @@ export class WorkerPool {
   /** Back up, then apply pending migrations to a database file. */
   migrate(siteId, database, bundle, { dbPath, backup = true } = {}) {
     const path = dbPath ?? this.sites.databasePath(siteId, database)
-    const existed = existsSync(path) && statSync(path).size > 0
+    assertNotSymlink(path)
+    const existed = existsSync(path) && lstatSync(path).size > 0
     const db = new Database(path, { create: true })
     try {
       db.run('PRAGMA busy_timeout = 5000')
       db.run('PRAGMA journal_mode = WAL')
       db.run('PRAGMA foreign_keys = ON')
       const migrations = bundle.migrations
-      const appliedNames = new Set(appliedMigrations(db).map((row) => row.name))
-      const hasPending = migrations.some((m) => !appliedNames.has(m.name))
+      const plan = planMigrations(db, migrations)
       let backupName = null
-      if (backup && existed && hasPending) {
+      if (
+        backup &&
+        existed &&
+        plan.pending.length > 0 &&
+        plan.changed.length === 0
+      ) {
         backupName = this.backup(
           siteId,
           database,
@@ -162,11 +180,16 @@ export class WorkerPool {
     const name = `${backupStamp()}_${reason}${deploymentId ? `_${deploymentId.slice(0, 8)}` : ''}_${randomUUID().slice(0, 8)}.sqlite`
     const target = join(dir, name)
     if (openDb) openDb.run(`VACUUM INTO ${sqlString(target)}`)
-    else snapshotDatabase(this.sites.databasePath(siteId, database), target)
+    else {
+      const source = this.sites.databasePath(siteId, database)
+      assertNotSymlink(source)
+      snapshotDatabase(source, target)
+    }
     const backups = this.listBackups(siteId, database).filter(
       (backup) => backup.name !== name,
     )
-    for (const old of backups.slice(this.config.backupsToKeep - 1)) {
+    const keep = Math.max(0, this.config.backupsToKeep - 1)
+    for (const old of backups.slice(keep)) {
       rmSync(join(dir, old.name), { force: true })
     }
     return name
@@ -175,11 +198,18 @@ export class WorkerPool {
   listBackups(siteId, database) {
     const dir = this.sites.backupDir(siteId, database)
     if (!existsSync(dir)) return []
-    return readdirSync(dir)
-      .filter((name) => name.endsWith('.sqlite'))
+    const items = []
+    for (const name of readdirSync(dir)
+      .filter((entry) => entry.endsWith('.sqlite'))
       .sort()
-      .reverse()
-      .map((name) => ({ name, sizeBytes: statSync(join(dir, name)).size }))
+      .reverse()) {
+      try {
+        items.push({ name, sizeBytes: statSync(join(dir, name)).size })
+      } catch {
+        // Backup was pruned concurrently.
+      }
+    }
+    return items
   }
 
   async spawn({ key, siteId, database, bundle, dbPath, slug }) {
@@ -240,8 +270,10 @@ export class WorkerPool {
       lastUsed: Date.now(),
       stopping: false,
     }
-    this.pipe(key, proc.stdout, 'stdout')
-    this.pipe(key, proc.stderr, 'stderr')
+    const pipes = [
+      this.pipe(key, proc.stdout, 'stdout'),
+      this.pipe(key, proc.stderr, 'stderr'),
+    ]
     proc.exited.then((code) => {
       settle.reject(
         new Error(`The backend exited during startup (code ${code}).`),
@@ -260,6 +292,7 @@ export class WorkerPool {
     } catch (error) {
       worker.stopping = true
       proc.kill('SIGKILL')
+      await Promise.race([Promise.allSettled(pipes), Bun.sleep(250)])
       const recent = (this.logs.get(key) ?? [])
         .slice(-20)
         .map((entry) => entry.line)
@@ -374,6 +407,20 @@ export class WorkerPool {
 
   /** Proxy a public request to the site's backend. */
   async request(context, incoming) {
+    let url
+    try {
+      url = new URL(context.url)
+    } catch {
+      throw new RuntimeError(400, 'invalid_url', 'Invalid public request URL.')
+    }
+    const headers = new Headers(incoming.headers)
+    for (const name of HOP_BY_HOP) headers.delete(name)
+    for (const name of [...headers.keys()]) {
+      if (name.startsWith('x-yeeet-')) headers.delete(name)
+    }
+    headers.set('host', url.host)
+    headers.set('x-yeeet-url', url.href)
+    if (context.requestId) headers.set('x-yeeet-request-id', context.requestId)
     const worker = await this.acquire(context)
     worker.inflight += 1
     worker.lastUsed = Date.now()
@@ -384,14 +431,6 @@ export class WorkerPool {
       worker.inflight -= 1
       worker.lastUsed = Date.now()
     }
-    const url = new URL(context.url)
-    const headers = new Headers(incoming.headers)
-    for (const name of HOP_BY_HOP) headers.delete(name)
-    for (const name of [...headers.keys()]) {
-      if (name.startsWith('x-yeeet-')) headers.delete(name)
-    }
-    headers.set('x-yeeet-url', url.href)
-    if (context.requestId) headers.set('x-yeeet-request-id', context.requestId)
     const controller = new AbortController()
     const timeout = setTimeout(
       () => controller.abort(new Error('timeout')),
@@ -472,18 +511,27 @@ export class WorkerPool {
    * snapshot of the target database and boot it against that snapshot.
    */
   async prepare(context) {
-    const bundle = await this.bundles.get(context.deploymentId, context.siteId)
-    this.sites.ensureSite(context.siteId)
-    const rehearsal = join(
-      this.sites.tmpDir(context.siteId),
-      `prepare-${randomUUID()}`,
-    )
-    mkdirSync(rehearsal, { recursive: true, mode: 0o700 })
-    const dbPath = join(rehearsal, 'rehearsal.sqlite')
-    const source = this.sites.databasePath(context.siteId, context.database)
-    const key = `${this.key(context.siteId, context.database)}#prepare`
+    this.preparing.add(context.deploymentId)
+    const rehearsalId = randomUUID()
+    let rehearsal = null
     try {
-      if (existsSync(source)) snapshotDatabase(source, dbPath)
+      const bundle = await this.bundles.get(
+        context.deploymentId,
+        context.siteId,
+      )
+      this.sites.ensureSite(context.siteId)
+      rehearsal = join(
+        this.sites.tmpDir(context.siteId),
+        `prepare-${rehearsalId}`,
+      )
+      mkdirSync(rehearsal, { recursive: true, mode: 0o700 })
+      const dbPath = join(rehearsal, 'rehearsal.sqlite')
+      const source = this.sites.databasePath(context.siteId, context.database)
+      const key = `${this.key(context.siteId, context.database)}#prepare-${rehearsalId}`
+      if (existsSync(source)) {
+        assertNotSymlink(source)
+        snapshotDatabase(source, dbPath)
+      }
       let migration
       try {
         migration = this.migrate(context.siteId, context.database, bundle, {
@@ -537,7 +585,8 @@ export class WorkerPool {
         },
       }
     } finally {
-      rmSync(rehearsal, { recursive: true, force: true })
+      this.preparing.delete(context.deploymentId)
+      if (rehearsal) rmSync(rehearsal, { recursive: true, force: true })
     }
   }
 
@@ -546,6 +595,7 @@ export class WorkerPool {
       const path = this.sites.databasePath(siteId, database)
       let migrations = []
       try {
+        assertNotSymlink(path)
         const db = new Database(path, { readonly: true })
         try {
           migrations = appliedMigrations(db)
@@ -558,8 +608,14 @@ export class WorkerPool {
       const worker = this.workers.get(this.key(siteId, database))
       const bytes = ['', '-wal']
         .map((suffix) => `${path}${suffix}`)
-        .filter((file) => existsSync(file))
-        .reduce((sum, file) => sum + statSync(file).size, 0)
+        .reduce((sum, file) => {
+          try {
+            const info = lstatSync(file)
+            return info.isFile() ? sum + info.size : sum
+          } catch {
+            return sum
+          }
+        }, 0)
       return {
         name: database,
         sizeBytes: bytes,
@@ -592,24 +648,31 @@ export class WorkerPool {
   }
 
   async purge(siteId, database) {
-    const targets = [...this.workers.values()].filter(
-      (worker) =>
-        worker.siteId === siteId && (!database || worker.database === database),
-    )
-    await Promise.all(targets.map((worker) => this.stop(worker)))
+    assertSiteId(siteId)
     if (database) {
-      await this.withLock(this.key(siteId, database), async () => {
+      const lockKey = this.key(siteId, database)
+      await this.withLock(lockKey, async () => {
+        const worker = this.workers.get(lockKey)
+        if (worker) await this.stop(worker)
         this.sites.removeDatabase(siteId, database)
         rmSync(this.sites.backupDir(siteId, database), {
           recursive: true,
           force: true,
         })
       })
+      for (const key of [...this.logs.keys()]) {
+        if (key === lockKey || key.startsWith(`${lockKey}#`))
+          this.logs.delete(key)
+      }
     } else {
-      this.sites.removeSite(assertSiteId(siteId))
-    }
-    for (const key of [...this.logs.keys()]) {
-      if (key.startsWith(`${siteId}/${database ?? ''}`)) this.logs.delete(key)
+      const targets = [...this.workers.values()].filter(
+        (worker) => worker.siteId === siteId,
+      )
+      await Promise.all(targets.map((worker) => this.stop(worker)))
+      this.sites.removeSite(siteId)
+      for (const key of [...this.logs.keys()]) {
+        if (key.startsWith(`${siteId}/`)) this.logs.delete(key)
+      }
     }
     return { purged: true }
   }
@@ -625,19 +688,33 @@ export class WorkerPool {
       throw new RuntimeError(404, 'backup_not_found', 'Backup not found.')
     const key = this.key(siteId, database)
     return this.withLock(key, async () => {
+      if (!existsSync(source))
+        throw new RuntimeError(404, 'backup_not_found', 'Backup not found.')
       const worker = this.workers.get(key)
       if (worker) await this.stop(worker, { drainMs: 10_000 })
       this.sites.ensureSite(siteId)
       const target = this.sites.databasePath(siteId, database)
+      assertNotSymlink(target)
       // Stage the selected backup before retention runs: the safety backup may
       // prune the very backup being restored when the retention limit is full.
       const staged = `${target}.restore-${randomUUID()}`
-      let safety
+      let safety = null
       try {
         copyFileSync(source, staged)
-        safety = existsSync(target)
-          ? this.backup(siteId, database, 'pre-restore', null)
-          : null
+        if (existsSync(target)) {
+          try {
+            safety = this.backup(siteId, database, 'pre-restore', null)
+          } catch {
+            // Fall back to a raw copy when restoring over a corrupted database.
+            const dir = this.sites.backupDir(siteId, database)
+            mkdirSync(dir, { recursive: true, mode: 0o700 })
+            const fallbackName = `${backupStamp()}_pre-restore_${randomUUID().slice(0, 8)}.sqlite`
+            if (lstatSync(target).isFile()) {
+              copyFileSync(target, join(dir, fallbackName))
+              safety = fallbackName
+            }
+          }
+        }
         renameSync(staged, target)
         for (const suffix of ['-wal', '-shm'])
           rmSync(`${target}${suffix}`, { force: true })
@@ -685,6 +762,7 @@ export class WorkerPool {
     if (process.platform !== 'linux') return
     const limitKb = this.config.maxMemoryMb * 1024
     for (const worker of this.workers.values()) {
+      if (worker.stopping) continue
       try {
         const status = readFileSync(`/proc/${worker.proc.pid}/status`, 'utf8')
         const rss = Number(/VmRSS:\s+(\d+)/.exec(status)?.[1] ?? 0)

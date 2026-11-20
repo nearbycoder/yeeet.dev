@@ -79,7 +79,12 @@ export function hashUploadFiles(
       } else if (event.data.completed !== undefined)
         progress(event.data.completed)
     }
-    worker.postMessage({ files })
+    try {
+      worker.postMessage({ files })
+    } catch (error) {
+      close()
+      reject(error)
+    }
   })
 }
 function delay(ms: number, signal: AbortSignal) {
@@ -116,24 +121,26 @@ export async function uploadPool<T>(
   items: Array<T>,
   concurrency: number,
   signal: AbortSignal,
-  action: (item: T) => Promise<void>,
+  action: (item: T, itemSignal: AbortSignal) => Promise<void>,
 ) {
   let next = 0
-  const state: { failed: boolean; error?: unknown } = { failed: false }
+  const errors: Array<unknown> = []
+  const poolController = new AbortController()
+  const itemSignal = AbortSignal.any([signal, poolController.signal])
   await Promise.all(
     Array.from({ length: Math.min(concurrency, items.length) }, async () => {
-      while (!state.failed && next < items.length) {
+      while (errors.length === 0 && next < items.length) {
         const item = items[next++]
         try {
-          signal.throwIfAborted()
-          await action(item)
+          itemSignal.throwIfAborted()
+          await action(item, itemSignal)
         } catch (error) {
-          state.failed = true
-          state.error = error
+          errors.push(error)
+          poolController.abort()
         }
       }
     }),
   )
   signal.throwIfAborted()
-  if (state.failed) throw state.error
+  if (errors.length > 0) throw errors[0]
 }

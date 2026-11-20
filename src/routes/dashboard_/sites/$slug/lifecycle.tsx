@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { ConfirmDialog } from '#/components/confirm-dialog'
 import { useConsoleMutation } from '#/lib/console-request'
+import { formatDateTime } from '#/lib/format'
 import {
   getLifecycleConsole,
   updatePreviewExpiry,
@@ -48,7 +49,7 @@ function Lifecycle() {
               <b>{version.id.slice(0, 8)}</b>
               <p>
                 {version.expiresAt
-                  ? `Expires ${new Date(version.expiresAt).toLocaleString()}`
+                  ? `Expires ${formatDateTime(version.expiresAt)}`
                   : 'No expiry'}
               </p>
               <form
@@ -123,9 +124,11 @@ function Lifecycle() {
             <input
               name="path"
               defaultValue={health?.path ?? '/'}
+              placeholder="/"
               required
               maxLength={500}
             />
+            <small>Start with / (no query string or # fragment).</small>
           </label>
           <label>
             Expected HTTP status
@@ -151,6 +154,7 @@ function Lifecycle() {
           </button>
         </form>
         <button
+          type="button"
           className="button button-paper"
           disabled={mutation.busy || !health}
           onClick={() =>
@@ -169,8 +173,12 @@ function Lifecycle() {
               HTTP {health.responseStatus} · {health.latencyMs} ms · version{' '}
               {health.deploymentId?.slice(0, 8) ?? 'none'}
             </p>
-            <p>Checked {new Date(health.checkedAt).toLocaleString()}</p>
-            {health.error ? <p className="form-error">{health.error}</p> : null}
+            <p>Checked {formatDateTime(health.checkedAt)}</p>
+            {health.error ? (
+              <p className="form-error" role="alert">
+                {health.error}
+              </p>
+            ) : null}
           </div>
         ) : (
           <p>No check results yet.</p>
@@ -189,6 +197,8 @@ function Lifecycle() {
             : 'This version’s preview and channel URLs will stop serving at the selected time. Production will remain available.'
         }
         confirmLabel="Save expiry"
+        eyebrow="CONFIRM CHANGE"
+        tone="neutral"
         busyLabel="Saving…"
         cancelLabel="Cancel"
         busy={mutation.busy}

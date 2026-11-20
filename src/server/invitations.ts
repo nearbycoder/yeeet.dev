@@ -58,7 +58,9 @@ export function createInvitationGrant(invitationId: string) {
 
 function invitationIdFromGrant(value?: string | null) {
   if (!value) return null
-  const [invitationId, expiresValue, signature] = value.split('.')
+  const parts = value.split('.')
+  if (parts.length !== 3) return null
+  const [invitationId, expiresValue, signature] = parts
   const expires = Number(expiresValue)
   if (!invitationId || !expires || !signature || expires < Date.now() / 1000) {
     return null
@@ -80,7 +82,13 @@ function cookieValue(headers?: Headers | null) {
   if (!cookie) return null
   for (const part of cookie.split(';')) {
     const [name, ...rest] = part.trim().split('=')
-    if (name === GRANT_COOKIE) return decodeURIComponent(rest.join('='))
+    if (name === GRANT_COOKIE) {
+      try {
+        return decodeURIComponent(rest.join('='))
+      } catch {
+        return null
+      }
+    }
   }
   return null
 }

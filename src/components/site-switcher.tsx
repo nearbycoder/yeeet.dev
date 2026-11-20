@@ -77,19 +77,27 @@ export function SiteSwitcher() {
     return () => window.removeEventListener('keydown', shortcut)
   }, [])
   useEffect(() => {
+    const element = dialog.current
+    if (!element) return
     if (open) {
       previousFocus.current =
         document.activeElement instanceof HTMLElement &&
         document.activeElement !== document.body
           ? document.activeElement
           : trigger.current
-      dialog.current?.showModal()
+      if (!element.open) element.showModal()
       input.current?.focus()
-    } else if (dialog.current?.open) {
-      dialog.current.close()
-      previousFocus.current?.focus()
+    } else if (element.open) {
+      element.close()
+      if (previousFocus.current?.isConnected) previousFocus.current.focus()
     }
   }, [open])
+  useEffect(() => {
+    const element = dialog.current
+    return () => {
+      if (element?.open) element.close()
+    }
+  }, [])
   useEffect(() => {
     if (!open) return
     let active = true
@@ -136,6 +144,9 @@ export function SiteSwitcher() {
         ref={dialog}
         aria-labelledby={title}
         onClose={() => setOpen(false)}
+        onClick={(event) => {
+          if (event.target === event.currentTarget) setOpen(false)
+        }}
         onCancel={(event) => {
           event.preventDefault()
           setOpen(false)
@@ -207,7 +218,10 @@ export function SiteSwitcher() {
         ) : error ? (
           <p role="alert">
             {error}{' '}
-            <button onClick={() => setRetry((value) => value + 1)}>
+            <button
+              type="button"
+              onClick={() => setRetry((value) => value + 1)}
+            >
               Retry site search
             </button>
           </p>

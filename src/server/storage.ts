@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import {
   CopyObjectCommand,
   DeleteObjectsCommand,
@@ -38,9 +39,17 @@ export function getStorage(): StorageContext {
   // REGION describes the app's location, not the S3 signing region.
   const region = process.env.S3_REGION || 'auto'
   const forcePathStyle = process.env.S3_FORCE_PATH_STYLE === 'true'
-  const cacheKey = [endpoint, bucket, accessKeyId, region, forcePathStyle].join(
-    '|',
-  )
+  const secretDigest = createHash('sha256')
+    .update(secretAccessKey)
+    .digest('hex')
+  const cacheKey = [
+    endpoint,
+    bucket,
+    accessKeyId,
+    secretDigest,
+    region,
+    forcePathStyle,
+  ].join('|')
 
   if (cachedStorage?.cacheKey === cacheKey) return cachedStorage.value
 

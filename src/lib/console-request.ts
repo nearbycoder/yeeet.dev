@@ -15,7 +15,9 @@ export async function requestJson<T = unknown>(
           body: JSON.stringify(body),
         }),
   })
-  const result = await response.json()
+  const result = (await response.json().catch(() => ({}))) as {
+    error?: { message?: string }
+  }
   if (!response.ok)
     throw new Error(result.error?.message || 'The request failed. Try again.')
   return result as T

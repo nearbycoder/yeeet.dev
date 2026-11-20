@@ -14,7 +14,18 @@ import {
   actorForWorkspaceDeployment,
 } from './workspaces'
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
-import { and, desc, eq, ilike, inArray, ne, or } from 'drizzle-orm'
+import {
+  and,
+  desc,
+  eq,
+  gt,
+  ilike,
+  inArray,
+  isNull,
+  ne,
+  or,
+  sql,
+} from 'drizzle-orm'
 import { db } from '#/db'
 import {
   customDomains,
@@ -32,7 +43,7 @@ import {
   validateDeploymentPassword,
 } from './deployment-access'
 import { removeRailwayCustomDomain } from './custom-domains'
-import { HttpError } from './http'
+import { HttpError, pgErrorInfo } from './http'
 import { siteUrl } from './platform-config'
 import {
   copyStoredObject,
@@ -42,6 +53,7 @@ import {
 } from './storage'
 import {
   HEADERS_FILE,
+  MAX_RULE_FILE_BYTES,
   REDIRECTS_FILE,
   parseHeaderRules,
   parseRedirectRules,
@@ -54,6 +66,7 @@ import {
   parseBackend,
   prepareBackend,
   prepareDeploymentBackend,
+  purgeBackendDatabase,
 } from './backend-runtime'
 import type { BackendPreparation } from './backend-runtime'
 
@@ -519,7 +532,7 @@ export async function createDeployment(input: {
     if (resumed) return resumed
   }
   const passwordHash = password ? await hashDeploymentPassword(password) : null
-  let slug = requestedSlug ? normalizeSlug(requestedSlug) : generateRandomSlug()
+  let slug = requestedSlug ?? generateRandomSlug()
   let existing = await db.query.sites.findFirst({
     where: eq(sites.slug, slug),
   })
@@ -632,19 +645,27 @@ export async function createDeployment(input: {
       }
     })
   } catch (error) {
-    if (
-      idempotencyKey &&
-      typeof error === 'object' &&
-      error !== null &&
-      'code' in error &&
-      error.code === '23505'
-    ) {
-      const resumed = await resumeIdempotentDeployment(
-        input.actor.userId,
-        idempotencyKey,
-        fingerprint,
-      )
-      if (resumed) return resumed
+    const pgError = pgErrorInfo(error)
+    if (pgError.code === '23505') {
+      if (
+        idempotencyKey &&
+        (!pgError.constraint ||
+          pgError.constraint === 'deployments_user_idempotency_idx')
+      ) {
+        const resumed = await resumeIdempotentDeployment(
+          input.actor.userId,
+          idempotencyKey,
+          fingerprint,
+        )
+        if (resumed) return resumed
+      }
+      if (pgError.constraint === 'sites_slug_idx') {
+        throw new HttpError(
+          409,
+          'That site name is already flying.',
+          'slug_taken',
+        )
+      }
     }
     throw error
   }
@@ -788,6 +809,13 @@ export async function completeDeployment(actor: Actor, deploymentId: string) {
   const readRuleFile = async (path: string) => {
     const file = ruleFiles.get(path)
     if (!file) return ''
+    if (file.size > MAX_RULE_FILE_BYTES) {
+      throw new HttpError(
+        400,
+        `Site rule files may not exceed ${MAX_RULE_FILE_BYTES / 1024} KB.`,
+        'site_rules_too_large',
+      )
+    }
     const object = await getStoredObject(file.storageKey)
     return (await object.Body?.transformToString()) ?? ''
   }
@@ -836,13 +864,18 @@ export async function completeDeployment(actor: Actor, deploymentId: string) {
           'This deployment has failed.',
           'deployment_failed',
         )
-      for (const check of checks) {
-        if (check.etag) {
-          await tx
-            .update(deploymentFiles)
-            .set({ etag: check.etag })
-            .where(eq(deploymentFiles.id, check.file.id))
-        }
+      const etagUpdates = checks.flatMap((check) =>
+        check.etag ? [{ id: check.file.id, etag: check.etag }] : [],
+      )
+      for (let index = 0; index < etagUpdates.length; index += 500) {
+        const chunk = etagUpdates.slice(index, index + 500)
+        const values = sql.join(
+          chunk.map((item) => sql`(${item.id}, ${item.etag})`),
+          sql`, `,
+        )
+        await tx.execute(
+          sql`UPDATE deployment_files AS f SET etag = v.etag FROM (VALUES ${values}) AS v(id, etag) WHERE f.id = v.id`,
+        )
       }
       await tx
         .update(deployments)
@@ -1173,6 +1206,10 @@ export async function deleteSiteChannel(
   )
   const removed = rows.at(0)
   if (!removed) throw new HttpError(404, 'Channel not found.', 'not_found')
+  await purgeBackendDatabase(
+    site.id,
+    backendDatabase({ kind: 'channel', channel }),
+  )
   await emitDeploymentEvent(userId, 'channel.deleted', {
     deploymentId: removed.deploymentId,
     site: slug,
@@ -1382,6 +1419,7 @@ export async function deleteSiteVersion(
       const wasActive = version.id === site.activeDeploymentId
       let activeDeploymentId = site.activeDeploymentId
       if (wasActive) {
+        const now = new Date()
         const replacements = await tx
           .select({ id: deployments.id })
           .from(deployments)
@@ -1390,6 +1428,7 @@ export async function deleteSiteVersion(
               eq(deployments.siteId, site.id),
               ne(deployments.id, version.id),
               eq(deployments.status, 'ready'),
+              or(isNull(deployments.expiresAt), gt(deployments.expiresAt, now)),
             ),
           )
           .orderBy(desc(deployments.createdAt), desc(deployments.id))
@@ -1445,7 +1484,11 @@ export async function deleteOwnedSite(userId: string, value: string) {
     where: eq(customDomains.siteId, site.id),
   })
   await Promise.all(
-    domains.map((domain) => removeRailwayCustomDomain(domain.railwayDomainId)),
+    domains.map((domain) =>
+      removeRailwayCustomDomain(domain.railwayDomainId, {
+        ignoreNotFound: true,
+      }),
+    ),
   )
   const prefix = `sites/${site.id}/`
   await withSiteLock(site.id, userId, async (tx) => {

@@ -8,6 +8,7 @@ import app from '../_server.ts'
 // A fresh in-memory database with every migration applied, like production.
 function testContext() {
   const db = new Database(':memory:')
+  db.run('PRAGMA foreign_keys = ON')
   const dir = join(import.meta.dir, '..', '_migrations')
   const names = readdirSync(dir)
     .filter((name) => name.endsWith('.sql'))
@@ -27,31 +28,43 @@ const call = (
 
 test('creates, lists, completes, and deletes todos', async () => {
   const ctx = testContext()
-  const created = await call(ctx, '/api/todos', {
-    method: 'POST',
-    body: JSON.stringify({ title: 'Write tests' }),
-  })
-  expect(created.status).toBe(201)
-  const todo = await created.json()
-  expect(todo).toMatchObject({ id: 1, title: 'Write tests', done: 0 })
+  try {
+    const created = await call(ctx, '/api/todos', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ title: 'Write tests' }),
+    })
+    expect(created.status).toBe(201)
+    const todo = await created.json()
+    expect(todo).toMatchObject({ id: 1, title: 'Write tests', done: 0 })
 
-  const done = await call(ctx, `/api/todos/${todo.id}`, {
-    method: 'PATCH',
-    body: JSON.stringify({ done: true }),
-  })
-  expect((await done.json()).done).toBe(1)
+    const done = await call(ctx, `/api/todos/${todo.id}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ done: true }),
+    })
+    expect((await done.json()).done).toBe(1)
 
-  expect(await (await call(ctx, '/api/todos')).json()).toHaveLength(1)
-  expect(
-    (await call(ctx, `/api/todos/${todo.id}`, { method: 'DELETE' })).status,
-  ).toBe(204)
-  expect(await (await call(ctx, '/api/todos')).json()).toEqual([])
+    expect(await (await call(ctx, '/api/todos')).json()).toHaveLength(1)
+    expect(
+      (await call(ctx, `/api/todos/${todo.id}`, { method: 'DELETE' })).status,
+    ).toBe(204)
+    expect(await (await call(ctx, '/api/todos')).json()).toEqual([])
+  } finally {
+    ctx.db.close()
+  }
 })
 
 test('rejects an empty title', async () => {
-  const response = await call(testContext(), '/api/todos', {
-    method: 'POST',
-    body: JSON.stringify({ title: ' ' }),
-  })
-  expect(response.status).toBe(400)
+  const ctx = testContext()
+  try {
+    const response = await call(ctx, '/api/todos', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ title: ' ' }),
+    })
+    expect(response.status).toBe(400)
+  } finally {
+    ctx.db.close()
+  }
 })

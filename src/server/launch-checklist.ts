@@ -9,7 +9,11 @@ import {
 import { currentHealthPassed } from '#/lib/launch-checklist'
 import { candidatePaths } from '#/lib/route-resolution'
 import { ownedLifecycleSite } from './lifecycle'
-import { deserializeSiteRules, matchingRedirect } from './site-rules'
+import {
+  deserializeSiteRules,
+  matchingRedirect,
+  safeRewritePath,
+} from './site-rules'
 import type { SiteRedirectRule } from './site-rules'
 import { simulateRoute } from './route-simulator'
 
@@ -29,6 +33,7 @@ export async function launchChecklist(userId: string, slug: string) {
             spaFallback: true,
             headerRules: true,
             redirectRules: true,
+            backend: true,
           },
         })
       : Promise.resolve(undefined),
@@ -68,10 +73,7 @@ export async function launchChecklist(userId: string, slug: string) {
       deserializeSiteRules<SiteRedirectRule>(version.redirectRules, []),
       '/',
     )
-    const path =
-      rule?.status === 200
-        ? new URL(rule.to, 'https://rewrite.yeeet.invalid').pathname
-        : '/'
+    const path = rule?.status === 200 ? safeRewritePath(rule.to) : '/'
     const files = await db
       .select({ path: deploymentFiles.path })
       .from(deploymentFiles)

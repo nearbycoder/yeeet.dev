@@ -7,7 +7,9 @@ import { ThemeToggle } from '#/components/theme-toggle'
 import { Yeeetling } from '#/components/yeeetling'
 
 export const Route = createFileRoute('/device')({
-  validateSearch: z.object({ user_code: z.string().optional() }),
+  validateSearch: z.object({
+    user_code: z.string().optional().catch(undefined),
+  }),
   component: DeviceAuthorization,
 })
 
@@ -85,96 +87,101 @@ function DeviceAuthorization() {
   }
 
   return (
-    <main id="main-content" tabIndex={-1} className="auth-page device-page">
-      <div className="auth-top">
-        <Brand />
-        <ThemeToggle inline />
-      </div>
-      <section className="auth-card">
-        <div className="auth-heading">
-          <div className="auth-mascot">
-            <Yeeetling
-              seed="terminal-buddy"
-              phase={
-                busy
-                  ? 'uploading'
-                  : message.startsWith('Approved')
-                    ? 'done'
-                    : message
-                      ? 'error'
-                      : 'ready'
-              }
-            />
-          </div>
-          <div>
-            <div className="eyebrow">
-              <span className="status-dot" /> Device authorization
-            </div>
-            <h1>Connect the CLI.</h1>
-            <p>Approve a terminal or agent that is waiting to yeeet.</p>
-          </div>
+    <>
+      <a className="skip-link" href="#main-content">
+        Skip to content
+      </a>
+      <main id="main-content" tabIndex={-1} className="auth-page device-page">
+        <div className="auth-top">
+          <Brand />
+          <ThemeToggle inline />
         </div>
-        {!claimed ? (
-          <form onSubmit={continueWithCode} className="auth-form">
-            <label>
-              <span>One-time code</span>
-              <input
-                className="device-code"
-                name="device-code"
-                required
-                value={code}
-                onChange={(event) => setCode(event.target.value)}
-                placeholder="ABCD-EFGH"
-                autoComplete="one-time-code"
-                spellCheck={false}
+        <section className="auth-card">
+          <div className="auth-heading">
+            <div className="auth-mascot">
+              <Yeeetling
+                seed="terminal-buddy"
+                phase={
+                  busy
+                    ? 'uploading'
+                    : message.startsWith('Approved')
+                      ? 'done'
+                      : message
+                        ? 'error'
+                        : 'ready'
+                }
               />
-            </label>
-            <button
-              className="button button-coral auth-submit"
-              disabled={busy || isPending || !code.trim()}
-            >
-              {busy ? 'Checking…' : 'Continue →'}
-            </button>
-          </form>
-        ) : (
-          <div className="device-approval">
-            <code>{code}</code>
-            <p>
-              <b>{session?.user.name}</b>, this device will be able to create
-              and list your deployments.
-            </p>
+            </div>
             <div>
-              <button
-                type="button"
-                className="button button-coral"
-                onClick={() => decide(true)}
-                disabled={busy}
-              >
-                Approve
-              </button>
-              <button
-                type="button"
-                className="button button-paper"
-                onClick={() => decide(false)}
-                disabled={busy}
-              >
-                Deny
-              </button>
+              <div className="eyebrow">
+                <span className="status-dot" /> Device authorization
+              </div>
+              <h1>Connect the CLI.</h1>
+              <p>Approve a terminal or agent that is waiting to yeeet.</p>
             </div>
           </div>
-        )}
-        {message ? (
-          <p
-            role="status"
-            aria-live="polite"
-            className={
-              message.startsWith('Approved') ? 'form-success' : 'form-error'
-            }
-          >
-            {message}
-          </p>
-        ) : null}
-      </section>
-    </main>
+          {!claimed ? (
+            <form onSubmit={continueWithCode} className="auth-form">
+              <label>
+                <span>One-time code</span>
+                <input
+                  className="device-code"
+                  name="device-code"
+                  required
+                  value={code}
+                  onChange={(event) => setCode(event.target.value)}
+                  placeholder="ABCD-EFGH"
+                  autoComplete="one-time-code"
+                  spellCheck={false}
+                />
+              </label>
+              <button
+                className="button button-coral auth-submit"
+                disabled={busy || isPending || !code.trim()}
+              >
+                {busy ? 'Checking…' : 'Continue →'}
+              </button>
+            </form>
+          ) : (
+            <div className="device-approval">
+              <code>{code}</code>
+              <p>
+                <b>{session?.user.name}</b>, this device will be able to create
+                and list your deployments.
+              </p>
+              <div>
+                <button
+                  type="button"
+                  className="button button-coral"
+                  onClick={() => decide(true)}
+                  disabled={busy}
+                >
+                  Approve
+                </button>
+                <button
+                  type="button"
+                  className="button button-paper"
+                  onClick={() => decide(false)}
+                  disabled={busy}
+                >
+                  Deny
+                </button>
+              </div>
+            </div>
+          )}
+          {message ? (
+            <p
+              role="status"
+              aria-live="polite"
+              className={
+                message.startsWith('Approved') ? 'form-success' : 'form-error'
+              }
+            >
+              {message}
+            </p>
+          ) : null}
+        </section>
+      </main>
+    </>
   )
 }

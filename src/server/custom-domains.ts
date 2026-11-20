@@ -5,8 +5,8 @@ import { and, eq } from 'drizzle-orm'
 import { parse } from 'tldts'
 import { db } from '#/db'
 import { customDomains, sites } from '#/db/schema'
-import { HttpError } from './http'
-import { controlPlaneUrl, siteDomain } from './platform-config'
+import { HttpError, pgErrorInfo } from './http'
+import { controlPlaneUrl, docsHost, siteDomain } from './platform-config'
 
 type DnsRecord = {
   hostlabel: string
@@ -67,6 +67,7 @@ async function railwayGraphql<T>(
     method: 'POST',
     headers: { 'content-type': 'application/json', ...config.headers },
     body: JSON.stringify({ query, variables }),
+    signal: AbortSignal.timeout(15_000),
   })
   const body = (await response.json().catch(() => ({}))) as {
     data?: T
@@ -109,11 +110,22 @@ export function normalizeCustomDomain(value: string) {
     )
   }
   const platformDomain = siteDomain()
-  const platformHost = new URL(controlPlaneUrl()).hostname
+  const platformHost = new URL(controlPlaneUrl()).hostname.toLowerCase()
+  const docs = docsHost()
+  const reservedExact = new Set(
+    [
+      platformHost,
+      platformDomain,
+      docs,
+      process.env.RAILWAY_PUBLIC_DOMAIN?.trim().toLowerCase(),
+      process.env.RAILWAY_PRIVATE_DOMAIN?.trim().toLowerCase(),
+    ].filter((entry): entry is string => Boolean(entry)),
+  )
   if (
-    hostname === platformHost ||
-    hostname === platformDomain ||
-    hostname.endsWith(`.${platformDomain}`)
+    reservedExact.has(hostname) ||
+    hostname.endsWith(`.${platformDomain}`) ||
+    hostname.endsWith(`.${platformHost}`) ||
+    hostname.endsWith(`.${docs}`)
   ) {
     throw new HttpError(
       409,
@@ -155,16 +167,12 @@ function domainResult(row: typeof customDomains.$inferSelect) {
   }
 }
 
-export async function listUserCustomDomains(userId: string) {
-  const rows = await db.query.customDomains.findMany({
-    where: eq(customDomains.userId, userId),
-  })
-  return rows.map(domainResult)
-}
-
 async function ownedSite(userId: string, value: string) {
   const site = await db.query.sites.findFirst({
-    where: and(eq(sites.slug, value), eq(sites.userId, userId)),
+    where: and(
+      eq(sites.slug, value.trim().toLowerCase()),
+      eq(sites.userId, userId),
+    ),
   })
   if (!site) throw new HttpError(404, 'Site not found.', 'not_found')
   return site
@@ -250,7 +258,16 @@ export async function createCustomDomain(
     })
     .returning()
     .catch(async (error: unknown) => {
-      await removeRailwayCustomDomain(provider.id).catch(() => undefined)
+      await removeRailwayCustomDomain(provider.id, {
+        ignoreNotFound: true,
+      }).catch(() => undefined)
+      if (pgErrorInfo(error).code === '23505') {
+        throw new HttpError(
+          409,
+          'That hostname is already connected to a Yeeet site.',
+          'domain_taken',
+        )
+      }
       throw error
     })
   return domainResult(row)
@@ -264,7 +281,7 @@ export async function refreshCustomDomain(
   const domain = await ownedDomain(userId, id, slug)
   const config = railwayConfiguration()
   const result = await railwayGraphql<{
-    customDomain: RailwayCustomDomain
+    customDomain: RailwayCustomDomain | null
   }>(
     `query customDomain($id: String!, $projectId: String!) {
       customDomain(id: $id, projectId: $projectId) {
@@ -278,6 +295,13 @@ export async function refreshCustomDomain(
     }`,
     { id: domain.railwayDomainId, projectId: config.projectId },
   )
+  if (!result.customDomain) {
+    throw new HttpError(
+      404,
+      'Custom domain no longer exists in Railway.',
+      'not_found',
+    )
+  }
   const status = result.customDomain.status
   const [updated] = await db
     .update(customDomains)
@@ -293,13 +317,27 @@ export async function refreshCustomDomain(
   return domainResult(updated)
 }
 
-export async function removeRailwayCustomDomain(id: string) {
-  await railwayGraphql<{ customDomainDelete: boolean }>(
-    `mutation customDomainDelete($id: String!) {
-      customDomainDelete(id: $id)
-    }`,
-    { id },
-  )
+export async function removeRailwayCustomDomain(
+  id: string,
+  options: { ignoreNotFound?: boolean } = {},
+) {
+  try {
+    await railwayGraphql<{ customDomainDelete: boolean }>(
+      `mutation customDomainDelete($id: String!) {
+        customDomainDelete(id: $id)
+      }`,
+      { id },
+    )
+  } catch (error) {
+    if (
+      options.ignoreNotFound &&
+      error instanceof HttpError &&
+      /not found|does not exist/i.test(error.message)
+    ) {
+      return
+    }
+    throw error
+  }
 }
 
 export async function deleteCustomDomain(
@@ -308,7 +346,9 @@ export async function deleteCustomDomain(
   id: string,
 ) {
   const domain = await ownedDomain(userId, id, slug)
-  await removeRailwayCustomDomain(domain.railwayDomainId)
+  await removeRailwayCustomDomain(domain.railwayDomainId, {
+    ignoreNotFound: true,
+  })
   await db.delete(customDomains).where(eq(customDomains.id, domain.id))
   return { id: domain.id, hostname: domain.hostname, deleted: true }
 }

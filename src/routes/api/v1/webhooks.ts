@@ -5,7 +5,7 @@ import {
   listWebhookEndpoints,
   WEBHOOK_EVENTS,
 } from '#/server/webhooks'
-import { errorResponse, HttpError, json } from '#/server/http'
+import { errorResponse, HttpError, json, readJsonBody } from '#/server/http'
 
 export const Route = createFileRoute('/api/v1/webhooks')({
   server: {
@@ -24,23 +24,37 @@ export const Route = createFileRoute('/api/v1/webhooks')({
       POST: async ({ request }) => {
         try {
           const actor = await requireActor(request)
-          const body = (await request.json().catch(() => ({}))) as {
-            url?: string
-            label?: string
-            events?: Array<string>
-          }
-          if (!body.url) {
+          const body = await readJsonBody(request)
+          if (typeof body.url !== 'string' || !body.url.trim()) {
             throw new HttpError(
               400,
               'A webhook URL is required.',
               'invalid_webhook_url',
             )
           }
+          if (body.label !== undefined && typeof body.label !== 'string') {
+            throw new HttpError(
+              400,
+              'Webhook label must be a string.',
+              'invalid_webhook_label',
+            )
+          }
+          if (
+            body.events !== undefined &&
+            (!Array.isArray(body.events) ||
+              body.events.some((event) => typeof event !== 'string'))
+          ) {
+            throw new HttpError(
+              400,
+              'Webhook events must be an array of event names.',
+              'invalid_webhook_events',
+            )
+          }
           return json(
             await createWebhookEndpoint(actor.userId, {
               url: body.url,
               label: body.label,
-              events: body.events,
+              events: body.events as Array<string> | undefined,
             }),
             { status: 201 },
           )

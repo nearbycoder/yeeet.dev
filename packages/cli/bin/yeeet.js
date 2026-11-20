@@ -13,6 +13,11 @@ import { scanDeploymentFiles } from './deployment-files.js'
 import mime from 'mime-types'
 import open from 'open'
 import { localPreflight } from './preflight.js'
+import {
+  BackendLayoutError,
+  describeBackend,
+  isPrivateBackendPath,
+} from '../runtime/backend-layout.js'
 
 const VERSION = '0.2.0'
 const CLIENT_ID = 'yeeet-cli'
@@ -26,7 +31,10 @@ function configPath() {
 
 async function readJson(path, fallback = {}) {
   try {
-    return JSON.parse(await readFile(path, 'utf8'))
+    const parsed = JSON.parse(await readFile(path, 'utf8'))
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? parsed
+      : fallback
   } catch {
     return fallback
   }
@@ -83,7 +91,8 @@ async function responseJson(response) {
 
 async function apiRequest(path, options = {}, commandOptions = {}) {
   const ctx = await context(commandOptions)
-  if (!ctx.token) {
+  const authToken = commandOptions.token || ctx.token
+  if (!authToken) {
     const error = new Error(
       'Not logged in. Run `yeeet login` or set YEEET_TOKEN.',
     )
@@ -91,10 +100,16 @@ async function apiRequest(path, options = {}, commandOptions = {}) {
     throw error
   }
   const headers = new Headers(options.headers)
-  headers.set('authorization', `Bearer ${ctx.token}`)
+  headers.set('authorization', `Bearer ${authToken}`)
   headers.set('user-agent', `yeeet-cli/${VERSION}`)
   headers.set('x-yeeet-client', `cli/${VERSION}`)
-  return responseJson(await fetch(`${ctx.api}${path}`, { ...options, headers }))
+  return responseJson(
+    await fetch(`${ctx.api}${path}`, {
+      ...options,
+      headers,
+      signal: options.signal ?? AbortSignal.timeout(60_000),
+    }),
+  )
 }
 
 function sleep(ms) {
@@ -119,13 +134,22 @@ async function login(options) {
         client_id: CLIENT_ID,
         scope: 'openid profile email',
       }),
+      signal: AbortSignal.timeout(30_000),
     }),
   )
 
   const verificationPath =
     codes.verification_uri_complete ||
     `${codes.verification_uri}?user_code=${encodeURIComponent(codes.user_code)}`
-  const verificationUrl = new URL(verificationPath, `${ctx.api}/`).toString()
+  const verificationTarget = new URL(verificationPath, `${ctx.api}/`)
+  if (
+    !['https:', 'http:'].includes(verificationTarget.protocol) ||
+    verificationTarget.username ||
+    verificationTarget.password
+  ) {
+    throw new Error('The server returned an invalid verification URL.')
+  }
+  const verificationUrl = verificationTarget.toString()
   if (options.json) {
     print(
       {
@@ -161,6 +185,7 @@ async function login(options) {
             device_code: codes.device_code,
             client_id: CLIENT_ID,
           }),
+          signal: AbortSignal.timeout(30_000),
         }),
       )
       if (token.access_token) {
@@ -169,7 +194,11 @@ async function login(options) {
           api: ctx.api,
           token: token.access_token,
         })
-        const user = await apiRequest('/api/v1/me', {}, { api: ctx.api })
+        const user = await apiRequest(
+          '/api/v1/me',
+          {},
+          { api: ctx.api, token: token.access_token },
+        )
         print(
           options.json
             ? { status: 'authenticated', user: user.user, api: ctx.api }
@@ -213,7 +242,7 @@ async function findFiles(target) {
     '.git/**',
     'node_modules/**',
     '.yeeet/**',
-    '.DS_Store',
+    '**/.DS_Store',
     '.yeeetignore',
     ...ignoreFile
       .split(/\r?\n/)
@@ -250,11 +279,16 @@ async function sha256File(path) {
 }
 
 function safeName(value) {
-  return value
+  const slug = value
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '')
+    .replace(/^-+|-+$/g, '')
     .slice(0, 63)
+    .replace(/-+$/g, '')
+  if (!slug) {
+    throw new Error('Site name must contain at least one letter or number.')
+  }
+  return slug
 }
 
 function printDeploymentDiff(plan) {
@@ -278,7 +312,6 @@ function printDeploymentDiff(plan) {
 const DEV_SERVER = fileURLToPath(
   new URL('../runtime/dev-server.js', import.meta.url),
 )
-const BACKEND_PATH = /^(?:_server\.(?:ts|js)|_server\/|_migrations\/)/
 
 function bunExecutable() {
   const bun = process.env.YEEET_BUN || 'bun'
@@ -295,20 +328,43 @@ function bunRequiredError() {
 }
 
 function hasBackendFiles(files) {
-  return files.some((file) => BACKEND_PATH.test(file.path))
+  return files.some((file) => isPrivateBackendPath(file.path))
 }
 
-async function checkBackend(targetPath) {
+async function checkBackend(targetPath, files) {
   const bun = bunExecutable()
-  if (!bun)
+  if (!bun) {
+    let backend = null
+    try {
+      const described = describeBackend(files)
+      if (described) {
+        backend = {
+          entry: described.entry,
+          files: described.files,
+          migrations: described.migrations.map((migration) => migration.name),
+        }
+      }
+    } catch (error) {
+      if (error instanceof BackendLayoutError) {
+        return {
+          status: 'failed',
+          backend: null,
+          errors: [{ code: error.code, message: error.message }],
+          warnings: [],
+        }
+      }
+      throw error
+    }
     return {
       status: 'skipped',
+      backend,
       warning: {
         code: 'backend_unchecked',
         message:
           'Install Bun to rehearse the backend locally (migrations and startup). It will still be checked on deploy.',
       },
     }
+  }
   const result = spawnSync(bun, [DEV_SERVER, 'check', targetPath], {
     encoding: 'utf8',
     maxBuffer: 10 * 1024 * 1024,
@@ -345,12 +401,13 @@ async function devServer(target, options) {
   const child = spawn(bun, args, { stdio: 'inherit' })
   for (const signal of ['SIGINT', 'SIGTERM'])
     process.on(signal, () => child.kill(signal))
-  await new Promise((resolvePromise) =>
-    child.on('exit', (code) => {
-      process.exitCode = code ?? 0
+  await new Promise((resolvePromise, reject) => {
+    child.on('error', reject)
+    child.on('exit', (code, signal) => {
+      process.exitCode = code ?? (signal ? 128 : 0)
       resolvePromise()
-    }),
-  )
+    })
+  })
 }
 
 async function backendStatus(site, options) {
@@ -371,6 +428,9 @@ async function backendStatus(site, options) {
     console.log(
       `  Migrations in live release: ${data.backend.migrations.join(', ') || 'none'}`,
     )
+  }
+  if (data.runtimeEnabled === false) {
+    console.log('  Backend runtime is not configured on this Yeeet instance.')
   }
   for (const database of data.databases) {
     console.log(
@@ -438,7 +498,7 @@ async function checkBuild(target, options) {
   let backend = null
   let backendChecked = false
   if (hasBackendFiles(files) && (await stat(resolve(target))).isDirectory()) {
-    const backendReport = await checkBackend(resolve(target))
+    const backendReport = await checkBackend(resolve(target), files)
     backend = backendReport.backend ?? null
     backendChecked = backendReport.status === 'passed'
     report.errors.push(...(backendReport.errors ?? []))
@@ -500,6 +560,10 @@ async function deploy(target, options) {
     const error = new Error('Passwords must be between 8 and 128 characters.')
     error.code = 'invalid_password'
     throw error
+  }
+  const concurrency = Number(options.concurrency ?? 8)
+  if (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > 32) {
+    throw new Error('--concurrency must be a whole number between 1 and 32.')
   }
   const files = await findFiles(targetPath)
   if (!files.length) throw new Error('No files found to deploy.')
@@ -575,27 +639,41 @@ async function deploy(target, options) {
   }
   const paths = new Map(files.map((file) => [file.path, file.absolutePath]))
   let uploaded = 0
-  await runConcurrent(
-    deployment.uploadUrls,
-    Number(options.concurrency || 8),
-    async (upload) => {
-      const response = await fetch(upload.url, {
-        method: upload.method,
-        headers: upload.headers,
-        body: await readFile(paths.get(upload.path)),
-      })
-      if (!response.ok)
-        throw new Error(
+  await runConcurrent(deployment.uploadUrls, concurrency, async (upload) => {
+    const filePath = paths.get(upload.path)
+    if (!filePath) {
+      throw new Error(`The API requested an unknown file path: ${upload.path}`)
+    }
+    const body = await readFile(filePath)
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        const response = await fetch(upload.url, {
+          method: upload.method,
+          headers: upload.headers,
+          body,
+          signal: AbortSignal.timeout(120_000),
+        })
+        if (response.ok) break
+        const error = new Error(
           `Upload failed for ${upload.path} (${response.status}).`,
         )
-      uploaded += 1
-      if (!options.json && process.stderr.isTTY) {
-        process.stderr.write(
-          `\r  → uploaded ${uploaded}/${deployment.uploadUrls.length}`,
-        )
+        error.status = response.status
+        throw error
+      } catch (error) {
+        if ((error.status == null || error.status >= 500) && attempt < 2) {
+          await sleep(500 * (attempt + 1))
+          continue
+        }
+        throw error
       }
-    },
-  )
+    }
+    uploaded += 1
+    if (!options.json && process.stderr.isTTY) {
+      process.stderr.write(
+        `\r  → uploaded ${uploaded}/${deployment.uploadUrls.length}`,
+      )
+    }
+  })
   if (!options.json && process.stderr.isTTY) process.stderr.write('\n')
 
   let completed
@@ -700,6 +778,12 @@ async function addDomain(site, hostname, options) {
 }
 
 async function findDomain(site, selector, options) {
+  const needle = selector.trim().toLowerCase()
+  if (!needle) {
+    const error = new Error('A custom-domain selector is required.')
+    error.code = 'invalid_domain'
+    throw error
+  }
   const data = await apiRequest(
     `/api/v1/sites/${encodeURIComponent(site)}/domains`,
     {},
@@ -707,9 +791,9 @@ async function findDomain(site, selector, options) {
   )
   const matches = data.domains.filter(
     (domain) =>
-      domain.id === selector ||
-      domain.hostname === selector.toLowerCase() ||
-      domain.id.startsWith(selector),
+      domain.id.toLowerCase() === needle ||
+      domain.hostname.toLowerCase() === needle ||
+      domain.id.toLowerCase().startsWith(needle),
   )
   if (matches.length !== 1) {
     const error = new Error(
@@ -839,9 +923,17 @@ async function addWebhook(url, options) {
 }
 
 async function findWebhook(selector, options) {
+  const needle = selector.trim().toLowerCase()
+  if (!needle) {
+    const error = new Error('A webhook selector is required.')
+    error.code = 'invalid_webhook'
+    throw error
+  }
   const data = await apiRequest('/api/v1/webhooks', {}, options)
   const matches = data.webhooks.filter(
-    (webhook) => webhook.id === selector || webhook.id.startsWith(selector),
+    (webhook) =>
+      webhook.id.toLowerCase() === needle ||
+      webhook.id.toLowerCase().startsWith(needle),
   )
   if (matches.length !== 1) {
     const error = new Error(
@@ -893,7 +985,10 @@ async function webhookDeliveries(options) {
 }
 
 async function analytics(site, options) {
-  const days = Number(options.days || 30)
+  const days = Number(options.days ?? 30)
+  if (!Number.isInteger(days) || days < 1 || days > 90) {
+    throw new Error('--days must be a whole number between 1 and 90.')
+  }
   const data = await apiRequest(
     `/api/v1/sites/${encodeURIComponent(site)}/analytics?days=${encodeURIComponent(days)}`,
     {},
@@ -1083,18 +1178,38 @@ async function shareVersion(site, selector, options) {
     error.code = 'invalid_version'
     throw error
   }
-  const history = await apiRequest(
-    `/api/v1/sites/${encodeURIComponent(site)}/versions`,
-    {},
-    options,
-  )
   const normalized = selector?.toLowerCase()
-  const matches = selector
-    ? history.versions.filter(
-        (version) =>
-          version.id === normalized || version.id.startsWith(normalized),
+  const matches = []
+  let cursor = null
+  for (let page = 0; page < 20; page += 1) {
+    const params = new URLSearchParams()
+    if (selector) params.set('q', selector)
+    if (cursor) params.set('cursor', cursor)
+    const query = params.toString()
+    const history = await apiRequest(
+      `/api/v1/sites/${encodeURIComponent(site)}/versions${query ? `?${query}` : ''}`,
+      {},
+      options,
+    )
+    if (selector) {
+      matches.push(
+        ...history.versions.filter(
+          (version) =>
+            version.id === normalized || version.id.startsWith(normalized),
+        ),
       )
-    : history.versions.filter((version) => version.current)
+      if (matches.length > 1 || !history.nextCursor) break
+    } else {
+      if (!history.site.activeDeploymentId) break
+      const current = history.versions.find((version) => version.current)
+      if (current) {
+        matches.push(current)
+        break
+      }
+      if (!history.nextCursor) break
+    }
+    cursor = history.nextCursor
+  }
   if (matches.length !== 1) {
     const error = new Error(
       matches.length
@@ -1123,17 +1238,47 @@ async function shareVersion(site, selector, options) {
 async function rollback(slug, selector, options) {
   let versionId = selector
   if (!versionId) {
-    const history = await apiRequest(
-      `/api/v1/sites/${encodeURIComponent(slug)}/versions`,
-      {},
-      options,
-    )
-    const currentIndex = history.versions.findIndex(
-      (version) => version.current,
-    )
-    const previous = history.versions
+    const allVersions = []
+    let cursor = null
+    let currentIndex = -1
+    let activeDeploymentId = null
+    for (let page = 0; page < 20; page += 1) {
+      const params = new URLSearchParams({ status: 'ready' })
+      if (cursor) params.set('cursor', cursor)
+      const history = await apiRequest(
+        `/api/v1/sites/${encodeURIComponent(slug)}/versions?${params.toString()}`,
+        {},
+        options,
+      )
+      activeDeploymentId = history.site.activeDeploymentId
+      if (!activeDeploymentId) {
+        const error = new Error(
+          'This site has no live version. Specify a ready version ID explicitly.',
+        )
+        error.code = 'no_live_version'
+        throw error
+      }
+      allVersions.push(...history.versions)
+      currentIndex = allVersions.findIndex((version) => version.current)
+      const afterCurrent =
+        currentIndex >= 0
+          ? allVersions
+              .slice(currentIndex + 1)
+              .find((version) => version.status === 'ready' && !version.channel)
+          : null
+      if (afterCurrent || !history.nextCursor) break
+      cursor = history.nextCursor
+    }
+    if (currentIndex < 0) {
+      const error = new Error(
+        'Could not locate the current live version in history. Specify a version ID explicitly.',
+      )
+      error.code = 'current_version_not_found'
+      throw error
+    }
+    const previous = allVersions
       .slice(currentIndex + 1)
-      .find((version) => version.status === 'ready')
+      .find((version) => version.status === 'ready' && !version.channel)
     if (!previous) {
       const error = new Error('No previous ready version is available.')
       error.code = 'no_previous_version'

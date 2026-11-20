@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
@@ -31,8 +31,8 @@ declare global {
 
 export const Route = createFileRoute('/promo')({
   validateSearch: z.object({
-    capture: z.coerce.boolean().optional(),
-    t: z.coerce.number().min(0).max(PROMO_DURATION).optional(),
+    capture: z.coerce.boolean().optional().catch(undefined),
+    t: z.coerce.number().min(0).max(PROMO_DURATION).optional().catch(undefined),
   }),
   loader: () => getPublicPlatformConfig(),
   head: ({ loaderData }) =>
@@ -108,6 +108,8 @@ function PromoCapture({ initial }: { initial: number }) {
         }),
     }
     return () => {
+      document.documentElement.classList.remove('promo-capture')
+      document.body.classList.remove('promo-capture')
       delete window.__promo
     }
   }, [])
@@ -119,6 +121,7 @@ function PromoPlayerPage({ initial }: { initial: number }) {
   const { docsUrl } = Route.useLoaderData()
   const [t, setT] = useState(initial)
   const [playing, setPlaying] = useState(false)
+  const [seekGeneration, setSeekGeneration] = useState(0)
   const [sound, setSound] = useState(false)
   const [audioAvailable, setAudioAvailable] = useState(true)
   const [scale, setScale] = useState(0.5)
@@ -127,7 +130,7 @@ function PromoPlayerPage({ initial }: { initial: number }) {
   const time = useRef(t)
   time.current = t
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     const element = viewport.current
     if (!element) return
     const observer = new ResizeObserver(([entry]) =>
@@ -177,17 +180,14 @@ function PromoPlayerPage({ initial }: { initial: number }) {
     }
     frame = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(frame)
-  }, [playing, sound])
+  }, [playing, sound, seekGeneration])
 
   function seek(ms: number) {
     const next = Math.min(Math.max(ms, 0), PROMO_DURATION)
+    time.current = next
     setT(next)
     if (audio.current) audio.current.currentTime = next / 1000
-    if (playing) {
-      // Restart the clock from the new position.
-      setPlaying(false)
-      requestAnimationFrame(() => setPlaying(true))
-    }
+    if (playing) setSeekGeneration((value) => value + 1)
   }
 
   function toggle() {

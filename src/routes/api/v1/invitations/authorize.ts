@@ -4,14 +4,21 @@ import {
   invitationGrantCookie,
   validateInvitationCode,
 } from '#/server/invitations'
-import { errorResponse, json } from '#/server/http'
+import { errorResponse, HttpError, json, readJsonBody } from '#/server/http'
 
 export const Route = createFileRoute('/api/v1/invitations/authorize')({
   server: {
     handlers: {
       POST: async ({ request }) => {
         try {
-          const body = (await request.json()) as { code?: string }
+          const body = await readJsonBody(request)
+          if (body.code !== undefined && typeof body.code !== 'string') {
+            throw new HttpError(
+              400,
+              'Invitation code must be a string.',
+              'invalid_invitation',
+            )
+          }
           const invitation = await validateInvitationCode(body.code)
           return json(
             { authorized: true },

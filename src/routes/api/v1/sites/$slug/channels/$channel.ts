@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { requireActor } from '#/server/actor'
 import { deleteSiteChannel, setSiteChannel } from '#/server/deployments'
-import { errorResponse, HttpError, json } from '#/server/http'
+import { errorResponse, HttpError, json, readJsonBody } from '#/server/http'
 
 export const Route = createFileRoute('/api/v1/sites/$slug/channels/$channel')({
   server: {
@@ -9,8 +9,8 @@ export const Route = createFileRoute('/api/v1/sites/$slug/channels/$channel')({
       PUT: async ({ request, params }) => {
         try {
           const actor = await requireActor(request)
-          const body = (await request.json()) as { version?: string }
-          if (!body.version) {
+          const body = await readJsonBody(request)
+          if (typeof body.version !== 'string' || !body.version.trim()) {
             throw new HttpError(
               400,
               'A version ID or prefix is required.',

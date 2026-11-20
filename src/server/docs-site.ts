@@ -1699,8 +1699,8 @@ yeeet deploy ./dist --json</code></pre><button class="copy-button" type="button"
             <p>Use <span class="inline-code" translate="no">nearbycoder/yeeet.dev@main</span> in GitHub Actions. Each trusted pull request gets a stable <span class="inline-code" translate="no">&lt;site&gt;-pr-&lt;number&gt;</span> URL, an updated PR comment, and cleanup when the PR closes.</p>
             <div class="code-block"><pre><code id="code-github-action">- uses: nearbycoder/yeeet.dev@main
   with:
-    token: \${{ secrets.YEEET_TOKEN }}
-    github-token: \${{ github.token }}
+    token: ${'$'}{{ secrets.YEEET_TOKEN }}
+    github-token: ${'$'}{{ github.token }}
     site: docs
     directory: dist</code></pre><button class="copy-button" type="button" data-copy="code-github-action">Copy</button></div>
             <h3>Give an Agent Native Yeeet Tools</h3>
@@ -1716,7 +1716,7 @@ yeeet deploy ./dist --json</code></pre><button class="copy-button" type="button"
 }</code></pre><button class="copy-button" type="button" data-copy="code-mcp">Copy</button></div>
             <h3>Signed Deployment Events</h3>
             <p>Webhooks use a durable outbox and retry failed public HTTPS endpoints. The secret appears once. Verify HMAC-SHA256 over the timestamp and raw body, reject stale requests, and deduplicate the delivery ID.</p>
-            <div class="code-block"><pre><code id="code-webhooks">yeeet webhook add https://example.com/yeeet \\
+            <div class="code-block"><pre><code id="code-webhooks">yeeet webhook add https://example.com/yeeet \
   --events deployment.ready,deployment.activated
 yeeet webhook deliveries
 yeeet webhook rotate-secret &lt;id&gt;</code></pre><button class="copy-button" type="button" data-copy="code-webhooks">Copy</button></div>

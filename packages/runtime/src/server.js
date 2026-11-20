@@ -152,10 +152,7 @@ async function canDropPrivileges(bunPath) {
 if (import.meta.main) {
   const config = runtimeConfig()
   if (config.isolation && !(await canDropPrivileges(config.bunPath))) {
-    if (
-      !process.env.RUNTIME_ISOLATION ||
-      process.env.RUNTIME_ISOLATION === 'required'
-    ) {
+    if (config.isolationSetting === 'required') {
       console.error(
         '[runtime] RUNTIME_ISOLATION=required, but this container cannot start processes as another user (missing CAP_SETUID/CAP_SETGID).',
       )
@@ -182,8 +179,17 @@ if (import.meta.main) {
     console.warn(
       '[runtime] Site workers share this process user. Run as root (the default container) to give every site its own OS user.',
     )
+  let shuttingDown = false
   const shutdown = async () => {
+    if (shuttingDown) return
+    shuttingDown = true
+    server.stop()
     await runtime.pool.shutdown()
+    try {
+      runtime.sites.state.close()
+    } catch {
+      // Ignore already-closed state database.
+    }
     process.exit(0)
   }
   process.on('SIGTERM', shutdown)

@@ -36,11 +36,6 @@ export function siteUrl(slug: string) {
   return `${hostnameProtocol(host)}://${slug}.${host}`
 }
 
-export function siteWildcardOrigin() {
-  const host = siteDomain()
-  return `${hostnameProtocol(host)}://*.${host}`
-}
-
 export function publicPlatformConfig() {
   return {
     uploadLimits: {

@@ -1,20 +1,22 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { authClient } from '#/lib/auth-client'
 import { useConsoleMutation } from '#/lib/console-request'
+import { formatDateTime } from '#/lib/format'
 import { CopyButton } from './copy-button'
 import { ConfirmDialog } from './confirm-dialog'
 import type { listAccountKeys } from '#/server/account-console'
 
 type Key = Awaited<ReturnType<typeof listAccountKeys>>[number]
-function date(value: string | null) {
-  return value ? new Date(value).toLocaleString() : 'Never'
-}
 export function ApiKeyManager({ keys }: { keys: Array<Key> }) {
   const mutation = useConsoleMutation()
   const [name, setName] = useState('')
   const [days, setDays] = useState('90')
   const [newKey, setNewKey] = useState('')
   const [remove, setRemove] = useState<Key | null>(null)
+  const [now, setNow] = useState<number | null>(null)
+  useEffect(() => {
+    setNow(Date.now())
+  }, [])
   return (
     <section className="panel site-page-panel" id="api-keys">
       <h2>API keys</h2>
@@ -126,15 +128,17 @@ export function ApiKeyManager({ keys }: { keys: Array<Key> }) {
             <p>
               <code>{key.start ?? 'yeeet_'}…</code> ·{' '}
               {key.enabled
-                ? key.expiresAt && new Date(key.expiresAt) < new Date()
+                ? key.expiresAt &&
+                  now !== null &&
+                  Date.parse(key.expiresAt) < now
                   ? 'Expired'
                   : 'Enabled'
                 : 'Disabled'}
             </p>
             <p>
-              Expires: {date(key.expiresAt)} · Last used:{' '}
-              {date(key.lastRequest)} · {key.requestCount ?? 0} requests in the
-              current rate window
+              Expires: {formatDateTime(key.expiresAt, 'Never')} · Last used:{' '}
+              {formatDateTime(key.lastRequest, 'Never')} ·{' '}
+              {key.requestCount ?? 0} requests in the current rate window
             </p>
             <div className="console-actions">
               <button

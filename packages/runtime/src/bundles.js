@@ -60,10 +60,19 @@ export class BundleStore {
     const dir = this.directory(deploymentId)
     const metadataPath = join(dir, 'bundle.json')
     if (!existsSync(metadataPath)) return null
-    const metadata = JSON.parse(readFileSync(metadataPath, 'utf8'))
-    if (metadata.format !== BUNDLE_FORMAT) return null
-    const now = new Date()
-    utimesSync(metadataPath, now, now)
+    let metadata
+    try {
+      metadata = JSON.parse(readFileSync(metadataPath, 'utf8'))
+    } catch {
+      return null
+    }
+    if (!metadata || metadata.format !== BUNDLE_FORMAT) return null
+    try {
+      const now = new Date()
+      utimesSync(metadataPath, now, now)
+    } catch {
+      // Ignore concurrent cleanup.
+    }
     return {
       ...metadata,
       dir,
@@ -131,8 +140,19 @@ export class BundleStore {
         'bundle_unavailable',
         `The control plane returned ${response.status} for the backend bundle.`,
       )
-    const body = await response.json()
+    let body
+    try {
+      body = await response.json()
+    } catch {
+      throw new RuntimeError(
+        502,
+        'invalid_bundle',
+        'The control plane returned invalid JSON for the backend bundle.',
+      )
+    }
     if (
+      !body ||
+      typeof body !== 'object' ||
       body.deploymentId !== deploymentId ||
       !UUID.test(body.siteId) ||
       !BACKEND_ENTRIES.includes(body.entry) ||
@@ -192,20 +212,24 @@ export class BundleStore {
     let removed = 0
     for (const name of readdirSync(this.root)) {
       const path = join(this.root, name)
-      if (name.startsWith('.tmp-')) {
-        if (Date.now() - statSync(path).mtimeMs > 60 * 60_000) {
-          rmSync(path, { recursive: true, force: true })
+      try {
+        if (name.startsWith('.tmp-')) {
+          if (Date.now() - statSync(path).mtimeMs > 60 * 60_000) {
+            rmSync(path, { recursive: true, force: true })
+          }
+          continue
         }
-        continue
-      }
-      if (!UUID.test(name) || inUse.has(name)) continue
-      const metadata = join(path, 'bundle.json')
-      const age = existsSync(metadata)
-        ? Date.now() - statSync(metadata).mtimeMs
-        : Infinity
-      if (age > maxAgeMs) {
-        rmSync(path, { recursive: true, force: true })
-        removed += 1
+        if (!UUID.test(name) || inUse.has(name)) continue
+        const metadata = join(path, 'bundle.json')
+        const age = existsSync(metadata)
+          ? Date.now() - statSync(metadata).mtimeMs
+          : Infinity
+        if (age > maxAgeMs) {
+          rmSync(path, { recursive: true, force: true })
+          removed += 1
+        }
+      } catch {
+        // Ignore entries removed concurrently.
       }
     }
     return removed

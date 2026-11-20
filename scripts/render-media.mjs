@@ -32,16 +32,30 @@ import {
 
 const args = process.argv.slice(2)
 const originFlag = args.indexOf('--origin')
+if (
+  originFlag >= 0 &&
+  (!args[originFlag + 1] || args[originFlag + 1].startsWith('--'))
+) {
+  throw new Error('--origin requires a URL argument.')
+}
 const origin = new URL(
   originFlag >= 0
     ? args[originFlag + 1]
     : process.env.MEDIA_ORIGIN || 'http://localhost:3000',
 )
+const VALID_TARGETS = new Set(['all', 'promo', 'brand', 'icons'])
 const targets = new Set(
   args.filter(
     (arg, index) => !arg.startsWith('--') && args[index - 1] !== '--origin',
   ),
 )
+for (const target of targets) {
+  if (!VALID_TARGETS.has(target)) {
+    throw new Error(
+      `Unknown render target "${target}". Expected one of: promo, brand, icons, all.`,
+    )
+  }
+}
 const all = targets.size === 0 || targets.has('all')
 const publicDir = resolve('public')
 const POSTER_TIME = yeeetMoment + 140
@@ -400,6 +414,7 @@ function synthesizeSoundtrack() {
 async function renderPromo(browser, workDir) {
   const promoDir = join(publicDir, 'promo')
   mkdirSync(promoDir, { recursive: true })
+  mkdirSync(join(publicDir, 'og'), { recursive: true })
   const audioPath = join(workDir, 'soundtrack.wav')
   writeFileSync(audioPath, synthesizeSoundtrack())
   console.log('Synthesized soundtrack.')
@@ -453,15 +468,42 @@ async function renderPromo(browser, workDir) {
       output,
     ],
     (stdin) => {
+      let stdinError = null
+      stdin.on('error', (error) => {
+        stdinError = error
+      })
       ;(async () => {
         for (let frame = 0; frame < frames; frame++) {
+          if (stdinError) throw stdinError
           await page.evaluate(
             (ms) => window.__promo.seek(ms),
             (frame * 1000) / PROMO_FPS,
           )
           const image = await page.screenshot({ type: 'png' })
-          if (!stdin.write(image))
-            await new Promise((done) => stdin.once('drain', done))
+          if (!stdin.write(image)) {
+            await new Promise((done, fail) => {
+              const onDrain = () => {
+                cleanup()
+                done()
+              }
+              const onClose = () => {
+                cleanup()
+                fail(stdinError || new Error('ffmpeg stdin closed early'))
+              }
+              const onError = (error) => {
+                cleanup()
+                fail(error)
+              }
+              const cleanup = () => {
+                stdin.off('drain', onDrain)
+                stdin.off('close', onClose)
+                stdin.off('error', onError)
+              }
+              stdin.once('drain', onDrain)
+              stdin.once('close', onClose)
+              stdin.once('error', onError)
+            })
+          }
           if (frame % PROMO_FPS === 0)
             process.stdout.write(`\rFrames ${frame}/${frames}`)
         }
@@ -555,12 +597,13 @@ function renderIcons() {
 if (all || targets.has('icons')) renderIcons()
 if (all || targets.has('promo') || targets.has('brand')) {
   const workDir = mkdtempSync(join(tmpdir(), 'yeeet-media-'))
-  const browser = await chromium.launch({ executablePath: chromePath() })
+  let browser
   try {
+    browser = await chromium.launch({ executablePath: chromePath() })
     if (all || targets.has('brand')) await renderBrandCards(browser)
     if (all || targets.has('promo')) await renderPromo(browser, workDir)
   } finally {
-    await browser.close()
+    if (browser) await browser.close()
     rmSync(workDir, { recursive: true, force: true })
   }
 }

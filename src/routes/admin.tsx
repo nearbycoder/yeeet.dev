@@ -3,6 +3,7 @@ import { DashboardHeader } from '#/components/dashboard-header'
 import { useState } from 'react'
 import { createFileRoute, redirect, useRouter } from '@tanstack/react-router'
 import { ConfirmDialog } from '#/components/confirm-dialog'
+import { formatBytes, formatDateTime } from '#/lib/format'
 import {
   getAdminData,
   getPublicPlatformConfig,
@@ -15,26 +16,13 @@ export const Route = createFileRoute('/admin')({
     if (!session)
       throw redirect({ to: '/login', search: { redirect: '/admin' } })
     const role = (session.user as { role?: string }).role
-    if (!role?.split(',').includes('admin'))
+    if (!role?.split(',').some((entry) => entry.trim() === 'admin'))
       throw redirect({ to: '/dashboard' })
     return { user: session.user, platform: await getPublicPlatformConfig() }
   },
   loader: () => getAdminData(),
   component: Admin,
 })
-
-function formatBytes(value: number) {
-  const units = ['B', 'KB', 'MB', 'GB']
-  const rank = Math.min(
-    Math.floor(Math.log(Math.max(value, 1)) / Math.log(1024)),
-    units.length - 1,
-  )
-  return `${(value / 1024 ** rank).toFixed(rank ? 1 : 0)} ${units[rank]}`
-}
-
-function formatDate(value: string | null) {
-  return value ? new Date(value).toLocaleString() : 'never'
-}
 
 type AdminDeleteTarget = {
   id: string
@@ -45,7 +33,10 @@ type AdminDeleteTarget = {
 
 async function adminRequest(path: string, init: RequestInit = {}) {
   const response = await fetch(path, init)
-  const data = await response.json()
+  const data = (await response.json().catch(() => ({}))) as {
+    code?: string
+    error?: { message?: string }
+  }
   if (!response.ok) {
     throw new Error(data.error?.message || 'Admin action failed.')
   }
@@ -137,7 +128,24 @@ function Admin() {
               <h2>Invitation codes</h2>
             </div>
           </div>
-          <div className="invite-create">
+          <form
+            className="invite-create"
+            onSubmit={(event) => {
+              event.preventDefault()
+              void mutate('invite', async () => {
+                const invitation = await adminRequest(
+                  '/api/v1/admin/invitations',
+                  {
+                    method: 'POST',
+                    headers: { 'content-type': 'application/json' },
+                    body: JSON.stringify({ label }),
+                  },
+                )
+                setNewCode(invitation.code ?? '')
+                setLabel('')
+              })
+            }}
+          >
             <input
               name="invitation-label"
               aria-label="Invitation purpose or person"
@@ -148,27 +156,13 @@ function Admin() {
               autoComplete="off"
             />
             <button
-              type="button"
+              type="submit"
               className="button button-coral"
-              disabled={busy === 'invite'}
-              onClick={() =>
-                mutate('invite', async () => {
-                  const invitation = await adminRequest(
-                    '/api/v1/admin/invitations',
-                    {
-                      method: 'POST',
-                      headers: { 'content-type': 'application/json' },
-                      body: JSON.stringify({ label }),
-                    },
-                  )
-                  setNewCode(invitation.code)
-                  setLabel('')
-                })
-              }
+              disabled={Boolean(busy)}
             >
               {busy === 'invite' ? 'Creating…' : 'Create invitation'}
             </button>
-          </div>
+          </form>
           {newCode ? (
             <div className="invite-reveal" aria-live="polite">
               <div>
@@ -186,7 +180,7 @@ function Admin() {
                   <small>{invitation.codeHint}</small>
                 </span>
                 <span>{invitation.useCount} uses</span>
-                <span>Last used {formatDate(invitation.lastUsedAt)}</span>
+                <span>Last used {formatDateTime(invitation.lastUsedAt)}</span>
                 <span
                   className={`state-pill ${invitation.active ? 'live' : 'blocked'}`}
                 >
@@ -195,9 +189,9 @@ function Admin() {
                 {invitation.active ? (
                   <button
                     type="button"
-                    disabled={busy === invitation.id}
+                    disabled={Boolean(busy)}
                     onClick={() =>
-                      mutate(invitation.id, () =>
+                      void mutate(invitation.id, () =>
                         adminRequest(
                           `/api/v1/admin/invitations/${invitation.id}/revoke`,
                           { method: 'POST' },
@@ -231,7 +225,7 @@ function Admin() {
                     <small>{account.email}</small>
                   </span>
                   <span>{account.siteCount} sites</span>
-                  <span>Joined {formatDate(account.createdAt)}</span>
+                  <span>Joined {formatDateTime(account.createdAt)}</span>
                   <span
                     className={`state-pill ${account.banned ? 'blocked' : account.role === 'admin' ? 'admin' : 'live'}`}
                   >
@@ -241,8 +235,9 @@ function Admin() {
                     {account.id !== user.id ? (
                       <button
                         type="button"
+                        disabled={Boolean(busy)}
                         onClick={() =>
-                          mutate(`role-${account.id}`, () =>
+                          void mutate(`role-${account.id}`, () =>
                             adminRequest(
                               `/api/v1/admin/users/${account.id}/role`,
                               {
@@ -263,8 +258,9 @@ function Admin() {
                     {account.banned ? (
                       <button
                         type="button"
+                        disabled={Boolean(busy)}
                         onClick={() =>
-                          mutate(`unban-${account.id}`, () =>
+                          void mutate(`unban-${account.id}`, () =>
                             adminRequest(
                               `/api/v1/admin/users/${account.id}/unban`,
                               { method: 'POST' },
@@ -278,6 +274,7 @@ function Admin() {
                       <button
                         type="button"
                         className="danger-link"
+                        disabled={Boolean(busy)}
                         onClick={() => {
                           setBanTarget(account.id)
                           setBanReason('')
@@ -292,7 +289,23 @@ function Admin() {
                   <p className="ban-note">Reason: {account.banReason}</p>
                 ) : null}
                 {banTarget === account.id ? (
-                  <div className="ban-form">
+                  <form
+                    className="ban-form"
+                    onSubmit={(event) => {
+                      event.preventDefault()
+                      void mutate(`ban-${account.id}`, async () => {
+                        await adminRequest(
+                          `/api/v1/admin/users/${account.id}/ban`,
+                          {
+                            method: 'POST',
+                            headers: { 'content-type': 'application/json' },
+                            body: JSON.stringify({ reason: banReason }),
+                          },
+                        )
+                        setBanTarget('')
+                      })
+                    }}
+                  >
                     <input
                       name={`ban-reason-${account.id}`}
                       aria-label={`Suspension reason for ${account.name}`}
@@ -303,28 +316,20 @@ function Admin() {
                       autoComplete="off"
                     />
                     <button
-                      type="button"
+                      type="submit"
                       className="button danger-button"
-                      onClick={() =>
-                        mutate(`ban-${account.id}`, async () => {
-                          await adminRequest(
-                            `/api/v1/admin/users/${account.id}/ban`,
-                            {
-                              method: 'POST',
-                              headers: { 'content-type': 'application/json' },
-                              body: JSON.stringify({ reason: banReason }),
-                            },
-                          )
-                          setBanTarget('')
-                        })
-                      }
+                      disabled={Boolean(busy)}
                     >
                       Confirm suspension
                     </button>
-                    <button type="button" onClick={() => setBanTarget('')}>
+                    <button
+                      type="button"
+                      disabled={Boolean(busy)}
+                      onClick={() => setBanTarget('')}
+                    >
                       Cancel
                     </button>
-                  </div>
+                  </form>
                 ) : null}
               </div>
             ))}
@@ -347,11 +352,11 @@ function Admin() {
                 </a>
                 <span>{site.deploymentCount} versions</span>
                 <span>{formatBytes(site.totalBytes)}</span>
-                <span>Updated {formatDate(site.updatedAt)}</span>
+                <span>Updated {formatDateTime(site.updatedAt)}</span>
                 <button
                   type="button"
                   className="danger-link"
-                  disabled={busy === `site-${site.id}`}
+                  disabled={Boolean(busy)}
                   onClick={() => setDeleteTarget(site)}
                 >
                   Delete site
@@ -376,7 +381,9 @@ function Admin() {
                 <span>
                   {event.details ? JSON.stringify(event.details) : '—'}
                 </span>
-                <time>{formatDate(event.createdAt)}</time>
+                <time dateTime={event.createdAt}>
+                  {formatDateTime(event.createdAt)}
+                </time>
               </div>
             ))}
           </div>

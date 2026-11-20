@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 
 const THEME_STORAGE_KEY = 'yeeet-theme'
 
@@ -13,7 +13,12 @@ function applyTheme(theme: Theme) {
 }
 
 export function ThemeToggle({ inline = false }: { inline?: boolean }) {
+  const [theme, setTheme] = useState<Theme | null>(null)
+
   useEffect(() => {
+    setTheme(
+      document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light',
+    )
     const colorScheme = window.matchMedia('(prefers-color-scheme: dark)')
     const followSystemTheme = (event: MediaQueryListEvent) => {
       try {
@@ -21,23 +26,34 @@ export function ThemeToggle({ inline = false }: { inline?: boolean }) {
       } catch {
         // Theme switching should still work when storage is unavailable.
       }
-      applyTheme(event.matches ? 'dark' : 'light')
+      const next: Theme = event.matches ? 'dark' : 'light'
+      applyTheme(next)
+      setTheme(next)
     }
 
     colorScheme.addEventListener('change', followSystemTheme)
     return () => colorScheme.removeEventListener('change', followSystemTheme)
   }, [])
 
+  const label =
+    theme === 'dark'
+      ? 'Switch to light theme'
+      : theme === 'light'
+        ? 'Switch to dark theme'
+        : 'Toggle color theme'
+
   return (
     <button
       className={`theme-toggle ${inline ? 'theme-toggle-inline' : ''}`}
       type="button"
-      aria-label="Toggle color theme"
-      title="Toggle color theme"
+      aria-label={label}
+      aria-pressed={theme ? theme === 'dark' : undefined}
+      title={label}
       onClick={() => {
-        const nextTheme =
+        const nextTheme: Theme =
           document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'
         applyTheme(nextTheme)
+        setTheme(nextTheme)
         try {
           localStorage.setItem(THEME_STORAGE_KEY, nextTheme)
         } catch {

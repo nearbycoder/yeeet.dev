@@ -29,6 +29,7 @@ import {
   normalizeSlug,
 } from './deployments'
 import { compareDeployments } from './deployment-inspection'
+import { isAccountBanned } from './actor'
 import type { Actor } from './actor'
 import type { WorkspaceRole } from '#/lib/workspaces'
 
@@ -72,7 +73,7 @@ export async function requireWorkspace(
     const owner = await db.query.user.findFirst({
       where: eq(user.id, workspace.ownerId),
     })
-    if (!owner || owner.banned)
+    if (!owner || isAccountBanned(owner))
       throw new HttpError(403, 'Workspace owner is unavailable.', 'forbidden')
   }
   return { ...workspace, role }
@@ -110,11 +111,23 @@ export async function actorForWorkspaceSite(actor: Actor, slug?: string) {
   })
   if (!assignment)
     throw new HttpError(409, 'That site name is already flying.', 'slug_taken')
-  const workspace = await requireWorkspace(
-    actor.userId,
-    assignment.workspaceId,
-    'edit',
-  )
+  let workspace: Awaited<ReturnType<typeof requireWorkspace>>
+  try {
+    workspace = await requireWorkspace(
+      actor.userId,
+      assignment.workspaceId,
+      'edit',
+    )
+  } catch (error) {
+    if (error instanceof HttpError && error.status === 404) {
+      throw new HttpError(
+        409,
+        'That site name is already flying.',
+        'slug_taken',
+      )
+    }
+    throw error
+  }
   if (workspace.ownerId !== site.userId)
     throw new HttpError(403, 'Site ownership changed.', 'forbidden')
   return { ...actor, userId: site.userId, actingUserId: actor.userId }
@@ -130,7 +143,18 @@ export async function actorForWorkspaceDeployment(
     .where(eq(deployments.id, deploymentId))
     .limit(1)
   const row = deploymentRows.at(0)
-  return row ? actorForWorkspaceSite(actor, row.slug) : actor
+  if (!row) return actor
+  try {
+    return await actorForWorkspaceSite(actor, row.slug)
+  } catch (error) {
+    if (
+      error instanceof HttpError &&
+      (error.status === 403 || error.status === 404 || error.status === 409)
+    ) {
+      return actor
+    }
+    throw error
+  }
 }
 export async function workspaceConsole(
   userId: string,
@@ -308,7 +332,7 @@ export async function mutateWorkspace(userId: string, input: unknown) {
       const account = await db.query.user.findFirst({
         where: eq(user.email, data.email.trim().toLowerCase()),
       })
-      if (!account || account.banned)
+      if (!account || isAccountBanned(account))
         throw new HttpError(
           400,
           'Use the email of an existing, active Yeeet account.',
@@ -419,6 +443,18 @@ export async function mutateWorkspace(userId: string, input: unknown) {
       })
       if (!version) throw new HttpError(404, 'Version not found.', 'not_found')
       await withSiteLock(version.siteId, workspace.ownerId, async (tx) => {
+        const assignment = await tx.query.workspaceSites.findFirst({
+          where: and(
+            eq(workspaceSites.siteId, version.siteId),
+            eq(workspaceSites.workspaceId, workspace.id),
+          ),
+        })
+        if (!assignment)
+          throw new HttpError(
+            404,
+            'Site not found in this workspace.',
+            'not_found',
+          )
         await lockedVersion(tx, version.siteId, version.id)
         const fresh = await tx.query.deploymentFeedback.findFirst({
           where: eq(deploymentFeedback.id, comment.id),

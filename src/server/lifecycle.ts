@@ -4,7 +4,8 @@ import { db } from '#/db'
 import { deployments, siteHealth, sites } from '#/db/schema'
 import { expirySchema, healthSchema } from '#/lib/lifecycle'
 import { HttpError } from './http'
-import { listSiteVersions, normalizeSlug, versionUrl } from './deployments'
+import { listSiteVersions, normalizeSlug } from './deployments'
+import { siteUrl } from './platform-config'
 import { maybeServeSite } from './site-gateway'
 import {
   deploymentShareCookieName,
@@ -107,8 +108,8 @@ async function checkOrigin(config: typeof siteHealth.$inferSelect) {
   let responseStatus = 0
   let error: string | null = null
   try {
-    if (!deployment) throw new Error('No ready production version.')
-    const url = new URL(versionUrl(deployment.id))
+    if (!site || !deployment) throw new Error('No ready production version.')
+    const url = new URL(siteUrl(site.slug))
     url.pathname = config.path
     const headers = new Headers()
     if (deployment.passwordHash)
@@ -181,11 +182,19 @@ let healthWorkerStarted = false
 export function startHealthWorker() {
   if (healthWorkerStarted || process.env.NODE_ENV === 'test') return
   healthWorkerStarted = true
-  const run = () =>
-    void processHealthChecks().catch((error) =>
-      console.error('Health check worker failed', error),
-    )
-  run()
-  const timer = setInterval(run, 60000)
+  let running = false
+  const run = async () => {
+    if (running) return
+    running = true
+    try {
+      await processHealthChecks()
+    } catch (error) {
+      console.error('Health check worker failed', error)
+    } finally {
+      running = false
+    }
+  }
+  void run()
+  const timer = setInterval(() => void run(), 60000)
   timer.unref()
 }

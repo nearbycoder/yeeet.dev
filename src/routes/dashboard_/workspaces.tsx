@@ -14,6 +14,7 @@ import { DashboardHeader } from '#/components/dashboard-header'
 import { ConfirmDialog } from '#/components/confirm-dialog'
 import { ManifestDiff } from '#/components/manifest-diff'
 import { useConsoleMutation } from '#/lib/console-request'
+import { formatDateTime } from '#/lib/format'
 import { canEditWorkspace } from '#/lib/workspaces'
 import {
   getSession,
@@ -47,6 +48,7 @@ function Workspaces() {
     title: string
     description: string
     action: unknown
+    tone?: 'danger' | 'neutral'
   } | null>(null)
   const editor = selected && canEditWorkspace(selected.role)
   const owner = selected?.role === 'owner'
@@ -111,7 +113,8 @@ function Workspaces() {
                 className="console-form-grid"
                 onSubmit={(event) => {
                   event.preventDefault()
-                  const form = new FormData(event.currentTarget)
+                  const formElement = event.currentTarget
+                  const form = new FormData(formElement)
                   void mutation.run(async () => {
                     const result = await updateWorkspace({
                       data: {
@@ -119,6 +122,7 @@ function Workspaces() {
                         name: String(form.get('name')),
                       },
                     })
+                    formElement.reset()
                     navigate({ workspace: result.id })
                   })
                 }}
@@ -186,12 +190,15 @@ function Workspaces() {
                       className="console-form-grid"
                       onSubmit={(event) => {
                         event.preventDefault()
-                        const form = new FormData(event.currentTarget)
+                        const formElement = event.currentTarget
+                        const form = new FormData(formElement)
                         void act({
                           action: 'member',
                           workspace: selected.id,
                           email: String(form.get('email')),
                           role: String(form.get('role')),
+                        }).then((ok) => {
+                          if (ok) formElement.reset()
                         })
                       }}
                     >
@@ -232,6 +239,7 @@ function Workspaces() {
                     </p>
                     {owner ? (
                       <button
+                        type="button"
                         className="button danger-link"
                         disabled={mutation.busy}
                         onClick={() =>
@@ -257,6 +265,7 @@ function Workspaces() {
                 ) : null}
                 {owner ? (
                   <button
+                    type="button"
                     className="button danger-link"
                     disabled={mutation.busy}
                     onClick={() =>
@@ -333,6 +342,7 @@ function Workspaces() {
                       ) : null}
                       {owner ? (
                         <button
+                          type="button"
                           className="button danger-link"
                           disabled={mutation.busy}
                           onClick={() =>
@@ -377,7 +387,7 @@ function Workspaces() {
                           <option key={version.id} value={version.id}>
                             {version.id.slice(0, 8)} ·{' '}
                             {version.current ? 'Live' : version.status} ·{' '}
-                            {new Date(version.createdAt).toLocaleString()}
+                            {formatDateTime(version.createdAt)}
                           </option>
                         ))}
                       </select>
@@ -388,6 +398,7 @@ function Workspaces() {
                     >
                       {search.versionCursor ? (
                         <button
+                          type="button"
                           className="button button-paper"
                           onClick={() =>
                             navigate({
@@ -403,6 +414,7 @@ function Workspaces() {
                       ) : null}
                       {selected.history.nextCursor ? (
                         <button
+                          type="button"
                           className="button button-paper"
                           onClick={() =>
                             navigate({
@@ -421,21 +433,25 @@ function Workspaces() {
                     {selected.version ? (
                       <>
                         <div className="console-actions">
-                          <a
-                            href={
-                              selected.version.shareUrl ??
-                              selected.version.previewUrl ??
-                              undefined
-                            }
-                            target="_blank"
-                            rel="noreferrer"
-                          >
-                            Open this version ↗
-                          </a>
+                          {(selected.version.shareUrl ??
+                          selected.version.previewUrl) ? (
+                            <a
+                              href={
+                                selected.version.shareUrl ??
+                                selected.version.previewUrl ??
+                                undefined
+                              }
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              Open this version ↗
+                            </a>
+                          ) : null}
                           {editor &&
                           selected.version.status === 'ready' &&
                           !selected.version.current ? (
                             <button
+                              type="button"
                               className="button button-ink"
                               disabled={mutation.busy}
                               onClick={() =>
@@ -443,6 +459,7 @@ function Workspaces() {
                                   title: 'Make this version live?',
                                   description:
                                     'Production will point to this version. Review its differences below before confirming.',
+                                  tone: 'neutral',
                                   action: {
                                     action: 'promote',
                                     workspace: selected.id,
@@ -524,6 +541,7 @@ function Workspaces() {
                         >
                           {search.feedbackCursor ? (
                             <button
+                              type="button"
                               className="button button-paper"
                               onClick={() =>
                                 navigate({
@@ -538,6 +556,7 @@ function Workspaces() {
                           ) : null}
                           {selected.feedbackNextCursor ? (
                             <button
+                              type="button"
                               className="button button-paper"
                               onClick={() =>
                                 navigate({
@@ -574,15 +593,13 @@ function Workspaces() {
                             </b>
                             <small>
                               {' '}
-                              · {new Date(
-                                comment.createdAt,
-                              ).toLocaleString()} · {comment.path}
+                              · {formatDateTime(comment.createdAt)} ·{' '}
+                              {comment.path}
                             </small>
                             <p className="feedback-body">{comment.body}</p>
                             {comment.editedAt ? (
                               <small>
-                                Edited{' '}
-                                {new Date(comment.editedAt).toLocaleString()}
+                                Edited {formatDateTime(comment.editedAt)}
                               </small>
                             ) : null}
                             {comment.authorId === data.userId ? (
@@ -594,6 +611,7 @@ function Workspaces() {
                             <div className="console-actions">
                               {editor ? (
                                 <button
+                                  type="button"
                                   className="button button-paper"
                                   disabled={mutation.busy}
                                   onClick={() =>
@@ -612,6 +630,7 @@ function Workspaces() {
                               ) : null}
                               {owner || comment.authorId === data.userId ? (
                                 <button
+                                  type="button"
                                   className="button danger-link"
                                   disabled={mutation.busy}
                                   onClick={() =>
@@ -651,6 +670,8 @@ function Workspaces() {
         description={confirm?.description ?? ''}
         confirmLabel="Confirm"
         cancelLabel="Cancel"
+        eyebrow={confirm?.tone === 'neutral' ? 'CONFIRM CHANGE' : 'DANGER ZONE'}
+        tone={confirm?.tone ?? 'danger'}
         busy={mutation.busy}
         onCancel={() => setConfirm(null)}
         onConfirm={() =>
