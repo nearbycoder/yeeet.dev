@@ -298,8 +298,8 @@ async function serve(options) {
   const dir = options.dir
   const rootReal = realpathSync(dir)
   const port = options.port ?? 8787
-  if (!Number.isInteger(port) || port < 1 || port > 65535)
-    throw new Error('--port must be an integer between 1 and 65535.')
+  if (!Number.isInteger(port) || port < 0 || port > 65535)
+    throw new Error('--port must be an integer between 0 and 65535.')
   let projectConfig = {}
   const configFile = join(dir, '.yeeet.json')
   if (existsSync(configFile)) {
