@@ -127,7 +127,8 @@ export const customDomains = pgTable(
       .notNull()
       .references(() => user.id, { onDelete: 'cascade' }),
     hostname: text('hostname').notNull(),
-    railwayDomainId: text('railway_domain_id').notNull(),
+    railwayDomainId: text('railway_domain_id'),
+    dnsVerifiedAt: timestamp('dns_verified_at'),
     verificationToken: text('verification_token'),
     verificationHost: text('verification_host'),
     dnsRecords: text('dns_records').default('[]').notNull(),

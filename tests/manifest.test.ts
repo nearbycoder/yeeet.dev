@@ -10,7 +10,10 @@ import {
   validateManifest,
   versionUrl,
 } from '../src/server/deployments'
-import { normalizeCustomDomain } from '../src/server/custom-domains'
+import {
+  normalizeCustomDomain,
+  verifyCustomDomainDns,
+} from '../src/server/custom-domains'
 import { normalizeAnalyticsPath } from '../src/server/analytics'
 import {
   generateShareNonce,
@@ -677,5 +680,27 @@ test('normalizeCustomDomain rejects docs host and control-plane subdomains', asy
       assert.throws(() => normalizeCustomDomain('api.yeeet.dev'))
       assert.throws(() => normalizeCustomDomain('sub.docs.yeeet.dev'))
     },
+  )
+})
+
+test('customer domain verification requires its exact TXT token and exclusive edge routing', () => {
+  const token = 'yeeet-verify=claim'
+  const ip = '192.0.2.5'
+  const verified = { txt: [['yeeet-verify=', 'claim']], ipv4: [ip], ipv6: [] }
+  assert.deepEqual(verifyCustomDomainDns(verified, token, ip), {
+    ownsDomain: true,
+    routesToYeeet: true,
+  })
+  for (const answers of [
+    { ...verified, ipv4: [] },
+    { ...verified, ipv4: [ip, '192.0.2.99'] },
+    { ...verified, ipv6: ['2001:db8::1'] },
+  ]) {
+    assert.equal(verifyCustomDomainDns(answers, token, ip).routesToYeeet, false)
+  }
+  assert.equal(
+    verifyCustomDomainDns({ ...verified, txt: [[`${token}-other`]] }, token, ip)
+      .ownsDomain,
+    false,
   )
 })

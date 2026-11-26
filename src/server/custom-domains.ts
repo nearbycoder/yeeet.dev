@@ -1,7 +1,9 @@
 import { randomUUID } from 'node:crypto'
+import { Resolver } from 'node:dns/promises'
+import { connect } from 'node:tls'
 import { isIP } from 'node:net'
 import { domainToASCII } from 'node:url'
-import { and, eq } from 'drizzle-orm'
+import { and, eq, isNotNull } from 'drizzle-orm'
 import { parse } from 'tldts'
 import { db } from '#/db'
 import { customDomains, sites } from '#/db/schema'
@@ -13,75 +15,76 @@ type DnsRecord = {
   requiredValue: string
   currentValue?: string | null
   status: string
+  type?: 'A' | 'CNAME'
 }
 
-type RailwayDomainStatus = {
-  verificationToken?: string | null
-  dnsRecords?: Array<DnsRecord>
-  certificateStatus?: string | null
-}
-
-type RailwayCustomDomain = {
-  id: string
-  domain: string
-  status: RailwayDomainStatus
-}
-
-const RAILWAY_API = 'https://backboard.railway.com/graphql/v2'
-
-function railwayConfiguration() {
-  const projectId = process.env.RAILWAY_PROJECT_ID
-  const environmentId = process.env.RAILWAY_ENVIRONMENT_ID
-  const serviceId = process.env.RAILWAY_SERVICE_ID
-  const projectToken = process.env.RAILWAY_TOKEN
-  const apiToken = process.env.RAILWAY_API_TOKEN
-  if (
-    !projectId ||
-    !environmentId ||
-    !serviceId ||
-    (!projectToken && !apiToken)
-  ) {
+function configuration() {
+  const target = process.env.CUSTOM_DOMAIN_TARGET?.trim().toLowerCase()
+  const ip = process.env.CUSTOM_DOMAIN_IPV4?.trim()
+  if (!target || !ip || isIP(ip) !== 4) {
     throw new HttpError(
       503,
-      'Custom domains are not configured yet. The platform operator must add a Railway project token.',
+      'Custom domains are not configured on this Yeeet instance.',
       'custom_domains_unavailable',
     )
   }
-  const headers: Record<string, string> = projectToken
-    ? { 'Project-Access-Token': projectToken }
-    : { authorization: `Bearer ${apiToken}` }
+  return { target, ip }
+}
+
+function routingRecord(
+  hostname: string,
+  config: ReturnType<typeof configuration>,
+): DnsRecord {
+  const apex = !parse(hostname, { allowPrivateDomains: true }).subdomain
   return {
-    projectId,
-    environmentId,
-    serviceId,
-    headers,
+    hostlabel: hostname,
+    type: apex ? 'A' : 'CNAME',
+    requiredValue: apex ? config.ip : config.target,
+    status: 'PENDING',
   }
 }
 
-async function railwayGraphql<T>(
-  query: string,
-  variables: unknown,
-): Promise<T> {
-  const config = railwayConfiguration()
-  const response = await fetch(RAILWAY_API, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', ...config.headers },
-    body: JSON.stringify({ query, variables }),
-    signal: AbortSignal.timeout(15_000),
-  })
-  const body = (await response.json().catch(() => ({}))) as {
-    data?: T
-    errors?: Array<{ message?: string }>
-  }
-  if (!response.ok || !body.data || body.errors?.length) {
+async function dnsAnswers<T>(lookup: Promise<T[]>): Promise<T[]> {
+  try {
+    return await lookup
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code
+    if (code === 'ENODATA' || code === 'ENOTFOUND') return []
     throw new HttpError(
       502,
-      body.errors?.[0]?.message ||
-        `Railway domain provisioning failed (${response.status}).`,
-      'railway_domain_error',
+      'DNS lookup failed. Try checking again.',
+      'dns_lookup_failed',
     )
   }
-  return body.data
+}
+
+export function verifyCustomDomainDns(
+  answers: { txt: string[][]; ipv4: string[]; ipv6: string[] },
+  token: string,
+  ip: string,
+) {
+  const ownsDomain = answers.txt.some((entry) => entry.join('') === token)
+  // CNAMEs and flattened apex records share the same effective addresses.
+  const routesToYeeet =
+    answers.ipv4.length > 0 &&
+    answers.ipv4.every((address) => address === ip) &&
+    answers.ipv6.length === 0
+  return { ownsDomain, routesToYeeet }
+}
+
+function certificateIssued(hostname: string, ip: string) {
+  return new Promise<boolean>((resolve) => {
+    // Always connect to our edge. The customer hostname is used only for SNI.
+    const socket = connect({ host: ip, port: 443, servername: hostname })
+    const finish = (issued: boolean) => {
+      socket.destroy()
+      resolve(issued)
+    }
+    socket.setTimeout(8_000)
+    socket.once('secureConnect', () => finish(socket.authorized))
+    socket.once('timeout', () => finish(false))
+    socket.once('error', () => finish(false))
+  })
 }
 
 export function normalizeCustomDomain(value: string) {
@@ -94,7 +97,7 @@ export function normalizeCustomDomain(value: string) {
     hostname.includes('/') ||
     hostname.includes(':') ||
     hostname.startsWith('*.') ||
-    hostname.length > 253 ||
+    hostname.length > 253 - '_yeeet-verify.'.length ||
     labels.some(
       (label) =>
         !/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(label) ||
@@ -117,6 +120,7 @@ export function normalizeCustomDomain(value: string) {
       platformHost,
       platformDomain,
       docs,
+      process.env.CUSTOM_DOMAIN_TARGET?.trim().toLowerCase(),
       process.env.RAILWAY_PUBLIC_DOMAIN?.trim().toLowerCase(),
       process.env.RAILWAY_PRIVATE_DOMAIN?.trim().toLowerCase(),
     ].filter((entry): entry is string => Boolean(entry)),
@@ -136,11 +140,6 @@ export function normalizeCustomDomain(value: string) {
   return hostname
 }
 
-function verificationHost(hostname: string) {
-  const parsed = parse(hostname)
-  return `_railway-verify${parsed.subdomain ? `.${parsed.subdomain}` : ''}`
-}
-
 function parseDnsRecords(value: string): Array<DnsRecord> {
   try {
     const parsed = JSON.parse(value) as unknown
@@ -151,6 +150,14 @@ function parseDnsRecords(value: string): Array<DnsRecord> {
 }
 
 function domainResult(row: typeof customDomains.$inferSelect) {
+  const dnsRecords = parseDnsRecords(row.dnsRecords)
+  if (
+    !dnsRecords.length &&
+    process.env.CUSTOM_DOMAIN_TARGET &&
+    process.env.CUSTOM_DOMAIN_IPV4
+  ) {
+    dnsRecords.push(routingRecord(row.hostname, configuration()))
+  }
   return {
     id: row.id,
     siteId: row.siteId,
@@ -159,7 +166,8 @@ function domainResult(row: typeof customDomains.$inferSelect) {
     railwayDomainId: row.railwayDomainId,
     verificationToken: row.verificationToken,
     verificationHost: row.verificationHost,
-    dnsRecords: parseDnsRecords(row.dnsRecords),
+    dnsRecords,
+    dnsVerified: row.dnsVerifiedAt !== null,
     certificateStatus: row.certificateStatus,
     error: row.error,
     createdAt: row.createdAt.toISOString(),
@@ -205,44 +213,7 @@ export async function createCustomDomain(
 ) {
   const site = await ownedSite(userId, slug)
   const hostname = normalizeCustomDomain(value)
-  const existing = await db.query.customDomains.findFirst({
-    where: eq(customDomains.hostname, hostname),
-  })
-  if (existing) {
-    throw new HttpError(
-      409,
-      'That hostname is already connected to a Yeeet site.',
-      'domain_taken',
-    )
-  }
-
-  const config = railwayConfiguration()
-  // Project-scoped tokens may create domains for their environment but cannot
-  // call Railway's global customDomainAvailable query. The mutation performs
-  // the same authoritative validation without requiring broader credentials.
-  const created = await railwayGraphql<{
-    customDomainCreate: RailwayCustomDomain
-  }>(
-    `mutation customDomainCreate($input: CustomDomainCreateInput!) {
-      customDomainCreate(input: $input) {
-        id domain
-        status {
-          verificationToken
-          dnsRecords { hostlabel requiredValue status }
-        }
-      }
-    }`,
-    {
-      input: {
-        projectId: config.projectId,
-        environmentId: config.environmentId,
-        serviceId: config.serviceId,
-        domain: hostname,
-        targetPort: 8080,
-      },
-    },
-  )
-  const provider = created.customDomainCreate
+  const record = routingRecord(hostname, configuration())
   const [row] = await db
     .insert(customDomains)
     .values({
@@ -250,17 +221,12 @@ export async function createCustomDomain(
       siteId: site.id,
       userId,
       hostname,
-      railwayDomainId: provider.id,
-      verificationToken: provider.status.verificationToken,
-      verificationHost: verificationHost(hostname),
-      dnsRecords: JSON.stringify(provider.status.dnsRecords ?? []),
-      certificateStatus: provider.status.certificateStatus ?? 'PENDING',
+      verificationToken: `yeeet-verify=${randomUUID()}`,
+      verificationHost: `_yeeet-verify.${hostname}`,
+      dnsRecords: JSON.stringify([record]),
     })
     .returning()
-    .catch(async (error: unknown) => {
-      await removeRailwayCustomDomain(provider.id, {
-        ignoreNotFound: true,
-      }).catch(() => undefined)
+    .catch((error: unknown) => {
       if (pgErrorInfo(error).code === '23505') {
         throw new HttpError(
           409,
@@ -279,65 +245,84 @@ export async function refreshCustomDomain(
   id: string,
 ) {
   const domain = await ownedDomain(userId, id, slug)
-  const config = railwayConfiguration()
-  const result = await railwayGraphql<{
-    customDomain: RailwayCustomDomain | null
-  }>(
-    `query customDomain($id: String!, $projectId: String!) {
-      customDomain(id: $id, projectId: $projectId) {
-        id domain
-        status {
-          verificationToken
-          certificateStatus
-          dnsRecords { hostlabel requiredValue currentValue status }
-        }
-      }
-    }`,
-    { id: domain.railwayDomainId, projectId: config.projectId },
-  )
-  if (!result.customDomain) {
+  const config = configuration()
+  const resolver = new Resolver({ timeout: 2_000, tries: 2 })
+  if (!domain.verificationHost || !domain.verificationToken) {
     throw new HttpError(
-      404,
-      'Custom domain no longer exists in Railway.',
-      'not_found',
+      409,
+      'Remove and reattach this hostname to get verification records.',
+      'missing_domain_verification',
     )
   }
-  const status = result.customDomain.status
-  const [updated] = await db
+  const [txt, ipv4, ipv6] = await Promise.all([
+    dnsAnswers(resolver.resolveTxt(domain.verificationHost)),
+    dnsAnswers(resolver.resolve4(domain.hostname)),
+    dnsAnswers(resolver.resolve6(domain.hostname)),
+  ])
+  const { ownsDomain, routesToYeeet } = verifyCustomDomainDns(
+    { txt, ipv4, ipv6 },
+    domain.verificationToken,
+    config.ip,
+  )
+  const verified = ownsDomain && routesToYeeet
+  const record = routingRecord(domain.hostname, config)
+  record.status = routesToYeeet ? 'VALID' : 'PENDING'
+  const checkedAt = new Date()
+  const updatedRows = await db
     .update(customDomains)
     .set({
-      verificationToken: status.verificationToken,
-      dnsRecords: JSON.stringify(status.dnsRecords ?? []),
-      certificateStatus: status.certificateStatus ?? 'PENDING',
-      error: null,
-      updatedAt: new Date(),
+      dnsVerifiedAt: verified ? checkedAt : null,
+      dnsRecords: JSON.stringify([record]),
+      certificateStatus:
+        verified && domain.dnsVerifiedAt ? domain.certificateStatus : 'PENDING',
+      error: !ownsDomain
+        ? 'Add the verification TXT record, then check DNS again.'
+        : !routesToYeeet
+          ? 'Point this hostname exclusively at Yeeet, then check DNS again.'
+          : null,
+      updatedAt: checkedAt,
     })
     .where(eq(customDomains.id, domain.id))
     .returning()
-  return domainResult(updated)
+  const updated = updatedRows.at(0)
+  if (!updated)
+    throw new HttpError(404, 'Custom domain not found.', 'not_found')
+  if (!verified) return domainResult(updated)
+
+  const issued = await certificateIssued(domain.hostname, config.ip)
+  const checkedRows = await db
+    .update(customDomains)
+    .set({ certificateStatus: issued ? 'ISSUED' : 'PENDING' })
+    .where(
+      and(
+        eq(customDomains.id, domain.id),
+        eq(customDomains.dnsVerifiedAt, checkedAt),
+      ),
+    )
+    .returning()
+  return domainResult(
+    checkedRows.at(0) ?? (await ownedDomain(userId, id, slug)),
+  )
 }
 
-export async function removeRailwayCustomDomain(
-  id: string,
-  options: { ignoreNotFound?: boolean } = {},
-) {
+export async function customDomainTlsAllowed(hostname: string) {
+  if (!process.env.CUSTOM_DOMAIN_TARGET || !process.env.CUSTOM_DOMAIN_IPV4)
+    return false
   try {
-    await railwayGraphql<{ customDomainDelete: boolean }>(
-      `mutation customDomainDelete($id: String!) {
-        customDomainDelete(id: $id)
-      }`,
-      { id },
-    )
+    hostname = normalizeCustomDomain(hostname)
   } catch (error) {
-    if (
-      options.ignoreNotFound &&
-      error instanceof HttpError &&
-      /not found|does not exist/i.test(error.message)
-    ) {
-      return
-    }
+    if (error instanceof HttpError) return false
     throw error
   }
+  return Boolean(
+    await db.query.customDomains.findFirst({
+      columns: { id: true },
+      where: and(
+        eq(customDomains.hostname, hostname),
+        isNotNull(customDomains.dnsVerifiedAt),
+      ),
+    }),
+  )
 }
 
 export async function deleteCustomDomain(
@@ -346,9 +331,6 @@ export async function deleteCustomDomain(
   id: string,
 ) {
   const domain = await ownedDomain(userId, id, slug)
-  await removeRailwayCustomDomain(domain.railwayDomainId, {
-    ignoreNotFound: true,
-  })
   await db.delete(customDomains).where(eq(customDomains.id, domain.id))
   return { id: domain.id, hostname: domain.hostname, deleted: true }
 }

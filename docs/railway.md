@@ -89,23 +89,10 @@ must verify ownership before marking its email verified and running the bootstra
 administrator signs in, create, rotate, and revoke invitations from `/admin`.
 Never reuse a development invitation code in production.
 
-### Optional custom-domain provisioning
+### Customer-owned domains
 
-To let users attach their own domains, create a project-scoped token in Railway
-and add it to the app service:
-
-```text
-RAILWAY_TOKEN=<project-scoped token>
-```
-
-Railway automatically injects `RAILWAY_PROJECT_ID`, `RAILWAY_ENVIRONMENT_ID`,
-and `RAILWAY_SERVICE_ID`. An account token can be supplied as
-`RAILWAY_API_TOKEN`, but it has broader authority and is not recommended.
-
-Without a token, custom-domain actions are disabled while normal wildcard
-deployments continue to work. Railway may enforce per-service custom-domain
-quotas. The `*.site.example.com` wildcard is one service domain and does not
-consume another Railway domain for every Yeeet site.
+Yeeet uses a Caddy edge for [customer-owned domains](custom-domains.md).
+The Railway wildcard still serves the built-in site URLs.
 
 ## 3. Configure GitHub OAuth (optional)
 

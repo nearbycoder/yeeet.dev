@@ -48,8 +48,6 @@ uploads can use signed URLs.
 - A private Railway Bucket with S3-compatible credentials.
 - A domain whose DNS you can edit for wildcard site and docs routing.
 - Optional GitHub OAuth credentials for GitHub login.
-- An optional project-scoped Railway token for end-user custom-domain
-  provisioning. Wildcard deployments do not need it.
 
 ### Deployment Dependencies
 

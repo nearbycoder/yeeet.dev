@@ -14,7 +14,6 @@ import { hasAdminRole } from './actor'
 import type { Actor } from './actor'
 import { HttpError } from './http'
 import { siteUrl } from './platform-config'
-import { removeRailwayCustomDomain } from './custom-domains'
 import {
   createInvitation,
   listInvitations,
@@ -221,13 +220,6 @@ export async function deleteSite(actor: Actor, siteId: string) {
   const domains = await db.query.customDomains.findMany({
     where: eq(customDomains.siteId, site.id),
   })
-  await Promise.all(
-    domains.map((domain) =>
-      removeRailwayCustomDomain(domain.railwayDomainId, {
-        ignoreNotFound: true,
-      }),
-    ),
-  )
   const prefix = `sites/${site.id}/`
   await withSiteLock(site.id, site.userId, async (tx) => {
     await tx

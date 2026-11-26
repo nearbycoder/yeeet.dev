@@ -1,6 +1,6 @@
 import { candidatePaths, shouldUseSpaFallback } from '#/lib/route-resolution'
 import { previewHasExpired } from '#/lib/lifecycle'
-import { and, eq, inArray } from 'drizzle-orm'
+import { and, eq, inArray, isNotNull } from 'drizzle-orm'
 import { db } from '#/db'
 import {
   customDomains,
@@ -297,7 +297,12 @@ export async function maybeServeSite(
       })
       .from(customDomains)
       .innerJoin(sites, eq(customDomains.siteId, sites.id))
-      .where(eq(customDomains.hostname, target.hostname))
+      .where(
+        and(
+          eq(customDomains.hostname, target.hostname),
+          isNotNull(customDomains.dnsVerifiedAt),
+        ),
+      )
       .limit(1)
     deploymentId = mappedRows.at(0)?.activeDeploymentId ?? null
     siteSlug = mappedRows.at(0)?.slug ?? null

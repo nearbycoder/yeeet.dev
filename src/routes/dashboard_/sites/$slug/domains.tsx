@@ -131,13 +131,16 @@ function SiteDomains() {
                       {record.status === 'VALID' ? '✓ Valid' : '→ Required'}
                     </span>
                     <code>
-                      {record.hostlabel} CNAME {record.requiredValue}
+                      {record.hostlabel} {record.type ?? 'CNAME'}{' '}
+                      {record.requiredValue}
                     </code>
                   </div>
                 ))}
                 {domain.verificationToken ? (
                   <div>
-                    <span>→ Required</span>
+                    <span className={domain.dnsVerified ? 'is-valid' : ''}>
+                      {domain.dnsVerified ? '✓ Valid' : '→ Required'}
+                    </span>
                     <code>
                       {domain.verificationHost} TXT {domain.verificationToken}
                     </code>

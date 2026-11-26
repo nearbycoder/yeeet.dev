@@ -42,7 +42,6 @@ import {
   shareTokenForDeployment,
   validateDeploymentPassword,
 } from './deployment-access'
-import { removeRailwayCustomDomain } from './custom-domains'
 import { HttpError, pgErrorInfo } from './http'
 import { siteUrl } from './platform-config'
 import {
@@ -1483,13 +1482,6 @@ export async function deleteOwnedSite(userId: string, value: string) {
   const domains = await db.query.customDomains.findMany({
     where: eq(customDomains.siteId, site.id),
   })
-  await Promise.all(
-    domains.map((domain) =>
-      removeRailwayCustomDomain(domain.railwayDomainId, {
-        ignoreNotFound: true,
-      }),
-    ),
-  )
   const prefix = `sites/${site.id}/`
   await withSiteLock(site.id, userId, async (tx) => {
     await tx

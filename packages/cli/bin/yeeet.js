@@ -736,7 +736,7 @@ function printDomain(domain) {
   console.log(`  Certificate: ${domain.certificateStatus}`)
   for (const record of domain.dnsRecords || []) {
     console.log(
-      `  ${record.status === 'VALID' ? '✓' : '→'} ${record.hostlabel} CNAME ${record.requiredValue}`,
+      `  ${record.status === 'VALID' ? '✓' : '→'} ${record.hostlabel} ${record.type ?? 'CNAME'} ${record.requiredValue}`,
     )
   }
   if (domain.verificationToken) {
@@ -1630,7 +1630,7 @@ backendCommand
 
 const domainCommand = program
   .command('domain')
-  .description('Manage custom domains and Railway-managed TLS')
+  .description('Manage custom domains and TLS')
 
 domainCommand
   .command('list')

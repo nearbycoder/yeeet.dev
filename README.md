@@ -80,7 +80,7 @@ builds or replace a framework's build command.
 - Versioned `_headers` and `_redirects` rules for cache policy, security headers,
   redirects, and internal rewrites.
 - Password-protected deployments and revocable one-click private share links.
-- Custom domains with Railway-managed DNS verification and TLS.
+- Custom domains with DNS ownership verification and Caddy-managed TLS.
 - Private S3-compatible object storage behind a cache-aware asset gateway.
 - Automatic 1200×630 social cards with each site's original Yeeetling mascot.
 - Email/password and GitHub login through Better Auth.
@@ -382,11 +382,8 @@ The detailed guide covers variables, GitHub OAuth, bucket CORS, wildcard DNS,
 custom-domain provisioning, CDN policy, and verification:
 [Railway production setup](docs/railway.md).
 
-Custom domains are optional. If no Railway project token is configured, the
-rest of the platform remains usable and the custom-domain API reports that the
-feature is unavailable. Railway may apply per-service custom-domain quotas;
-the platform wildcard serves any number of Yeeet subdomains without creating a
-Railway domain for each site.
+Built-in wildcard sites work without per-site DNS records. For customer-owned
+domains on a VPS, see [Caddy custom-domain setup](docs/custom-domains.md).
 
 ## Local development
 
@@ -436,7 +433,7 @@ All deployment-specific values live in environment variables. Important ones:
 | `INITIAL_INVITATION_CODE`                        | Optional first invitation code                                    |
 | `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET`      | Optional GitHub OAuth app                                         |
 | `S3_*`                                           | Private S3-compatible bucket connection and credentials           |
-| `RAILWAY_TOKEN`                                  | Optional project token for user custom domains                    |
+| `CUSTOM_DOMAIN_TARGET` / `CUSTOM_DOMAIN_IPV4`    | Optional Caddy DNS target hostname and public IPv4 address        |
 | `MAX_DEPLOY_BYTES`                               | Per-deployment byte limit; defaults to 500 MB                     |
 | `BACKEND_RUNTIME_URL` / `BACKEND_RUNTIME_SECRET` | Optional private Bun runtime connection and shared signing secret |
 
